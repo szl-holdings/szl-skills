@@ -1,0 +1,14 @@
+{
+  "name": "szl-skills",
+  "owner": { "name": "SZL Holdings", "url": "https://github.com/szl-holdings" },
+  "metadata": { "description": "Fail-closed evidence and decision skills from SZL Holdings", "version": "0.1.0" },
+  "plugins": [
+    {
+      "name": "szl-evidence-skills",
+      "description": "TypeSafe Jev as a second reader (never the gate) and governed decisions that carry their own evidence.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/typesafe-ai", "./skills/szl-governed-decision"]
+    }
+  ]
+}
