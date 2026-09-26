@@ -1,5 +1,5 @@
 ---
-name: typesafe-ai
+name: szl-typesafe-ai
 license: Apache-2.0
 description: >
   TypeSafe/Jev: Choice/Noul/Score in code, not TypeScript types. System One

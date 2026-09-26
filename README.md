@@ -6,7 +6,7 @@ Fail-closed evidence and decision skills for Claude (Claude Science, Claude Code
 
 Claude Science: Skills > Import from GitHub, paste:
 
-    szl-holdings/szl-skills@v0.1.0
+    szl-holdings/szl-skills@v0.1.1
 
 Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills/.
 
@@ -14,10 +14,10 @@ Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills
 
 | Skill | What it does | What it does not do |
 |---|---|---|
-| typesafe-ai | Uses TypeSafe Jev (Choice / Noul / Score) as an optional second reader for evidence-class triage. Fail-closed: any error gives UNAVAILABLE, never PASS. | Not a gate. Not TypeScript, Zod, Pydantic, mypy, or JSON Schema. Never marks anything LIVE. |
+| szl-typesafe-ai | Uses TypeSafe Jev (Choice / Noul / Score) as an optional second reader for evidence-class triage. Fail-closed: any error gives UNAVAILABLE, never PASS. | Not a gate. Not TypeScript, Zod, Pydantic, mypy, or JSON Schema. Never marks anything LIVE. |
 | szl-governed-decision | Wraps a classifier, policy engine, or System One model so each decision carries its own evidence. | Does not prove a model output is true. Receipts cover integrity and origin only. |
 
-## Setup for typesafe-ai
+## Setup for szl-typesafe-ai
 
 Use your own TypeSafe key. Save it as a credential (Customize > Credentials > Add Credential, generic token, name typesafe) or as the environment variable TYPESAFE_API_KEY. Never paste it into chat.
 
