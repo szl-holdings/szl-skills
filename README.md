@@ -6,7 +6,7 @@ Fail-closed evidence and decision skills for Claude (Claude Science, Claude Code
 
 Claude Science: Skills > Import from GitHub, paste:
 
-    szl-holdings/szl-skills@v0.1.1
+    szl-holdings/szl-skills@v0.1.2
 
 Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills/.
 

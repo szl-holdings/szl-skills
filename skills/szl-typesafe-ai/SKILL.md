@@ -44,7 +44,7 @@ Code owns the workflow. Jev supplies typed judgments.
 | Degree on ordered levels | Score | overclaim_severity |
 
 Pack: `jev-plane/packs/overclaim_reader.json` (`szl.overclaim_reader.v1`).
-Client: `jev-plane/plane/client.py`. Compose: `jev-plane/plane/compose.py` plus `compose_overclaim.py`.
+Reference implementation (not bundled with this skill): the Jev client and compose helpers in [szl-typesafe-triage/jev-plane/plane](https://github.com/szl-holdings/szl-typesafe-triage/tree/8d73dd23f640aace362172fff55d82ef7de63f98/jev-plane/plane).
 Governed wrap: `skills/szl-governed-decision`.
 
 ## Fail-closed contract (non-negotiable)

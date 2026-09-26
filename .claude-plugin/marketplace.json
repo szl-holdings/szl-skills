@@ -1,7 +1,7 @@
 {
   "name": "szl-skills",
   "owner": { "name": "SZL Holdings", "url": "https://github.com/szl-holdings" },
-  "metadata": { "description": "Fail-closed evidence and decision skills from SZL Holdings", "version": "0.1.1" },
+  "metadata": { "description": "Fail-closed evidence and decision skills from SZL Holdings", "version": "0.1.2" },
   "plugins": [
     {
       "name": "szl-evidence-skills",
