@@ -6,7 +6,7 @@ Fail-closed evidence and decision skills for Claude (Claude Science, Claude Code
 
 Claude Science: Skills > Import from GitHub, paste:
 
-    szl-holdings/szl-skills@v0.1.2
+    szl-holdings/szl-skills@v0.1.3
 
 Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills/.
 
@@ -24,3 +24,10 @@ Use your own TypeSafe key. Save it as a credential (Customize > Credentials > Ad
 ## Provenance
 
 Built from szl-holdings/szl-typesafe-triage at commit 8d73dd23f640aace362172fff55d82ef7de63f98 (typesafe-ai source: GITHUB). License: Apache-2.0 (see LICENSE and NOTICE).
+## Specialists
+
+[specialists/szl-estate-auditor](specialists/szl-estate-auditor/SPECIALIST.md) describes a read-only Claude Science specialist that audits a GitHub org and a Hugging Face org against their public claims. Specialists are not imported with the skills; copy the fields into Customize > Specialists.
+
+## Checks
+
+Every push and pull request runs python tools/selfcheck.py. See [CHANGELOG.md](CHANGELOG.md).
