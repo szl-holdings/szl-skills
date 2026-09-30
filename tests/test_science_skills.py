@@ -265,6 +265,21 @@ class CapsuleTests(unittest.TestCase):
 
 
 class PackagingTests(unittest.TestCase):
+    def test_release_packages_match_immutable_git_blobs_and_are_deterministic(self):
+        package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
+        import zipfile
+        revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, capture_output=True, text=True).stdout.strip()
+        with tempfile.TemporaryDirectory() as temp:
+            first = package["package_skills"](pathlib.Path(temp) / "one", revision)
+            second = package["package_skills"](pathlib.Path(temp) / "two", revision)
+            self.assertEqual(first, second)
+            for report in first:
+                with zipfile.ZipFile(pathlib.Path(temp) / "one" / report["archive"]) as archive:
+                    expected = package["git_bytes"](revision, "skills/" + report["skill"] + "/SKILL.md")
+                    self.assertEqual(archive.read("SKILL.md"), expected)
+            with self.assertRaises(ValueError):
+                package["package_skills"](pathlib.Path(temp) / "bad", "main")
+
     def test_archives_contain_standalone_entrypoints_and_run(self):
         package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
         import zipfile

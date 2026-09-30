@@ -5,7 +5,7 @@ packages. They do not establish successful application import or measured agent 
 
 ## Checks
 
-The behavioral/packaging/SDK-contract suite ran 45 tests on Windows Python 3.11: 44 passed
+The behavioral/packaging/SDK-contract suite ran 46 tests on Windows Python 3.11: 45 passed
 and one symlink-creation test was skipped because the host denied symlink creation.
 The existing paired-comparison suite passed all 12 tests. Repository selfcheck and the
 generated-workbench drift check passed. CI runs the same suites on Linux Python 3.12.

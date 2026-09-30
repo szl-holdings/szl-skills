@@ -79,7 +79,10 @@ For individual upload packages (no installs), run:
 python tools/package_science.py --output-dir ../science-skill-packages
 ```
 
-Each ZIP has SKILL.md and kernel.py at its root plus its CLI, examples and license notices.
+Each ZIP has SKILL.md at its root plus its explicit helpers, CLI, resources and license notices.
+For releases, pass --revision with the full 40-character commit: the builder reads immutable
+Git blobs and writes deterministic archives, so Windows line endings or local edits cannot
+change what is attributed to that source revision.
 Use the import mechanism available in your Claude Science version. [CLAUDE_SCIENCE_SETUP.md](CLAUDE_SCIENCE_SETUP.md)
 provides the supported SDK installer and curated SZL_SCIENCE specialist with application
 readbacks. Actual application registration and agent task performance remain unverified
