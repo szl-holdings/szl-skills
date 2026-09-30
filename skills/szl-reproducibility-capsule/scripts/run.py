@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Portable offline CLI; every skill contains its own identical copy."""
+"""Portable offline manifest CLI; replay declarations are never executed."""
 import argparse
 import json
 import pathlib

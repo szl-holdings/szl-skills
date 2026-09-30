@@ -1,49 +1,45 @@
 ---
 name: szl-math-claim-check
-description: Turn a mathematical claim into explicit assumptions, numerical checks and proof obligations. Use for conjectures, invariant tests, formula validation, counterexample searches, or distinguishing Lean-checked results from numerical observations.
+description: Audit a mathematical claim's assumptions, supplied formal proof records and runtime scope, or check bounded numerical observations. Use when a theorem, formula or implementation is presented as evidence and its exact proposition, domain, numeric semantics and proof obligations need to remain distinct.
 license: Apache-2.0
 ---
 
+The numerical `szl_weighted_geomean` helper accepts axes in [0,1] and nonnegative
+weights that sum to one; omitted weights are uniform. Normalize conventional
+weights before calling it. A zero axis with positive weight pins the result to zero.
+
 # Mathematical claim checking
 
-Write the exact statement, quantifiers, domain, units and assumptions before testing.
-Separate definitions, assumptions, cited theorems, conjectures and proof obligations.
-Prefer a small falsifying example to many successful random samples.
+Write the exact statement, quantifiers, domain and assumptions. Separate definitions,
+cited theorems, conjectures, numerical observations and remaining proof obligations.
 
-- Inspect the actual formula and its domain. Include zeros, boundaries, extreme scales and
-  zero weights when permitted. Fix tolerances before the run.
-- Derive or execute the calculation in a reviewed local implementation. Cases contain
-  `inputs`, `lhs` and `rhs`. Call `szl_check_math_cases` from `kernel.py` with an explicit
-  equal, le or ge relation. Do not eval a formula string from a paper or dataset.
-- Inspect rounding, units and domain membership before interpreting an apparent failure.
-  Use rational or high-precision arithmetic where useful. A numerical discrepancy is not
-  automatically an exact mathematical refutation.
-- For Lean, inspect the pinned project, toolchain and dependency lock. Run the relevant
-  target if available; inspect sorry, admit and the theorem's assumptions, including
-  `#print axioms`. Retain command, exit status and revision. A repository's PROVEN label
-  does not replace those observations.
+For a theorem-to-runtime claim, read [the scope contract](references/scope-contract.md).
+Supply immutable source/toolchain/dependency observations, the actual theorem symbol,
+proposition bytes, retained checker log and its transitive axiom observations. Review the
+informal-to-formal and formal-to-runtime correspondence with evidence; a text search for
+`sorry` or a repository's PROVEN label cannot establish this correspondence. Call
+`szl_audit_math_scope(contract)` or run `python scripts/run.py assets/scope-example.json`.
+The helper checks bindings, missing assumptions, interval extensions, one-way claims
+presented as iff, unfinished proof observations, custom axioms and numeric boundary review.
+It reads supplied records only; it never invokes Lean, evaluates formulas or executes a
+source's command. `STRUCTURAL_CHECKS_PASSED` leaves `proof_discharged: false`.
 
-`szl_weighted_geomean(axes, weights)` is a strict [0,1] numerical helper. A zero-valued axis
-with positive weight pins the aggregate to zero; a zero weight ignores its axis. This differs
-deliberately from older SZL gates that veto every zero axis regardless of weight; never
-silently substitute it into a production gate. Lambda uniqueness remains **Conjecture 1 (OPEN)**.
-NO_COUNTEREXAMPLE_IN_TESTED_CASES is not a theorem or proof of uniqueness.
+For numerical cases, use the existing `szl_check_math_cases(claim, cases, relation, atol,
+rtol)` API or `python scripts/run.py assets/example.json`. Fix tolerances and tested domain
+before observations; include zeros, boundaries and extreme scales when permitted. Cases
+supply reviewed `inputs`, `lhs`, `rhs`. Inspect exact arithmetic and rounding before treating
+a discrepancy as mathematical refutation. Successful samples establish only
+NO_COUNTEREXAMPLE_IN_TESTED_CASES. `szl_weighted_geomean` remains a strict [0,1] helper:
+positive-weight zeros pin the result to zero; zero-weight axes are ignored. Do not silently
+replace a production gate with it. Lambda remains **Conjecture 1 (OPEN)**.
 
-Return the statement, assumptions, source revision, tested domain, failures with inputs,
-and remaining proof obligations.
+Return the bound statement/proposition/source hashes, findings, tested domain and remaining
+obligations. Retain failures. Unrun scientific or behavioral evaluation is NOT_MEASURED.
+Sensitive scientific use and licensing decisions require human approval.
 
-```bash
-python scripts/run.py assets/example.json
-```
+Runtime: Python 3.10+ stdlib, offline, keyless; CLI input capped at 8 MiB. Scope comparison
+supports named real intervals, not arbitrary logical predicates or semantic proof checking.
+No external service, model/provider/GPU call or dependency installation is bundled.
+Read [provenance](references/provenance.md) for source pins and source-rights boundaries.
 
-Input supplies `claim`, `cases`, optional `relation`, `atol`, `rtol`. The example tests the
-false statement that the geometric mean always equals the minimum.
-
-SZL anchors: [formula source](https://github.com/szl-holdings/szl-formulas/tree/65c800b59249f27559de575bc66f5054fa585fa5),
-[Lean source](https://github.com/szl-holdings/lutar-lean/tree/ff4bfecbf6585677f75684c72dd4014c78135366),
-[formula dataset](https://huggingface.co/datasets/SZLHOLDINGS/canonical-formulas-v1/tree/99c45c0989676f9a842a707ab5af60f1e2de99ce).
-The helper does not run those projects automatically or certify proof status.
-Outside services: none offline. Optional source retrieval sends identifiers to GitHub or
-Hugging Face; only private sources require credentials.
-
-Runtime: Python 3.10+ offline; Lean is optional and must already be available for formal checking.
+Modified 2026-09-30: added the original supplied-record scope audit and its boundaries.

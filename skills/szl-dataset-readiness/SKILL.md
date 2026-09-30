@@ -1,49 +1,29 @@
 ---
 name: szl-dataset-readiness
-description: Inspect scientific tables for missing fields, exact duplicates, cross-split feature or subject leakage, and declared provenance and reuse terms. Use before training, evaluation, dataset sharing or admission into a research second brain.
+description: Audit selected scientific tables for exact feature and entity leakage, temporal availability and split-order faults, and preprocessing fit-scope leakage bound to actual row IDs. Use before research training or evaluation; missing evidence stays unknown and this audit does not approve scientific suitability or data rights.
 license: Apache-2.0
 ---
 
 # Dataset readiness
 
-Establish the scientific task, observation unit, labels, subject grouping and split design.
-Record immutable source revision, source locator, collection description, consent/access
-conditions and stated reuse terms. License metadata alone does not establish permission to
-reuse personal data or every upstream item.
+Modified 2026-09-30; original SZL additions. Python 3.10+ and stdlib, offline.
 
-Call `szl_audit_dataset` from `kernel.py` on selected rows with explicit `feature_columns`,
-`split_column`, optional `group_column`, and `metadata`. Choose identity-defining content;
-exclude row ids and split names so copies across splits can be detected. Use subject or
-experiment ids as the group column when those units must stay together.
+Establish the observation unit, prediction origin, entity boundaries and intended
+split design before selecting columns. Call `szl_audit_dataset` in `kernel.py` on
+explicitly bounded rows. Retain the existing exact-feature/group checks; provide
+`leakage_spec` to inspect entity, temporal and preprocessing evidence. Read
+[the contract](references/contract.md) when preparing that manifest or interpreting
+missing evidence. Metadata records source revision and terms without verifying them.
 
-The helper detects exact feature duplicates, subject overlap, missing selected values,
-inconsistent row keys and undeclared provenance/reuse metadata. It reports counts, indexes
-and digests rather than copied records. Hashes are not anonymization. NO_CHECKED_ISSUES means
-only these checks found nothing; readiness stays REVIEW and suitability is NOT_ASSESSED.
+Use content-defining features that exclude row ids and split names. Bind transform
+fit row ids to selected evidence, and distinguish label availability from label
+observation time. A TRAIN_ONLY declaration alone does not establish train-only fit.
+Do not silently sample, impute missing timestamps, or infer timezone/column semantics.
 
-Also inspect task-relevant label validity, distribution shift, collection bias, batch effects,
-temporal leakage and semantic near-duplicates with appropriate tools. State what was not
-checked. Sampling is a sample audit, not a full-dataset result. Retain original row ids when
-explaining findings to the scientist; never silently sample.
-
-```bash
-python scripts/run.py assets/example.json
-```
-
-Input: `rows`, `feature_columns`, optional `split_column`, `group_column`, `metadata`.
-Convert selected local CSV/Parquet into a bounded table with established local tools.
-The synthetic example intentionally duplicates train/test features and a subject.
-
-Useful SZL inputs:
-[formula registry](https://huggingface.co/datasets/SZLHOLDINGS/canonical-formulas-v1/tree/99c45c0989676f9a842a707ab5af60f1e2de99ce),
-[Lean theorem tree](https://huggingface.co/datasets/SZLHOLDINGS/lean-theorem-tree/tree/8283cc8b75a54142016c8ac7fac5695903a9e6ba),
-[receipts benchmark](https://huggingface.co/datasets/SZLHOLDINGS/governed-receipts-bench/tree/9e8a4921740f310d144012e27e3bb0cb34e733af).
-Inspect actual cards and file schemas first. The
-[second-brain dataset](https://huggingface.co/datasets/SZLHOLDINGS/szl-second-brain-inrepo/tree/c9823ec107fc1fd4df6166c4ad0a37c776ee7e64)
-declares license other; keep it an optional inspection source rather than bundling it.
-
-Outside services: none bundled. Optional Hub/GitHub retrieval sends repo/revision identifiers;
-private sources require existing credentials. No automatic upload, training admission,
-personal-data export or universal approval follows from the checks.
-
-Runtime: Python 3.10+; stdlib; offline JSON tables up to 100000 rows.
+Run `python scripts/run.py assets/leakage-clean.json` for a synthetic clean design;
+`assets/example.json` retains the earlier synthetic duplicate/subject example.
+Report findings and missing evidence together. NO_CHECKED_ISSUES applies only to
+the supplied checks and selected rows; readiness remains REVIEW. Human review is
+required for sensitive scientific use and licensing decisions. Digests are not
+anonymization. Semantic duplicates and causal leakage need independent investigation.
+No network, model calls, training, upload, or scientific-performance claim follows.
