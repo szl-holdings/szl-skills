@@ -1,0 +1,400 @@
+{
+  "schema": "szl.science-acceptance.v1",
+  "status": "PASS",
+  "tests_run": 132,
+  "failures": 0,
+  "errors": 0,
+  "skipped": [],
+  "seconds": 0.372,
+  "controls": {
+    "landlock_abi": 3,
+    "seccomp": "ENFORCED",
+    "no_new_privs": true,
+    "uid": 1000,
+    "network": "DENIED",
+    "child_process": "DENIED",
+    "outside_files": "DENIED",
+    "memory_bytes": 536870912,
+    "cpu_seconds": 60,
+    "file_size_bytes": 2097152
+  },
+  "preflight": {
+    "outside_fake_secret": "DENIED",
+    "host_mount": "DENIED",
+    "network_socket": "DENIED",
+    "child_process": "DENIED"
+  },
+  "input_inventory": [
+    {
+      "path": "skills/szl-analysis-plan-audit/SKILL.md",
+      "sha256": "cfcd5ca2a0ab00f6c909eab966a3d421357c9226fb98c609934287d5e21aaf47",
+      "bytes": 2410
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/assets/example.json",
+      "sha256": "52cb3ff1a4467b53b54e421d8f2fca8442305f1c2bb821deece751d5cc9663c4",
+      "bytes": 3208
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/kernel.py",
+      "sha256": "891744abe89a29bc12d9cb9cb39fba422593d0f2a514dec9f25051f9202b2c04",
+      "bytes": 15616
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/references/contract.md",
+      "sha256": "756cedf5e2d0d8e038eaa789267bdfe57b3635a8e8d4ecbb59f8264ceb04c598",
+      "bytes": 4763
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/references/provenance.md",
+      "sha256": "2eaf0ed3cffde1c9786c60fb4a31cd52e60c5d2563f58d671ec339aba497b7c7",
+      "bytes": 1287
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/scripts/run.py",
+      "sha256": "f68b224ba6130abadbe56d173c79c3837fb74f42119db893ae93621f10bea6a6",
+      "bytes": 1286
+    },
+    {
+      "path": "skills/szl-artifact-lineage/SKILL.md",
+      "sha256": "77664ad6fe3db1243f7f2fc6657d7424bdcc3b3825737117f96de62c1705e0d0",
+      "bytes": 2220
+    },
+    {
+      "path": "skills/szl-artifact-lineage/assets/example.json",
+      "sha256": "88f9b941d7e67b4d4f373aed1dae8030787dc7cd0b72a7afe51c907d1310aedc",
+      "bytes": 1918
+    },
+    {
+      "path": "skills/szl-artifact-lineage/kernel.py",
+      "sha256": "f269b17d530432696ed3b863f0d4b51729572c8a94f3703d455b51d439379254",
+      "bytes": 10651
+    },
+    {
+      "path": "skills/szl-artifact-lineage/references/contract.md",
+      "sha256": "b71369c879c9e41a505380fa243ac3c620dc42c9296a5a25d31db8f7d237ec56",
+      "bytes": 2754
+    },
+    {
+      "path": "skills/szl-artifact-lineage/references/provenance.md",
+      "sha256": "36cea20440d5df51de336fa332861d640ede94a2e301362cb1b8632e2dd74034",
+      "bytes": 1297
+    },
+    {
+      "path": "skills/szl-artifact-lineage/scripts/run.py",
+      "sha256": "871bcdc8cc425c6f9c9f36410dcd3d63234327d35d20bae2c9fae4b2d097371e",
+      "bytes": 1862
+    },
+    {
+      "path": "skills/szl-dataset-readiness/SKILL.md",
+      "sha256": "3ab24363f65d61c479b6f26b915117179ba41666cb7c32ba2b7570bd88ca1825",
+      "bytes": 1895
+    },
+    {
+      "path": "skills/szl-dataset-readiness/assets/example.json",
+      "sha256": "078be4964a2b75fbb59c5ea3131a0dff7b2e8139f621b644234d8a91ac39888a",
+      "bytes": 584
+    },
+    {
+      "path": "skills/szl-dataset-readiness/assets/leakage-clean.json",
+      "sha256": "6c2bfaf56c6348e7afbe4641d4a1ff414e955dce0b5a58214654de1695862e1a",
+      "bytes": 1161
+    },
+    {
+      "path": "skills/szl-dataset-readiness/kernel.py",
+      "sha256": "c0a8462908cda2407825af31e56f32d1b68cde07178f3364a34b920b4c2f202d",
+      "bytes": 17888
+    },
+    {
+      "path": "skills/szl-dataset-readiness/references/contract.md",
+      "sha256": "5d482a803d85ec03fe3112ffd3aea18113bdd0559e1f5f6018c7f4c24b8a563d",
+      "bytes": 4979
+    },
+    {
+      "path": "skills/szl-dataset-readiness/scripts/run.py",
+      "sha256": "57b1e0162bb3bfdcf84b8c6de979a274844062c7a8908ee760020a30734dc217",
+      "bytes": 3369
+    },
+    {
+      "path": "skills/szl-math-claim-check/SKILL.md",
+      "sha256": "2d029ceb4d1a56ee577c27235a866ea405f7539029204842c9898fa907c79bdc",
+      "bytes": 3091
+    },
+    {
+      "path": "skills/szl-math-claim-check/assets/example.json",
+      "sha256": "4caef130b7c4aafded7528caa936f425262be928cee69cd1261d4496dc4aaff4",
+      "bytes": 284
+    },
+    {
+      "path": "skills/szl-math-claim-check/assets/scope-example.json",
+      "sha256": "bc7a3e751f5ce2a72ae6dcb6c40417222088d693ceb3e0801bc519fd64c5bed3",
+      "bytes": 2484
+    },
+    {
+      "path": "skills/szl-math-claim-check/kernel.py",
+      "sha256": "21b120cef10917921cc624fc5ac1ed15ca92316eea331f37ac9cd9e3d9746951",
+      "bytes": 13556
+    },
+    {
+      "path": "skills/szl-math-claim-check/references/provenance.md",
+      "sha256": "005988c51496941c287fb10987b8121f8b6be80b0209ea8a55ededf69898b1a1",
+      "bytes": 1421
+    },
+    {
+      "path": "skills/szl-math-claim-check/references/scope-contract.md",
+      "sha256": "1c8ca9056424da90c2cbc4f20d4367107fa023857b23940316ef2531c9aab4db",
+      "bytes": 4420
+    },
+    {
+      "path": "skills/szl-math-claim-check/scripts/run.py",
+      "sha256": "8b99d4c235820f60c31c16144650fb27e852db0a0ec9472c45ca38e3390ddd4d",
+      "bytes": 3604
+    },
+    {
+      "path": "skills/szl-model-evaluation/SKILL.md",
+      "sha256": "b1d67805b371cb5443500d812f41647e73cd7e1a7fcc01d1f6804378b7c7d8bb",
+      "bytes": 3306
+    },
+    {
+      "path": "skills/szl-model-evaluation/assets/attempts-example.json",
+      "sha256": "0d815852140637c5820eb03bc29cbe440e2adf16aefeda1a2e3c00ce44bd1993",
+      "bytes": 709
+    },
+    {
+      "path": "skills/szl-model-evaluation/assets/example.json",
+      "sha256": "e748342c86e95aea85e4525d45d0771d9b3b9238ce7ca96d1da41fe29ed6b9b8",
+      "bytes": 285
+    },
+    {
+      "path": "skills/szl-model-evaluation/kernel.py",
+      "sha256": "2675ac754770a579bfffebb6bac42f2ee39b95185e768d5dc50976919a78fa2b",
+      "bytes": 15278
+    },
+    {
+      "path": "skills/szl-model-evaluation/references/contracts.md",
+      "sha256": "4d0256c214f09491b958c8bbbfac13d8c755fba8123c0e7360a54a1c430fb0fd",
+      "bytes": 4195
+    },
+    {
+      "path": "skills/szl-model-evaluation/scripts/run.py",
+      "sha256": "59585857dc7c8202ded3697dd8ce5b3621f8835f39646f0832ccc8f4e1529b7a",
+      "bytes": 3809
+    },
+    {
+      "path": "skills/szl-negative-control-audit/SKILL.md",
+      "sha256": "434acbd1ca43a63c71acce70cbb8c78852e4e25833e8a71b48815c3b438a7ecb",
+      "bytes": 2492
+    },
+    {
+      "path": "skills/szl-negative-control-audit/assets/example.json",
+      "sha256": "e216a67ceef52d13a40af89f9dd7659fa6947b3d2bb80d0b7f03fb96342cb472",
+      "bytes": 3048
+    },
+    {
+      "path": "skills/szl-negative-control-audit/kernel.py",
+      "sha256": "d270f51ab644cd069022456635361d2c10110134c27070f1502b75726408bb5d",
+      "bytes": 14984
+    },
+    {
+      "path": "skills/szl-negative-control-audit/references/contract.md",
+      "sha256": "5be747205c7e515010f1e2a5f433540337f38ca6c95ce1c88658f33b730a1f74",
+      "bytes": 4776
+    },
+    {
+      "path": "skills/szl-negative-control-audit/references/provenance.md",
+      "sha256": "758d69a4876a228d15c4dafefafd87b0d94c1feaaff0f16c7e8d0e6cdabafd17",
+      "bytes": 1351
+    },
+    {
+      "path": "skills/szl-negative-control-audit/scripts/run.py",
+      "sha256": "a4fa24bbeb941e08222a2018b39a0659f8b987c14759e3efd97e98e5c90477d9",
+      "bytes": 1287
+    },
+    {
+      "path": "skills/szl-paired-science/SKILL.md",
+      "sha256": "bba6aee75db992d287dd4572257db61e9c8b929c1579551d9776ed4644e995a5",
+      "bytes": 2383
+    },
+    {
+      "path": "skills/szl-paired-science/assets/example-v2.json",
+      "sha256": "547d2884eecc8d9e87ffa16604737c79627bccacdb7bc7711165aecdd724b4bb",
+      "bytes": 16693
+    },
+    {
+      "path": "skills/szl-paired-science/assets/fixture-lock.json",
+      "sha256": "2959b272e85e33d45cb3dba6b0159eb164f53e44ff0852ea041d9f6841df6a33",
+      "bytes": 144
+    },
+    {
+      "path": "skills/szl-paired-science/references/binding-contract.md",
+      "sha256": "ca47ab5c11d6e9e202eebe7b44559d7c0e7c92c30712ac990cc31a9ddde0b21a",
+      "bytes": 6781
+    },
+    {
+      "path": "skills/szl-paired-science/references/protocol.md",
+      "sha256": "fe8bab717215c02f59a809ae94dd9d0e719e92b2908081000b903258d99699ca",
+      "bytes": 3717
+    },
+    {
+      "path": "skills/szl-paired-science/scripts/qualify.py",
+      "sha256": "42ab6aad7fd2a101d00a574d92e6389f06a740b87bda0700a29e6f1d038c6838",
+      "bytes": 25366
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/SKILL.md",
+      "sha256": "0e1dfd85db316629d8cc6cc1bf19189fa6921278dd1dd802b33f3bd6408fd154",
+      "bytes": 3109
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/example.json",
+      "sha256": "7a58028e0e470a6aa1714a60519ecce8064ffcccd06d21719a56e509d2c4c641",
+      "bytes": 184
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/protocol.txt",
+      "sha256": "19cfdab1d5ae8440b0e0e796523c2edd8a8b759f7f207086bb347860a26f6b23",
+      "bytes": 270
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/analysis.py",
+      "sha256": "d9feed64ebc9c8a04324940127179f5d59eb9a27207af22018caba244f9afc93",
+      "bytes": 110
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/environment.json",
+      "sha256": "9e53a7bf9f7e689b58768a655c34dd411059f5f801f318871eb21c102ad74960",
+      "bytes": 77
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/input.txt",
+      "sha256": "c1a2420c7eb2a817586df8cf72ca871623468f50b37839cf900b70d6b7fa3cda",
+      "bytes": 58
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/plan.json",
+      "sha256": "56a14674f15569da3e84c461fcb02950e07e8ba6749d07450e348ea551896698",
+      "bytes": 107
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/result.txt",
+      "sha256": "4fbb536756e1258952e18bbc3bd6f9130da70297604ea7af2b7f73d7f5e9d3f3",
+      "bytes": 46
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay-example.json",
+      "sha256": "9ce63a733551771076db08082e144203c91fc06fcf9a695ccb0b42c9d0cc0f0b",
+      "bytes": 1166
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/kernel.py",
+      "sha256": "787762420ab3307867866d273351f4a4b00d834e696f49c1089ca7d5dbd286cf",
+      "bytes": 15542
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/references/contracts.md",
+      "sha256": "064954f01361cada034e2388a66d3c4eb365570cfd50a93e257dc8a1d9311e29",
+      "bytes": 5143
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/scripts/run.py",
+      "sha256": "607067b658d5ce0f7df24e1a6be4f88219e3193f4b0991dc2f3c709b999d37f4",
+      "bytes": 3373
+    },
+    {
+      "path": "skills/szl-research-anatomy/SKILL.md",
+      "sha256": "f52a0cb989b2fcc03e3c6e3883b1664fd63f24b003f6ce9d753121c68e92544b",
+      "bytes": 3291
+    },
+    {
+      "path": "skills/szl-research-anatomy/assets/example.json",
+      "sha256": "e70e56de4752037ab8a1b6f935f4388206c1786b0754d4c7a64a6360bd8d8e69",
+      "bytes": 1020
+    },
+    {
+      "path": "skills/szl-research-anatomy/assets/ledger-example.json",
+      "sha256": "4bb9c9e3614734226668618ccd50778302df4e95d17dbe2304d786e40cd3ff41",
+      "bytes": 1157
+    },
+    {
+      "path": "skills/szl-research-anatomy/kernel.py",
+      "sha256": "abc6ae213eb972534a8d97dc310dfdabaa2b61e41a96044dd564d8ff998963eb",
+      "bytes": 11946
+    },
+    {
+      "path": "skills/szl-research-anatomy/references/ledger-contract.md",
+      "sha256": "81d7eac7add4f41f071ac15310cac65bac28ff7d7ae67e344961b69b77038bcf",
+      "bytes": 3973
+    },
+    {
+      "path": "skills/szl-research-anatomy/references/provenance.md",
+      "sha256": "86c5642ef92bc984ff85298fc184fd26c06321f0c4691c7648449e499fbdc390",
+      "bytes": 1345
+    },
+    {
+      "path": "skills/szl-research-anatomy/scripts/run.py",
+      "sha256": "57b1e0162bb3bfdcf84b8c6de979a274844062c7a8908ee760020a30734dc217",
+      "bytes": 3369
+    },
+    {
+      "path": "skills/szl-unit-invariants/SKILL.md",
+      "sha256": "7926749caab7eff34875a4688a3211131ae63d033e22d6eaf8471a6751e77d79",
+      "bytes": 2387
+    },
+    {
+      "path": "skills/szl-unit-invariants/assets/example.json",
+      "sha256": "2493005472de06d52795684434d6686fb0f9afe458282ecbd9c73541bfa7f5d5",
+      "bytes": 874
+    },
+    {
+      "path": "skills/szl-unit-invariants/kernel.py",
+      "sha256": "3e34f2357f5f263be7063edbc4ed102983b247ed3f7b06f935edc4d2dfe22728",
+      "bytes": 12629
+    },
+    {
+      "path": "skills/szl-unit-invariants/references/contract.md",
+      "sha256": "8d5ba108d005f80d949f2594aebe577d0e08f099df78951d2296fe30cbdf9486",
+      "bytes": 3794
+    },
+    {
+      "path": "skills/szl-unit-invariants/references/provenance.md",
+      "sha256": "8d5606354a9fc98c97ad5ae73eafa8284a36ecb6a4d5aaa7f8828880e535fefa",
+      "bytes": 1237
+    },
+    {
+      "path": "skills/szl-unit-invariants/scripts/run.py",
+      "sha256": "74da18febf9eea5fa1efdcb908a9c963ce944639182b813662392b150a7dfda1",
+      "bytes": 1889
+    },
+    {
+      "path": "tests/test_science_attempts_replay.py",
+      "sha256": "493264a04cac5d199cec48ea5e6698c68dd1ee16d0326aa96137d571182e849c",
+      "bytes": 18379
+    },
+    {
+      "path": "tests/test_science_binding.py",
+      "sha256": "8c2aa917aec44c62e5c814ee22c443bce992c46a461c306fea35eaf6fb8fcb1e",
+      "bytes": 17823
+    },
+    {
+      "path": "tests/test_science_lineage_units.py",
+      "sha256": "d9fb4f020a7669527130b727f1c2b312bab24a0578cd45dafe512a7d0064f475",
+      "bytes": 17939
+    },
+    {
+      "path": "tests/test_science_plan_controls.py",
+      "sha256": "74410a10cdb0a07c8f8fb3856600638584956aba61db53537eba80ac1098354a",
+      "bytes": 17757
+    },
+    {
+      "path": "tests/test_science_scope_ledger.py",
+      "sha256": "47edb738d7443541150a1bb547d6f5ad532bc3aaef277e13021346aaa546a89b",
+      "bytes": 16353
+    }
+  ],
+  "test_output": "test_ambiguous_time_is_unknown_and_not_imputed (test_science_binding.DatasetLeakageTests.test_ambiguous_time_is_unknown_and_not_imputed) ... ok\ntest_complete_clean_evidence_keeps_review_boundary (test_science_binding.DatasetLeakageTests.test_complete_clean_evidence_keeps_review_boundary) ... ok\ntest_declaration_budgets_bound_nested_work (test_science_binding.DatasetLeakageTests.test_declaration_budgets_bound_nested_work) ... ok\ntest_entity_overlap_with_distinct_feature_values (test_science_binding.DatasetLeakageTests.test_entity_overlap_with_distinct_feature_values) ... ok\ntest_fit_heldout_rows_cannot_hide_behind_train_declaration (test_science_binding.DatasetLeakageTests.test_fit_heldout_rows_cannot_hide_behind_train_declaration) ... ok\ntest_future_observation_and_reversed_order_detected (test_science_binding.DatasetLeakageTests.test_future_observation_and_reversed_order_detected) ... ok\ntest_invalid_typed_and_duplicate_evidence_rejected (test_science_binding.DatasetLeakageTests.test_invalid_typed_and_duplicate_evidence_rejected) ... ok\ntest_missing_declarations_and_legacy_not_checked (test_science_binding.DatasetLeakageTests.test_missing_declarations_and_legacy_not_checked) ... ok\ntest_partial_fit_evidence_retains_observed_heldout_contradiction (test_science_binding.DatasetLeakageTests.test_partial_fit_evidence_retains_observed_heldout_contradiction) ... ok\ntest_timezone_offsets_order_as_utc (test_science_binding.DatasetLeakageTests.test_timezone_offsets_order_as_utc) ... ok\ntest_training_label_unavailable_at_evaluation_origin (test_science_binding.DatasetLeakageTests.test_training_label_unavailable_at_evaluation_origin) ... ok\ntest_transform_cannot_declare_heldout_scope_allowed (test_science_binding.DatasetLeakageTests.test_transform_cannot_declare_heldout_scope_allowed) ... ok\ntest_unresolved_fit_row_and_omitted_transform_are_unknown (test_science_binding.DatasetLeakageTests.test_unresolved_fit_row_and_omitted_transform_are_unknown) ... ok\ntest_absent_bindings_rejects_and_legacy_remains_declaration_only (test_science_binding.PairedBindingTests.test_absent_bindings_rejects_and_legacy_remains_declaration_only) ... ok\ntest_changed_input_target_or_corpus_cannot_reuse_old_envelopes (test_science_binding.PairedBindingTests.test_changed_input_target_or_corpus_cannot_reuse_old_envelopes) ... ok\ntest_cli_invalid_json_returns_nonzero_without_process_launch (test_science_binding.PairedBindingTests.test_cli_invalid_json_returns_nonzero_without_process_launch) ... ok\ntest_duplicate_substituted_or_missing_pair_evidence_invalid (test_science_binding.PairedBindingTests.test_duplicate_substituted_or_missing_pair_evidence_invalid) ... ok\ntest_false_loss_or_scale_cannot_qualify (test_science_binding.PairedBindingTests.test_false_loss_or_scale_cannot_qualify) ... ok\ntest_fully_rehashed_payload_cannot_own_frozen_input_truth (test_science_binding.PairedBindingTests.test_fully_rehashed_payload_cannot_own_frozen_input_truth) ... ok\ntest_invalid_bool_nonfinite_schema_and_missing_byte_types (test_science_binding.PairedBindingTests.test_invalid_bool_nonfinite_schema_and_missing_byte_types) ... ok\ntest_raw_digest_mismatch_and_absent_bytes_block (test_science_binding.PairedBindingTests.test_raw_digest_mismatch_and_absent_bytes_block) ... ok\ntest_scorer_and_prespecified_plan_changes_block (test_science_binding.PairedBindingTests.test_scorer_and_prespecified_plan_changes_block) ... ok\ntest_v2_without_separate_frozen_manifest_remains_declared (test_science_binding.PairedBindingTests.test_v2_without_separate_frozen_manifest_remains_declared) ... ok\ntest_valid_bound_fixture_readbacks_before_local_inference (test_science_binding.PairedBindingTests.test_valid_bound_fixture_readbacks_before_local_inference) ... ok\ntest_absent_attempt_is_missing_not_success (test_science_attempts_replay.AttemptLedgerTests.test_absent_attempt_is_missing_not_success) ... ok\ntest_all_failure_statuses_and_empty_observations_never_manufacture_metrics (test_science_attempts_replay.AttemptLedgerTests.test_all_failure_statuses_and_empty_observations_never_manufacture_metrics) ... ok\ntest_complete_success_preserves_actual_binary_scoring (test_science_attempts_replay.AttemptLedgerTests.test_complete_success_preserves_actual_binary_scoring) ... ok\ntest_duplicate_unplanned_wrong_row_and_saved_correctness_rejected (test_science_attempts_replay.AttemptLedgerTests.test_duplicate_unplanned_wrong_row_and_saved_correctness_rejected) ... ok\ntest_invalid_output_is_completed_and_unsuccessful (test_science_attempts_replay.AttemptLedgerTests.test_invalid_output_is_completed_and_unsuccessful) ... ok\ntest_invalid_plan_labels_ids_and_bounds_rejected (test_science_attempts_replay.AttemptLedgerTests.test_invalid_plan_labels_ids_and_bounds_rejected) ... ok\ntest_nonfinite_boolean_out_of_range_and_non_success_probability_rejected (test_science_attempts_replay.AttemptLedgerTests.test_nonfinite_boolean_out_of_range_and_non_success_probability_rejected) ... ok\ntest_plan_digest_detects_label_change_and_is_order_independent (test_science_attempts_replay.AttemptLedgerTests.test_plan_digest_detects_label_change_and_is_order_independent) ... ok\ntest_timeout_keeps_planned_and_quality_denominators (test_science_attempts_replay.AttemptLedgerTests.test_timeout_keeps_planned_and_quality_denominators) ... ok\ntest_unavailable_is_recorded_but_not_attempted (test_science_attempts_replay.AttemptLedgerTests.test_unavailable_is_recorded_but_not_attempted) ... ok\ntest_bundled_replay_fixture_binds_actual_synthetic_bytes (test_science_attempts_replay.ReplayManifestTests.test_bundled_replay_fixture_binds_actual_synthetic_bytes) ... ok\ntest_changed_missing_and_tampered_prevent_readiness (test_science_attempts_replay.ReplayManifestTests.test_changed_missing_and_tampered_prevent_readiness) ... ok\ntest_complete_retained_manifest_is_ready_but_never_executes_source (test_science_attempts_replay.ReplayManifestTests.test_complete_retained_manifest_is_ready_but_never_executes_source) ... ok\ntest_duplicate_paths_outputs_and_invalid_roles_rejected (test_science_attempts_replay.ReplayManifestTests.test_duplicate_paths_outputs_and_invalid_roles_rejected) ... ok\ntest_environment_plan_output_digests_and_missing_roles_rejected (test_science_attempts_replay.ReplayManifestTests.test_environment_plan_output_digests_and_missing_roles_rejected) ... ok\ntest_file_count_size_and_metadata_bounds_rejected_before_sweeps (test_science_attempts_replay.ReplayManifestTests.test_file_count_size_and_metadata_bounds_rejected_before_sweeps) ... ok\ntest_legacy_strings_and_no_replay_are_supported (test_science_attempts_replay.ReplayManifestTests.test_legacy_strings_and_no_replay_are_supported) ... ok\ntest_manifest_is_deterministic_and_self_consistent_duplicates_are_refused (test_science_attempts_replay.ReplayManifestTests.test_manifest_is_deterministic_and_self_consistent_duplicates_are_refused) ... ok\ntest_numeric_policy_is_validated_not_applied (test_science_attempts_replay.ReplayManifestTests.test_numeric_policy_is_validated_not_applied) ... ok\ntest_shell_credential_args_capabilities_seed_and_resource_bounds_rejected (test_science_attempts_replay.ReplayManifestTests.test_shell_credential_args_capabilities_seed_and_resource_bounds_rejected) ... ok\ntest_symlink_and_reparse_roots_refused (test_science_attempts_replay.ReplayManifestTests.test_symlink_and_reparse_roots_refused) ... ok\ntest_traversal_absolute_private_configuration_and_secret_fields_rejected (test_science_attempts_replay.ReplayManifestTests.test_traversal_absolute_private_configuration_and_secret_fields_rejected) ... ok\ntest_typed_denial_field_is_valid_but_injected_replay_credentials_are_not (test_science_attempts_replay.ReplayManifestTests.test_typed_denial_field_is_valid_but_injected_replay_credentials_are_not) ... ok\ntest_boundary_inclusion_and_narrowing (test_science_scope_ledger.MathScopeTests.test_boundary_inclusion_and_narrowing) ... ok\ntest_changed_informal_statement_breaks_correspondence (test_science_scope_ledger.MathScopeTests.test_changed_informal_statement_breaks_correspondence) ... ok\ntest_complete_binding_passes_structure_without_certifying_proof (test_science_scope_ledger.MathScopeTests.test_complete_binding_passes_structure_without_certifying_proof) ... ok\ntest_deterministic_report_ignores_mapping_and_assumption_order (test_science_scope_ledger.MathScopeTests.test_deterministic_report_ignores_mapping_and_assumption_order) ... ok\ntest_failed_checker_and_pin_mismatch_are_retained (test_science_scope_ledger.MathScopeTests.test_failed_checker_and_pin_mismatch_are_retained) ... ok\ntest_floating_point_correspondence_requires_recorded_review (test_science_scope_ledger.MathScopeTests.test_floating_point_correspondence_requires_recorded_review) ... ok\ntest_missing_log_is_unknown_and_forged_digest_is_blocked (test_science_scope_ledger.MathScopeTests.test_missing_log_is_unknown_and_forged_digest_is_blocked) ... ok\ntest_missing_readback_and_changed_implementation_cannot_pass (test_science_scope_ledger.MathScopeTests.test_missing_readback_and_changed_implementation_cannot_pass) ... ok\ntest_one_direction_cannot_establish_iff (test_science_scope_ledger.MathScopeTests.test_one_direction_cannot_establish_iff) ... ok\ntest_runtime_domain_extension_and_missing_assumption_block (test_science_scope_ledger.MathScopeTests.test_runtime_domain_extension_and_missing_assumption_block) ... ok\ntest_types_nonfinite_duplicate_ids_and_schema_are_rejected (test_science_scope_ledger.MathScopeTests.test_types_nonfinite_duplicate_ids_and_schema_are_rejected) ... ok\ntest_unfinished_proof_and_custom_or_unreviewed_axioms_block (test_science_scope_ledger.MathScopeTests.test_unfinished_proof_and_custom_or_unreviewed_axioms_block) ... ok\ntest_wrong_theorem_and_changed_proposition_are_blocked (test_science_scope_ledger.MathScopeTests.test_wrong_theorem_and_changed_proposition_are_blocked) ... ok\ntest_changed_source_uses_evidence_edges_as_dependencies (test_science_scope_ledger.ResearchLedgerTests.test_changed_source_uses_evidence_edges_as_dependencies) ... ok\ntest_conflicting_evidence_is_retained_and_propagated (test_science_scope_ledger.ResearchLedgerTests.test_conflicting_evidence_is_retained_and_propagated) ... ok\ntest_contradiction_without_recorded_support_still_requires_review (test_science_scope_ledger.ResearchLedgerTests.test_contradiction_without_recorded_support_still_requires_review) ... ok\ntest_correction_preserves_unsigned_history_and_link_descendants (test_science_scope_ledger.ResearchLedgerTests.test_correction_preserves_unsigned_history_and_link_descendants) ... ok\ntest_current_support_and_qualification_preserve_boundary (test_science_scope_ledger.ResearchLedgerTests.test_current_support_and_qualification_preserve_boundary) ... ok\ntest_cycle_via_evidence_and_missing_parent_rejected (test_science_scope_ledger.ResearchLedgerTests.test_cycle_via_evidence_and_missing_parent_rejected) ... ok\ntest_expiry_is_inclusive_and_descendant_only (test_science_scope_ledger.ResearchLedgerTests.test_expiry_is_inclusive_and_descendant_only) ... ok\ntest_future_observation_and_clock_conflict (test_science_scope_ledger.ResearchLedgerTests.test_future_observation_and_clock_conflict) ... ok\ntest_invalid_time_timezone_equal_expiry_and_missing_observation_rejected (test_science_scope_ledger.ResearchLedgerTests.test_invalid_time_timezone_equal_expiry_and_missing_observation_rejected) ... ok\ntest_legacy_graph_and_functions_remain_supported (test_science_scope_ledger.ResearchLedgerTests.test_legacy_graph_and_functions_remain_supported) ... ok\ntest_no_clock_never_reports_expiry_checked (test_science_scope_ledger.ResearchLedgerTests.test_no_clock_never_reports_expiry_checked) ... ok\ntest_output_order_is_stable_for_permuted_nodes_and_links (test_science_scope_ledger.ResearchLedgerTests.test_output_order_is_stable_for_permuted_nodes_and_links) ... ok\ntest_retraction_and_correction_do_not_disappear (test_science_scope_ledger.ResearchLedgerTests.test_retraction_and_correction_do_not_disappear) ... ok\ntest_completed_negative_audit_returns_one_and_retains_findings (test_science_lineage_units.CliContractTests.test_completed_negative_audit_returns_one_and_retains_findings) ... ok\ntest_duplicate_keys_nonfinite_json_and_size_limit_rejected (test_science_lineage_units.CliContractTests.test_duplicate_keys_nonfinite_json_and_size_limit_rejected) ... ok\ntest_standalone_cli_reports_and_exclusive_output_without_processes (test_science_lineage_units.CliContractTests.test_standalone_cli_reports_and_exclusive_output_without_processes) ... ok\ntest_bounds_and_sorted_findings (test_science_lineage_units.LineageTests.test_bounds_and_sorted_findings) ... ok\ntest_changed_source_readback_never_counts_as_match (test_science_lineage_units.LineageTests.test_changed_source_readback_never_counts_as_match) ... ok\ntest_complete_continuity_is_deterministic_and_not_execution (test_science_lineage_units.LineageTests.test_complete_continuity_is_deterministic_and_not_execution) ... ok\ntest_detached_input_and_missing_stage_are_findings (test_science_lineage_units.LineageTests.test_detached_input_and_missing_stage_are_findings) ... ok\ntest_duplicate_producer_and_cycle_are_rejected (test_science_lineage_units.LineageTests.test_duplicate_producer_and_cycle_are_rejected) ... ok\ntest_missing_edge_report_work_is_bounded (test_science_lineage_units.LineageTests.test_missing_edge_report_work_is_bounded) ... ok\ntest_missing_readback_reports_unobserved_input_and_output (test_science_lineage_units.LineageTests.test_missing_readback_reports_unobserved_input_and_output) ... ok\ntest_substituted_consumer_digest_breaks_all_three_bindings (test_science_lineage_units.LineageTests.test_substituted_consumer_digest_breaks_all_three_bindings) ... ok\ntest_substituted_producer_digest_breaks_parent_continuity (test_science_lineage_units.LineageTests.test_substituted_producer_digest_breaks_parent_continuity) ... ok\ntest_unknown_edge_invalid_pin_duplicate_id_and_unknown_field_rejected (test_science_lineage_units.LineageTests.test_unknown_edge_invalid_pin_duplicate_id_and_unknown_field_rejected) ... ok\ntest_unlisted_stage_and_orphan_derived_artifact_require_review (test_science_lineage_units.LineageTests.test_unlisted_stage_and_orphan_derived_artifact_require_review) ... ok\ntest_array_length_mismatch_is_not_broadcast (test_science_lineage_units.UnitInvariantTests.test_array_length_mismatch_is_not_broadcast) ... ok\ntest_bounded_failure_details_preserve_total_counts (test_science_lineage_units.UnitInvariantTests.test_bounded_failure_details_preserve_total_counts) ... ok\ntest_declared_dimension_mismatch_uses_actual_unit_dimension (test_science_lineage_units.UnitInvariantTests.test_declared_dimension_mismatch_uses_actual_unit_dimension) ... ok\ntest_duplicate_id_bad_dimension_negative_tolerance_and_expression_operation_rejected (test_science_lineage_units.UnitInvariantTests.test_duplicate_id_bad_dimension_negative_tolerance_and_expression_operation_rejected) ... ok\ntest_exact_conversion_and_speed_definition (test_science_lineage_units.UnitInvariantTests.test_exact_conversion_and_speed_definition) ... ok\ntest_inclusive_range_and_predeclared_tolerance_boundary (test_science_lineage_units.UnitInvariantTests.test_inclusive_range_and_predeclared_tolerance_boundary) ... ok\ntest_meters_plus_seconds_is_a_dimension_failure (test_science_lineage_units.UnitInvariantTests.test_meters_plus_seconds_is_a_dimension_failure) ... ok\ntest_missing_unsupported_offset_and_unknown_units_rejected (test_science_lineage_units.UnitInvariantTests.test_missing_unsupported_offset_and_unknown_units_rejected) ... ok\ntest_nonfinite_boolean_expression_and_numeric_magnitude_rejected (test_science_lineage_units.UnitInvariantTests.test_nonfinite_boolean_expression_and_numeric_magnitude_rejected) ... ok\ntest_product_sum_and_difference_follow_dimension_algebra (test_science_lineage_units.UnitInvariantTests.test_product_sum_and_difference_follow_dimension_algebra) ... ok\ntest_rounding_and_traps_are_independent_of_caller_context (test_science_lineage_units.UnitInvariantTests.test_rounding_and_traps_are_independent_of_caller_context) ... ok\ntest_thousandfold_scale_error_is_flagged_with_full_counts (test_science_lineage_units.UnitInvariantTests.test_thousandfold_scale_error_is_flagged_with_full_counts) ... ok\ntest_total_invariant_work_bound_is_enforced (test_science_lineage_units.UnitInvariantTests.test_total_invariant_work_bound_is_enforced) ... ok\ntest_zero_denominator_is_undefined_not_clamped (test_science_lineage_units.UnitInvariantTests.test_zero_denominator_is_undefined_not_clamped) ... ok\ntest_attempt_identity_and_timing_conflicts_are_detected (test_science_plan_controls.AnalysisPlanAuditTests.test_attempt_identity_and_timing_conflicts_are_detected) ... ok\ntest_changed_multiplicity_family_is_detected (test_science_plan_controls.AnalysisPlanAuditTests.test_changed_multiplicity_family_is_detected) ... ok\ntest_coherent_post_hoc_alpha_change_is_still_a_deviation (test_science_plan_controls.AnalysisPlanAuditTests.test_coherent_post_hoc_alpha_change_is_still_a_deviation) ... ok\ntest_correctly_bound_amendment_remains_exploratory (test_science_plan_controls.AnalysisPlanAuditTests.test_correctly_bound_amendment_remains_exploratory) ... ok\ntest_findings_are_stably_sorted (test_science_plan_controls.AnalysisPlanAuditTests.test_findings_are_stably_sorted) ... ok\ntest_fixed_plan_with_retained_failure_is_consistent (test_science_plan_controls.AnalysisPlanAuditTests.test_fixed_plan_with_retained_failure_is_consistent) ... ok\ntest_invalid_family_duplicates_booleans_nonfinite_and_extra_fields (test_science_plan_controls.AnalysisPlanAuditTests.test_invalid_family_duplicates_booleans_nonfinite_and_extra_fields) ... ok\ntest_malformed_result_digest_is_invalid_not_a_clean_report (test_science_plan_controls.AnalysisPlanAuditTests.test_malformed_result_digest_is_invalid_not_a_clean_report) ... ok\ntest_metric_direction_estimand_units_split_margin_and_exclusions_detected (test_science_plan_controls.AnalysisPlanAuditTests.test_metric_direction_estimand_units_split_margin_and_exclusions_detected) ... ok\ntest_missing_failed_attempt_cannot_disappear (test_science_plan_controls.AnalysisPlanAuditTests.test_missing_failed_attempt_cannot_disappear) ... ok\ntest_unproven_precommit_and_wrong_plan_digest_are_exploratory (test_science_plan_controls.AnalysisPlanAuditTests.test_unproven_precommit_and_wrong_plan_digest_are_exploratory) ... ok\ntest_unscheduled_attempt_and_stopping_change_are_detected (test_science_plan_controls.AnalysisPlanAuditTests.test_unscheduled_attempt_and_stopping_change_are_detected) ... ok\ntest_wrong_deviation_version_and_hash_are_detected (test_science_plan_controls.AnalysisPlanAuditTests.test_wrong_deviation_version_and_hash_are_detected) ... ok\ntest_abs_delta_boundary_is_inclusive (test_science_plan_controls.NegativeControlAuditTests.test_abs_delta_boundary_is_inclusive) ... ok\ntest_changed_input_and_scorer_are_detected_from_bytes (test_science_plan_controls.NegativeControlAuditTests.test_changed_input_and_scorer_are_detected_from_bytes) ... ok\ntest_changed_tolerance_cannot_hide_a_null_failure (test_science_plan_controls.NegativeControlAuditTests.test_changed_tolerance_cannot_hide_a_null_failure) ... ok\ntest_common_readout_alone_does_not_establish_shared_nuisance (test_science_plan_controls.NegativeControlAuditTests.test_common_readout_alone_does_not_establish_shared_nuisance) ... ok\ntest_consistent_synthetic_registry_binds_actual_bytes (test_science_plan_controls.NegativeControlAuditTests.test_consistent_synthetic_registry_binds_actual_bytes) ... ok\ntest_declared_artifact_hash_mismatch_is_not_accepted (test_science_plan_controls.NegativeControlAuditTests.test_declared_artifact_hash_mismatch_is_not_accepted) ... ok\ntest_duplicate_cycle_unbounded_and_nonfinite_inputs_are_invalid (test_science_plan_controls.NegativeControlAuditTests.test_duplicate_cycle_unbounded_and_nonfinite_inputs_are_invalid) ... ok\ntest_expected_null_with_directed_path_is_rejected (test_science_plan_controls.NegativeControlAuditTests.test_expected_null_with_directed_path_is_rejected) ... ok\ntest_failed_control_is_retained_without_numeric_estimate (test_science_plan_controls.NegativeControlAuditTests.test_failed_control_is_retained_without_numeric_estimate) ... ok\ntest_findings_are_stably_sorted (test_science_plan_controls.NegativeControlAuditTests.test_findings_are_stably_sorted) ... ok\ntest_identity_contamination_and_late_freeze_are_inconclusive (test_science_plan_controls.NegativeControlAuditTests.test_identity_contamination_and_late_freeze_are_inconclusive) ... ok\ntest_irrelevant_nuisance_is_not_shared (test_science_plan_controls.NegativeControlAuditTests.test_irrelevant_nuisance_is_not_shared) ... ok\ntest_missing_registered_control_is_inconclusive (test_science_plan_controls.NegativeControlAuditTests.test_missing_registered_control_is_inconclusive) ... ok\ntest_clean_synthetic_clis_return_zero (test_science_plan_controls.PlanControlCLITests.test_clean_synthetic_clis_return_zero) ... ok\ntest_duplicate_nonfinite_deep_and_unknown_schema_are_nonzero (test_science_plan_controls.PlanControlCLITests.test_duplicate_nonfinite_deep_and_unknown_schema_are_nonzero) ... ok\ntest_existing_output_is_retained_and_reports_failure (test_science_plan_controls.PlanControlCLITests.test_existing_output_is_retained_and_reports_failure) ... ok\ntest_inconclusive_and_exploratory_clis_return_one (test_science_plan_controls.PlanControlCLITests.test_inconclusive_and_exploratory_clis_return_one) ... ok\ntest_sidecar_ast_matches_loadable_conventions_and_schema (test_science_plan_controls.PlanControlCLITests.test_sidecar_ast_matches_loadable_conventions_and_schema) ... ok\n\n----------------------------------------------------------------------\nRan 132 tests in 0.372s\n\nOK\n",
+  "snapshot_path": "/tmp/szl-science-acceptance-88styig3",
+  "emitted_test_output": "",
+  "scientific_performance": "NOT_MEASURED",
+  "model_behavior": "NOT_MEASURED",
+  "scope": "Reviewed synthetic helper tests; no hostile-code certification or supplied-command replay"
+}

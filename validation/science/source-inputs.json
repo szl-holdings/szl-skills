@@ -1,0 +1,26 @@
+[
+  {
+    "library_file_id": "libfile_33f5e3a4e7288191a2ded38d59b45066",
+    "file_name": "sources.lock(1).json",
+    "bytes": 1072244,
+    "sha256": "a2ecf880bf9c7159b0ee7b05eed3b00afe0697962c51517ac78a5aa9df4e50ed"
+  },
+  {
+    "library_file_id": "libfile_9fed95a4decc8191bd18af5d81d76122",
+    "file_name": "ai4science-phase0-v4-evidence.zip",
+    "bytes": 6146710,
+    "sha256": "046175728acce48942e26aaf602fa61c2816eb99f4fe5baddbbc8e3cf6640938"
+  },
+  {
+    "library_file_id": "libfile_b5e6e4d3dcf48191a9feeab400a5d1d3",
+    "file_name": "szl-frontier-bibliography-2026-09-30.json",
+    "bytes": 40817,
+    "sha256": "670e02dde0d4d8bc914cef3cad98ccea71b93c57188b51c4d60e2a1947b4f34d"
+  },
+  {
+    "library_file_id": "libfile_8734d9095a8c819186bcdc7bca2e6d11",
+    "file_name": "ai4s-auditor-review.zip",
+    "bytes": 88174,
+    "sha256": "7f5ec8f3a72c3a8e3f2e94214950b6194e66c754265e5852d822ffdd385e2d5d"
+  }
+]

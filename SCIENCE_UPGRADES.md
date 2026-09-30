@@ -22,8 +22,9 @@ model/capsule entrypoint, kernel and CLI files, and regenerates their workbench 
 LICENSE terms and calibration/MIT attribution are retained; NOTICE now uses the actual
 `skills/szl-typesafe-ai` path. Static notice/inventory/mirror checks and all 73 upgrade
 fixtures passed again. These reports are retained as `validation/science/notice-upgrades-*`.
-This branch selects eight science skills and excludes the two evidence skills; the four
-new audit packages and twelve-science-skill routing belong to the companion source branch.
+The upgrade-only PR selects eight science skills and excludes the two evidence skills.
+The combined candidate adds four standalone audits for twelve science skills; all fourteen
+repository packages remain split into twelve science and two evidence skills.
 
 The P2 review follow-up preserves exact integer theorem/runtime interval endpoints,
 records out-of-range UTC normalization as UNKNOWN, and refuses option-shaped replay

@@ -23,7 +23,11 @@
         "./skills/szl-kernel-comparison",
         "./skills/szl-reproducibility-capsule",
         "./skills/szl-science-workbench",
-        "./skills/szl-paired-science"
+        "./skills/szl-paired-science",
+        "./skills/szl-artifact-lineage",
+        "./skills/szl-unit-invariants",
+        "./skills/szl-negative-control-audit",
+        "./skills/szl-analysis-plan-audit"
       ]
     }
   ]

@@ -1,7 +1,15 @@
 # Claude Science setup
 
-The repository and individual ZIPs use the application's supported skill formats. The
-candidate import line is in README. GitHub importing skills does not create a specialist.
+The source candidate contains fourteen skills: twelve science skills and two evidence
+skills. The SDK installer selects only the twelve science skills; it deliberately excludes
+szl-typesafe-ai and szl-governed-decision. Ten acceptance packages are six upgrades and four
+new audits; the existing workbench and kernel-comparison retain their separate checks.
+The historical v0.2.0-rc.1 tag contains eight science skills and does not include this
+expanded candidate. GitHub importing skills does not create a specialist.
+
+Use a clean, isolated checkout of the reviewed full source commit before staging resources.
+bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
+application registration requires separate human review and authorization.
 
 For supported SDK registration and specialist setup, select this repository as the Claude
 Science project. In that application's **repl** control-plane tool (not its scientific
@@ -15,18 +23,24 @@ receipt = setup["install"](host, resources, "claude-science-install-receipt.json
 print({"status": receipt["status"], "agent": receipt["agent"]})
 ```
 
-The SDK procedure stages eight skills, accepts the real sidecar gate when available,
-publishes through host.skills, reads every resource back, then creates SZL_SCIENCE with
-exactly the eight selected skills and zero connectors on creation. It does not switch the
+The SDK procedure stages twelve science skills, checks returned sidecar gates for edited
+kernel.py resources, publishes through host.skills and reads every resource back. A new
+SZL_SCIENCE profile requests exactly the twelve selected skills and zero connectors on
+creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
-`update=True` updates only these eight named SZL skills; protected bundled-name collisions
+`update=True` updates only these twelve named SZL skills; protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles
-retain their existing connectors/mode, which the receipt reports explicitly.
+retain additional skills and their existing connectors/mode, which the receipt reports
+explicitly. Creation and updating a matching profile therefore have different inventories.
 
 The receipt says PUBLISHED_AND_READ_BACK only after those application readbacks succeed.
 A kernel gate rejection, unavailable SDK, publish refusal or mismatch is a visible failure.
-An absent sidecar probe is recorded as PROBE_UNAVAILABLE. Publication is distinct from an
-agent task evaluation; the receipt retains NOT_EXECUTED for that until a pilot is run.
+An absent sidecar probe is recorded as PROBE_UNAVAILABLE, even when publication/readback
+succeeds. Unchanged kernels do not receive a fresh probe; CLI-only paired-science and
+workbench resources do not enter the kernel gate path. Confirm all intended resources in
+the actual application's supported import/runtime and retain unresolved checks separately.
+Publication/readback is distinct from real sidecar validation and agent task evaluation;
+the receipt retains NOT_EXECUTED for task evaluation until a pilot is run.
 
 Select the new specialist using the application's normal conversation picker. Pilot:
 

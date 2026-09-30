@@ -8,7 +8,8 @@ import pathlib
 import re
 
 NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check", "szl-dataset-readiness",
-         "szl-model-evaluation", "szl-kernel-comparison", "szl-reproducibility-capsule", "szl-paired-science"]
+         "szl-model-evaluation", "szl-kernel-comparison", "szl-reproducibility-capsule", "szl-paired-science",
+         "szl-artifact-lineage", "szl-unit-invariants", "szl-negative-control-audit", "szl-analysis-plan-audit"]
 AGENT = "SZL_SCIENCE"
 PROMPT = """You are SZL Science Workbench, a scientific workflow assistant. Connect the scientist's
 question to inspectable artifacts, selected calculations, actual outputs and retained
@@ -49,7 +50,7 @@ def install(host, resources, receipt_path, update=False):
     if receipt_path.exists():
         raise FileExistsError("Retain the previous receipt; choose a new receipt path")
     if set(resources) != set(NAMES):
-        raise ValueError("Expected the eight reviewed science skills")
+        raise ValueError("Expected the complete reviewed science skill inventory")
     inventory = {s["name"]: s for s in host.skills.list()}
     profiles = {a["name"]: a for a in host.agents.list()}
     if AGENT in profiles and profiles[AGENT].get("systemPrompt") != PROMPT:

@@ -1,0 +1,347 @@
+{
+  "status": "PASS",
+  "packages": 10,
+  "findings": [],
+  "inventory": [
+    {
+      "path": "skills/szl-dataset-readiness/assets/example.json",
+      "sha256": "078be4964a2b75fbb59c5ea3131a0dff7b2e8139f621b644234d8a91ac39888a",
+      "bytes": 584
+    },
+    {
+      "path": "skills/szl-dataset-readiness/assets/leakage-clean.json",
+      "sha256": "6c2bfaf56c6348e7afbe4641d4a1ff414e955dce0b5a58214654de1695862e1a",
+      "bytes": 1161
+    },
+    {
+      "path": "skills/szl-dataset-readiness/kernel.py",
+      "sha256": "c0a8462908cda2407825af31e56f32d1b68cde07178f3364a34b920b4c2f202d",
+      "bytes": 17888
+    },
+    {
+      "path": "skills/szl-dataset-readiness/references/contract.md",
+      "sha256": "5d482a803d85ec03fe3112ffd3aea18113bdd0559e1f5f6018c7f4c24b8a563d",
+      "bytes": 4979
+    },
+    {
+      "path": "skills/szl-dataset-readiness/scripts/run.py",
+      "sha256": "57b1e0162bb3bfdcf84b8c6de979a274844062c7a8908ee760020a30734dc217",
+      "bytes": 3369
+    },
+    {
+      "path": "skills/szl-dataset-readiness/SKILL.md",
+      "sha256": "3ab24363f65d61c479b6f26b915117179ba41666cb7c32ba2b7570bd88ca1825",
+      "bytes": 1895
+    },
+    {
+      "path": "skills/szl-paired-science/assets/example-v2.json",
+      "sha256": "547d2884eecc8d9e87ffa16604737c79627bccacdb7bc7711165aecdd724b4bb",
+      "bytes": 16693
+    },
+    {
+      "path": "skills/szl-paired-science/assets/fixture-lock.json",
+      "sha256": "2959b272e85e33d45cb3dba6b0159eb164f53e44ff0852ea041d9f6841df6a33",
+      "bytes": 144
+    },
+    {
+      "path": "skills/szl-paired-science/references/binding-contract.md",
+      "sha256": "ca47ab5c11d6e9e202eebe7b44559d7c0e7c92c30712ac990cc31a9ddde0b21a",
+      "bytes": 6781
+    },
+    {
+      "path": "skills/szl-paired-science/references/protocol.md",
+      "sha256": "fe8bab717215c02f59a809ae94dd9d0e719e92b2908081000b903258d99699ca",
+      "bytes": 3717
+    },
+    {
+      "path": "skills/szl-paired-science/scripts/qualify.py",
+      "sha256": "42ab6aad7fd2a101d00a574d92e6389f06a740b87bda0700a29e6f1d038c6838",
+      "bytes": 25366
+    },
+    {
+      "path": "skills/szl-paired-science/SKILL.md",
+      "sha256": "bba6aee75db992d287dd4572257db61e9c8b929c1579551d9776ed4644e995a5",
+      "bytes": 2383
+    },
+    {
+      "path": "skills/szl-model-evaluation/assets/attempts-example.json",
+      "sha256": "0d815852140637c5820eb03bc29cbe440e2adf16aefeda1a2e3c00ce44bd1993",
+      "bytes": 709
+    },
+    {
+      "path": "skills/szl-model-evaluation/assets/example.json",
+      "sha256": "e748342c86e95aea85e4525d45d0771d9b3b9238ce7ca96d1da41fe29ed6b9b8",
+      "bytes": 285
+    },
+    {
+      "path": "skills/szl-model-evaluation/kernel.py",
+      "sha256": "bd8754c77a962eed07061a7b57d9894ccafbb39604cfc52d5db20e5052bf15e0",
+      "bytes": 15431
+    },
+    {
+      "path": "skills/szl-model-evaluation/references/contracts.md",
+      "sha256": "4d0256c214f09491b958c8bbbfac13d8c755fba8123c0e7360a54a1c430fb0fd",
+      "bytes": 4195
+    },
+    {
+      "path": "skills/szl-model-evaluation/scripts/run.py",
+      "sha256": "76baddf40cc1354265fbdd9c3e39bfb0c6195602ea9cea5abd5a027266d0fbe3",
+      "bytes": 3931
+    },
+    {
+      "path": "skills/szl-model-evaluation/SKILL.md",
+      "sha256": "58a76a509bdba4051be6a963c6210bddce621a309a1ac70d9235e14a1f479399",
+      "bytes": 3453
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/example.json",
+      "sha256": "7a58028e0e470a6aa1714a60519ecce8064ffcccd06d21719a56e509d2c4c641",
+      "bytes": 184
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/protocol.txt",
+      "sha256": "19cfdab1d5ae8440b0e0e796523c2edd8a8b759f7f207086bb347860a26f6b23",
+      "bytes": 270
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/analysis.py",
+      "sha256": "d9feed64ebc9c8a04324940127179f5d59eb9a27207af22018caba244f9afc93",
+      "bytes": 110
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/environment.json",
+      "sha256": "9e53a7bf9f7e689b58768a655c34dd411059f5f801f318871eb21c102ad74960",
+      "bytes": 77
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/input.txt",
+      "sha256": "c1a2420c7eb2a817586df8cf72ca871623468f50b37839cf900b70d6b7fa3cda",
+      "bytes": 58
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/plan.json",
+      "sha256": "56a14674f15569da3e84c461fcb02950e07e8ba6749d07450e348ea551896698",
+      "bytes": 107
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay/result.txt",
+      "sha256": "4fbb536756e1258952e18bbc3bd6f9130da70297604ea7af2b7f73d7f5e9d3f3",
+      "bytes": 46
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/assets/replay-example.json",
+      "sha256": "9ce63a733551771076db08082e144203c91fc06fcf9a695ccb0b42c9d0cc0f0b",
+      "bytes": 1166
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/kernel.py",
+      "sha256": "b5822a1a3fbaa1173ec1cf05c28f463bea533cd70f2d0969b3e43ea460bc4150",
+      "bytes": 15672
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/references/contracts.md",
+      "sha256": "064954f01361cada034e2388a66d3c4eb365570cfd50a93e257dc8a1d9311e29",
+      "bytes": 5143
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/scripts/run.py",
+      "sha256": "da4f00fb8ff25bd8cd3c6f076e9b9109d69f1cb824d3a72e947e8a404c1657ed",
+      "bytes": 3507
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/SKILL.md",
+      "sha256": "595ecb8fb9e7cadf2469cf5ca415dabf4fd0175d91ba509db81e11c996b77e35",
+      "bytes": 3252
+    },
+    {
+      "path": "skills/szl-math-claim-check/assets/example.json",
+      "sha256": "4caef130b7c4aafded7528caa936f425262be928cee69cd1261d4496dc4aaff4",
+      "bytes": 284
+    },
+    {
+      "path": "skills/szl-math-claim-check/assets/scope-example.json",
+      "sha256": "bc7a3e751f5ce2a72ae6dcb6c40417222088d693ceb3e0801bc519fd64c5bed3",
+      "bytes": 2484
+    },
+    {
+      "path": "skills/szl-math-claim-check/kernel.py",
+      "sha256": "21b120cef10917921cc624fc5ac1ed15ca92316eea331f37ac9cd9e3d9746951",
+      "bytes": 13556
+    },
+    {
+      "path": "skills/szl-math-claim-check/references/provenance.md",
+      "sha256": "005988c51496941c287fb10987b8121f8b6be80b0209ea8a55ededf69898b1a1",
+      "bytes": 1421
+    },
+    {
+      "path": "skills/szl-math-claim-check/references/scope-contract.md",
+      "sha256": "1c8ca9056424da90c2cbc4f20d4367107fa023857b23940316ef2531c9aab4db",
+      "bytes": 4420
+    },
+    {
+      "path": "skills/szl-math-claim-check/scripts/run.py",
+      "sha256": "8b99d4c235820f60c31c16144650fb27e852db0a0ec9472c45ca38e3390ddd4d",
+      "bytes": 3604
+    },
+    {
+      "path": "skills/szl-math-claim-check/SKILL.md",
+      "sha256": "2d029ceb4d1a56ee577c27235a866ea405f7539029204842c9898fa907c79bdc",
+      "bytes": 3091
+    },
+    {
+      "path": "skills/szl-research-anatomy/assets/example.json",
+      "sha256": "e70e56de4752037ab8a1b6f935f4388206c1786b0754d4c7a64a6360bd8d8e69",
+      "bytes": 1020
+    },
+    {
+      "path": "skills/szl-research-anatomy/assets/ledger-example.json",
+      "sha256": "4bb9c9e3614734226668618ccd50778302df4e95d17dbe2304d786e40cd3ff41",
+      "bytes": 1157
+    },
+    {
+      "path": "skills/szl-research-anatomy/kernel.py",
+      "sha256": "abc6ae213eb972534a8d97dc310dfdabaa2b61e41a96044dd564d8ff998963eb",
+      "bytes": 11946
+    },
+    {
+      "path": "skills/szl-research-anatomy/references/ledger-contract.md",
+      "sha256": "81d7eac7add4f41f071ac15310cac65bac28ff7d7ae67e344961b69b77038bcf",
+      "bytes": 3973
+    },
+    {
+      "path": "skills/szl-research-anatomy/references/provenance.md",
+      "sha256": "86c5642ef92bc984ff85298fc184fd26c06321f0c4691c7648449e499fbdc390",
+      "bytes": 1345
+    },
+    {
+      "path": "skills/szl-research-anatomy/scripts/run.py",
+      "sha256": "57b1e0162bb3bfdcf84b8c6de979a274844062c7a8908ee760020a30734dc217",
+      "bytes": 3369
+    },
+    {
+      "path": "skills/szl-research-anatomy/SKILL.md",
+      "sha256": "f52a0cb989b2fcc03e3c6e3883b1664fd63f24b003f6ce9d753121c68e92544b",
+      "bytes": 3291
+    },
+    {
+      "path": "skills/szl-artifact-lineage/assets/example.json",
+      "sha256": "88f9b941d7e67b4d4f373aed1dae8030787dc7cd0b72a7afe51c907d1310aedc",
+      "bytes": 1918
+    },
+    {
+      "path": "skills/szl-artifact-lineage/kernel.py",
+      "sha256": "f269b17d530432696ed3b863f0d4b51729572c8a94f3703d455b51d439379254",
+      "bytes": 10651
+    },
+    {
+      "path": "skills/szl-artifact-lineage/references/contract.md",
+      "sha256": "b71369c879c9e41a505380fa243ac3c620dc42c9296a5a25d31db8f7d237ec56",
+      "bytes": 2754
+    },
+    {
+      "path": "skills/szl-artifact-lineage/references/provenance.md",
+      "sha256": "36cea20440d5df51de336fa332861d640ede94a2e301362cb1b8632e2dd74034",
+      "bytes": 1297
+    },
+    {
+      "path": "skills/szl-artifact-lineage/scripts/run.py",
+      "sha256": "871bcdc8cc425c6f9c9f36410dcd3d63234327d35d20bae2c9fae4b2d097371e",
+      "bytes": 1862
+    },
+    {
+      "path": "skills/szl-artifact-lineage/SKILL.md",
+      "sha256": "77664ad6fe3db1243f7f2fc6657d7424bdcc3b3825737117f96de62c1705e0d0",
+      "bytes": 2220
+    },
+    {
+      "path": "skills/szl-unit-invariants/assets/example.json",
+      "sha256": "2493005472de06d52795684434d6686fb0f9afe458282ecbd9c73541bfa7f5d5",
+      "bytes": 874
+    },
+    {
+      "path": "skills/szl-unit-invariants/kernel.py",
+      "sha256": "3e34f2357f5f263be7063edbc4ed102983b247ed3f7b06f935edc4d2dfe22728",
+      "bytes": 12629
+    },
+    {
+      "path": "skills/szl-unit-invariants/references/contract.md",
+      "sha256": "8d5ba108d005f80d949f2594aebe577d0e08f099df78951d2296fe30cbdf9486",
+      "bytes": 3794
+    },
+    {
+      "path": "skills/szl-unit-invariants/references/provenance.md",
+      "sha256": "8d5606354a9fc98c97ad5ae73eafa8284a36ecb6a4d5aaa7f8828880e535fefa",
+      "bytes": 1237
+    },
+    {
+      "path": "skills/szl-unit-invariants/scripts/run.py",
+      "sha256": "74da18febf9eea5fa1efdcb908a9c963ce944639182b813662392b150a7dfda1",
+      "bytes": 1889
+    },
+    {
+      "path": "skills/szl-unit-invariants/SKILL.md",
+      "sha256": "7926749caab7eff34875a4688a3211131ae63d033e22d6eaf8471a6751e77d79",
+      "bytes": 2387
+    },
+    {
+      "path": "skills/szl-negative-control-audit/assets/example.json",
+      "sha256": "e216a67ceef52d13a40af89f9dd7659fa6947b3d2bb80d0b7f03fb96342cb472",
+      "bytes": 3048
+    },
+    {
+      "path": "skills/szl-negative-control-audit/kernel.py",
+      "sha256": "d270f51ab644cd069022456635361d2c10110134c27070f1502b75726408bb5d",
+      "bytes": 14984
+    },
+    {
+      "path": "skills/szl-negative-control-audit/references/contract.md",
+      "sha256": "5be747205c7e515010f1e2a5f433540337f38ca6c95ce1c88658f33b730a1f74",
+      "bytes": 4776
+    },
+    {
+      "path": "skills/szl-negative-control-audit/references/provenance.md",
+      "sha256": "758d69a4876a228d15c4dafefafd87b0d94c1feaaff0f16c7e8d0e6cdabafd17",
+      "bytes": 1351
+    },
+    {
+      "path": "skills/szl-negative-control-audit/scripts/run.py",
+      "sha256": "a4fa24bbeb941e08222a2018b39a0659f8b987c14759e3efd97e98e5c90477d9",
+      "bytes": 1287
+    },
+    {
+      "path": "skills/szl-negative-control-audit/SKILL.md",
+      "sha256": "434acbd1ca43a63c71acce70cbb8c78852e4e25833e8a71b48815c3b438a7ecb",
+      "bytes": 2492
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/assets/example.json",
+      "sha256": "52cb3ff1a4467b53b54e421d8f2fca8442305f1c2bb821deece751d5cc9663c4",
+      "bytes": 3208
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/kernel.py",
+      "sha256": "891744abe89a29bc12d9cb9cb39fba422593d0f2a514dec9f25051f9202b2c04",
+      "bytes": 15616
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/references/contract.md",
+      "sha256": "756cedf5e2d0d8e038eaa789267bdfe57b3635a8e8d4ecbb59f8264ceb04c598",
+      "bytes": 4763
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/references/provenance.md",
+      "sha256": "2eaf0ed3cffde1c9786c60fb4a31cd52e60c5d2563f58d671ec339aba497b7c7",
+      "bytes": 1287
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/scripts/run.py",
+      "sha256": "f68b224ba6130abadbe56d173c79c3837fb74f42119db893ae93621f10bea6a6",
+      "bytes": 1286
+    },
+    {
+      "path": "skills/szl-analysis-plan-audit/SKILL.md",
+      "sha256": "cfcd5ca2a0ab00f6c909eab966a3d421357c9226fb98c609934287d5e21aaf47",
+      "bytes": 2410
+    }
+  ]
+}

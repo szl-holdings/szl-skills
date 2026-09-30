@@ -18,12 +18,13 @@ Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills
 | szl-governed-decision | Wraps a classifier, policy engine, or System One model so each decision carries its own evidence. | Does not prove a model output is true. Receipts cover integrity and origin only. |
 | szl-paired-science | Checks complete paired measurements, training-only normalization, identity controls, exact input hashes, and corrected paired comparisons offline. | Does not verify researcher declarations, certify science, or admit a model to production. |
 
-## Science pack (0.2.0-rc.1)
+## Science pack source candidate
 
-Eight science skills form a connected scientific workflow. They are offline-first, stdlib-only
-and prefixed with szl to avoid personal-skill name collisions. Each includes a SKILL.md,
-a Claude Science kernel.py helper, a standalone command-line alternative and a synthetic
-example. No weight downloads, private second-brain data, service calls or keys are bundled.
+The source candidate contains fourteen skills: twelve science skills and two evidence skills.
+The twelve science skills are offline-first, stdlib-only and prefixed with szl to avoid
+personal-skill name collisions. Each includes a SKILL.md, explicit resources, a command-line
+workflow and synthetic fixtures. Ten expose kernel.py; paired-science and workbench use CLI
+resources instead. No weight downloads, private second-brain data or keys are bundled.
 
 - **szl-research-anatomy** maintains persistent project memory and propagates source changes
   to dependent claims, proofs and runs without erasing previous records.
@@ -42,14 +43,29 @@ example. No weight downloads, private second-brain data, service calls or keys a
 - **szl-science-workbench** runs the selected checks together, observes actual input/code
   bytes, saves immutable results and propagates changed or missing sources through anatomy.
   Its helper copies are generated and checked against the reviewed originals, not hand-maintained.
+- **szl-artifact-lineage** audits required stages and producer/consumer digest continuity.
+- **szl-unit-invariants** checks a restricted SI dimension, conversion, range and invariant grammar.
+- **szl-negative-control-audit** audits retained computational controls and outcomes without execution.
+- **szl-analysis-plan-audit** compares frozen analysis settings with retained run declarations.
 
-Candidate GitHub import:
+Historical eight-science-skill prerelease import:
 
     szl-holdings/szl-skills@v0.2.0-rc.1
 
-The science plugin contains exactly these eight skills; the evidence plugin contains the
-two existing skills. No duplicated skill names occur across the plugins. This is a
-prerelease at a signed source revision; Stephen merges source and community-index PRs.
+Four original audit packages add artifact-lineage continuity, SI unit/invariant checks,
+computational negative-control evidence and frozen analysis-plan comparison. See
+[SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md) for the six substantial upgrades, four additions,
+bounded synthetic acceptance procedure and remaining scientific/application boundaries.
+These additions are reviewed through draft source branches; existing release tags are
+unchanged. Use the reviewed source revision when inspecting this candidate.
+The historical tag above does not contain the expanded twelve-skill candidate.
+
+The science plugin and SDK installer select exactly these twelve skills; the separate
+evidence plugin contains the two existing skills, excluded from that installer. Ten
+acceptance packages are six upgraded skills and four new audits. Existing workbench and
+kernel-comparison checks remain separate, and the four standalone additions do not expand
+the workbench's check-dispatch graph. No duplicated names occur across plugins. This is an
+unreleased draft at a signed source revision; Stephen reviews and merges source PRs.
 
 The workbench is also self-contained if imported alone. Start a synthetic project:
 
