@@ -20,7 +20,7 @@ Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills
 
 ## Science pack (0.2.0-rc.1)
 
-Eight science skills form a connected scientific workflow. They are offline-first, stdlib-only
+Twelve science skills form a connected scientific workflow. They are offline-first, stdlib-only
 and prefixed with szl to avoid personal-skill name collisions. Each includes a SKILL.md,
 a Claude Science kernel.py helper, a standalone command-line alternative and a synthetic
 example. No weight downloads, private second-brain data, service calls or keys are bundled.
@@ -47,7 +47,14 @@ Candidate GitHub import:
 
     szl-holdings/szl-skills@v0.2.0-rc.1
 
-The science plugin contains exactly these eight skills; the evidence plugin contains the
+Four original audit packages add artifact-lineage continuity, SI unit/invariant checks,
+computational negative-control evidence and frozen analysis-plan comparison. See
+[SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md) for the six substantial upgrades, four additions,
+bounded synthetic acceptance procedure and remaining scientific/application boundaries.
+These additions are reviewed through draft source branches; existing release tags are
+unchanged. Use the reviewed source revision when inspecting this candidate.
+
+The science plugin contains exactly these twelve skills; the evidence plugin contains the
 two existing skills. No duplicated skill names occur across the plugins. This is a
 prerelease at a signed source revision; Stephen merges source and community-index PRs.
 
