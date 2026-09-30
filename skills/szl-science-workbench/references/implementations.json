@@ -17,7 +17,7 @@
   {
     "path": "scripts/library/model.py",
     "source": "skills/szl-model-evaluation/kernel.py",
-    "sha256": "2675ac754770a579bfffebb6bac42f2ee39b95185e768d5dc50976919a78fa2b"
+    "sha256": "bd8754c77a962eed07061a7b57d9894ccafbb39604cfc52d5db20e5052bf15e0"
   },
   {
     "path": "scripts/library/kernel_compare.py",
@@ -27,7 +27,7 @@
   {
     "path": "scripts/library/capsule.py",
     "source": "skills/szl-reproducibility-capsule/kernel.py",
-    "sha256": "787762420ab3307867866d273351f4a4b00d834e696f49c1089ca7d5dbd286cf"
+    "sha256": "b5822a1a3fbaa1173ec1cf05c28f463bea533cd70f2d0969b3e43ea460bc4150"
   },
   {
     "path": "scripts/library/paired.py",

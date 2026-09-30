@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
+# Modified 2026-09-30: original bounded replay-declaration extensions to SZL baseline
+# 9668f1571315e93ca2059b9a44f12beef483532d.
 """Explicit file manifests; never execute recorded commands."""
 import hashlib
 import json
