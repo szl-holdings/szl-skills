@@ -271,14 +271,26 @@ class PackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             destination = pathlib.Path(temp)
             reports = package["package_skills"](destination)
-            self.assertEqual(len(reports), 6)
+            self.assertEqual(len(reports), 8)
             for report in reports:
                 with self.subTest(skill=report["skill"]):
                     unpacked = destination / ("imported-" + report["skill"])
                     with zipfile.ZipFile(destination / report["archive"]) as z:
-                        self.assertTrue({"SKILL.md", "kernel.py", "LICENSE", "NOTICE", "scripts/run.py", "assets/example.json"} <= set(z.namelist()))
-                        self.assertLess(report["uncompressed_bytes"], 100000)
+                        self.assertTrue({"SKILL.md", "LICENSE", "NOTICE"} <= set(z.namelist()))
+                        self.assertLess(report["uncompressed_bytes"], 200000)
                         z.extractall(unpacked)
+                    if report["skill"] == "szl-science-workbench":
+                        project = destination / "standalone-project"
+                        init = subprocess.run([sys.executable, "-B", str(unpacked / "scripts" / "workbench.py"), "init", str(project)], capture_output=True, text=True)
+                        self.assertEqual(init.returncode, 0, init.stderr)
+                        p = subprocess.run([sys.executable, "-B", str(unpacked / "scripts" / "workbench.py"), "run", str(project)], capture_output=True, text=True)
+                        self.assertEqual(p.returncode, 1, p.stderr)
+                        self.assertTrue(json.loads(p.stdout)["completed"])
+                        continue
+                    if report["skill"] == "szl-paired-science":
+                        self.assertTrue((unpacked / "scripts" / "qualify.py").is_file())
+                        continue
+                    self.assertTrue((unpacked / "kernel.py").is_file())
                     p = subprocess.run([sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
                                         str(unpacked / "assets" / "example.json"), "--root", str(unpacked)], capture_output=True, text=True)
                     self.assertEqual(p.returncode, 0, p.stderr)

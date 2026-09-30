@@ -16,8 +16,9 @@ def package_skills(destination):
     reports = []
     for relative in plugin["skills"]:
         skill = ROOT / relative
-        members = [skill / "SKILL.md", skill / "kernel.py", skill / "scripts" / "run.py"]
-        members += sorted(p for p in (skill / "assets").rglob("*") if p.is_file())
+        members = sorted(p for p in skill.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
+        if not (skill / "SKILL.md").is_file():
+            raise ValueError("Missing skill entrypoint")
         if any(not p.is_file() or p.is_symlink() for p in members):
             raise ValueError("Missing or symlinked skill resource")
         archive = destination / (skill.name + ".zip")
