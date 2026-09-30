@@ -17,6 +17,14 @@ Generated workbench mirrors and their manifest are synchronized. Kernel comparis
 governed-decision and TypeSafe capabilities retain their scope. No registry foundation,
 security workflow, remote protection or external data is modified.
 
+The notice follow-up adds explicit dated/baseline modification notices to all six
+model/capsule entrypoint, kernel and CLI files, and regenerates their workbench copies.
+LICENSE terms and calibration/MIT attribution are retained; NOTICE now uses the actual
+`skills/szl-typesafe-ai` path. Static notice/inventory/mirror checks and all 73 upgrade
+fixtures passed again. These reports are retained as `validation/science/notice-upgrades-*`.
+This branch selects eight science skills and excludes the two evidence skills; the four
+new audit packages and twelve-science-skill routing belong to the companion source branch.
+
 The three new author suites contain 73 synthetic acceptance tests. They ran with the
 four companion audit packages in a non-root Python 3.12.3 Linux snapshot; all 132 author
 tests passed. An independent reviewer exercised all ten candidate packages in 13 further

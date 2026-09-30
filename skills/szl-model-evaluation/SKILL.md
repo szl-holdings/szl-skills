@@ -4,6 +4,9 @@ description: Score supplied binary predictions or saved categorical outputs and 
 license: Apache-2.0
 ---
 
+<!-- Modified 2026-09-30: original attempt-ledger and denominator extensions to
+SZL source baseline 9668f1571315e93ca2059b9a44f12beef483532d. -->
+
 # Model evaluation with complete denominators
 
 Establish the target population, retained labels, split construction and predeclared

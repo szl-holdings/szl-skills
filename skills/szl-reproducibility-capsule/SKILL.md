@@ -4,6 +4,9 @@ description: Create and verify exact-byte manifests for explicitly selected rese
 license: Apache-2.0
 ---
 
+<!-- Modified 2026-09-30: original bounded replay-declaration extensions to
+SZL source baseline 9668f1571315e93ca2059b9a44f12beef483532d. -->
+
 # Reproducibility capsule
 
 Select a declared project root and explicit files. Retain the experiment's inputs, source,

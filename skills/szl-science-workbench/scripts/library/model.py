@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
+# Modified 2026-09-30: original attempt-ledger extensions to SZL baseline
+# 9668f1571315e93ca2059b9a44f12beef483532d; metric attribution below retained.
 # Metrics adapted from szl-holdings/szl-calibration, metrics.py at
 # b2e317877abed98e70f9cf6730944a797837faf1. Copyright 2026 SZL Holdings.
 """Binary prediction metrics; no model loading, training, or network access."""
