@@ -112,9 +112,25 @@ class PairedScienceTests(unittest.TestCase):
         self.invalid(experiment(2))
 
     def test_duplicate_json_nonfinite_and_size_rejected(self):
-        for raw in (b'{"a":1,"a":2}', b'{"a":NaN}', b'x' * (QUALIFY.MAX_BYTES + 1)):
+        for raw in (b'{"a":1,"a":2}', b'{"a":NaN}', b'x' * (QUALIFY.MAX_BYTES + 1),
+                    b'[' * 65 + b'0' + b']' * 65):
             with self.assertRaises(ValueError):
                 QUALIFY.load_bytes(raw)
+
+    def test_structural_brackets_in_strings_do_not_count_as_nesting(self):
+        import json
+        value = {"text": '[' * 2000 + '"escaped"' + ']' * 2000}
+        self.assertEqual(QUALIFY.load_bytes(json.dumps(value).encode()), value)
+
+    def test_cli_deep_json_returns_typed_invalid_input(self):
+        import json
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / "deep.json"
+            path.write_bytes(b'[' * 2000 + b'0' + b']' * 2000)
+            run = subprocess.run([sys.executable, "-B", str(HELPER), str(path)], capture_output=True, check=False)
+        self.assertEqual(run.returncode, 2)
+        self.assertEqual(json.loads(run.stdout)["status"], "INVALID_INPUT")
+        self.assertEqual(run.stderr, b"")
 
     def test_cli_identifies_actual_input_and_helper_bytes(self):
         import hashlib

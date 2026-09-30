@@ -1,6 +1,6 @@
 # Paired comparison protocol
 
-The input is one UTF-8 JSON object, at most 1 MiB, with schema `szl.paired-science/v1`. Duplicate object keys, NaN, and infinity are invalid. Run:
+The input is one UTF-8 JSON object, at most 1 MiB and 64 structural nesting levels, with schema `szl.paired-science/v1`. Duplicate object keys, NaN, and infinity are invalid. Brackets inside quoted strings do not count as structural nesting. Run:
 
 ```
 python skills/szl-paired-science/scripts/qualify.py experiment.json

@@ -10,6 +10,7 @@ import re
 import sys
 
 MAX_BYTES = 1024 * 1024
+MAX_JSON_DEPTH = 64
 TOP = {"schema", "source_revision", "dataset_sha256", "plan_sha256", "input_scope",
        "pre_registered", "independent_pairs", "alpha", "minimum_normalized_improvement",
        "identity_control_tolerance", "train_ids", "test_ids", "tasks"}
@@ -160,8 +161,30 @@ def unique_object(pairs):
 def load_bytes(raw):
     if len(raw) > MAX_BYTES:
         raise ProtocolError("input exceeds 1 MiB")
-    return json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
-                      parse_constant=lambda value: (_ for _ in ()).throw(ProtocolError("nonfinite JSON")))
+    depth, quoted, escaped = 0, False, False
+    for byte in raw:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif byte == 92:
+                escaped = True
+            elif byte == 34:
+                quoted = False
+        elif byte == 34:
+            quoted = True
+        elif byte in (91, 123):
+            depth += 1
+            if depth > MAX_JSON_DEPTH:
+                raise ProtocolError("JSON nesting exceeds 64 levels")
+        elif byte in (93, 125):
+            depth -= 1
+            if depth < 0:
+                raise ProtocolError("invalid JSON structure")
+    try:
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
+                          parse_constant=lambda value: (_ for _ in ()).throw(ProtocolError("nonfinite JSON")))
+    except RecursionError as error:
+        raise ProtocolError("JSON nesting exceeds interpreter limit") from error
 
 
 def main():
