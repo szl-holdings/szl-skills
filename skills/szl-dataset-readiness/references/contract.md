@@ -33,7 +33,10 @@ for a nonempty transform list. Nonmissing row split values must be strings.
 
 Read time fields as aware ISO 8601 datetimes, including `Z` or an explicit offset.
 Local times, date-only values, invalid timestamps and missing values are unknown
-evidence. Normalize offsets to UTC before ordering. Reject duplicate row ids.
+evidence. Normalize offsets to UTC before ordering. A timestamp whose UTC normalization
+falls outside the representable datetime range also remains UNKNOWN, with diagnostic
+`MISSING_AMBIGUOUS_OR_OUT_OF_RANGE_TIME`; normalization never supplies a substitute time.
+Reject duplicate row ids.
 
 Temporal findings identify: observations after their prediction time; training
 labels unavailable at the earliest held-out prediction origin; and overlapping

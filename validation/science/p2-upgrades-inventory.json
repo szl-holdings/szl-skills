@@ -1,0 +1,40 @@
+{
+  "evidence_excluded": [
+    "szl-typesafe-ai",
+    "szl-governed-decision"
+  ],
+  "findings": [],
+  "host_registration": "NOT_RUN",
+  "kind": "STATIC_DATA_ONLY",
+  "license_terms": "UNCHANGED",
+  "notices_checked": [
+    {
+      "path": "skills/szl-model-evaluation/SKILL.md",
+      "sha256": "58a76a509bdba4051be6a963c6210bddce621a309a1ac70d9235e14a1f479399"
+    },
+    {
+      "path": "skills/szl-model-evaluation/kernel.py",
+      "sha256": "bd8754c77a962eed07061a7b57d9894ccafbb39604cfc52d5db20e5052bf15e0"
+    },
+    {
+      "path": "skills/szl-model-evaluation/scripts/run.py",
+      "sha256": "76baddf40cc1354265fbdd9c3e39bfb0c6195602ea9cea5abd5a027266d0fbe3"
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/SKILL.md",
+      "sha256": "595ecb8fb9e7cadf2469cf5ca415dabf4fd0175d91ba509db81e11c996b77e35"
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/kernel.py",
+      "sha256": "dd25c6fd6f094446119dd9c3c6368c1bf96b9f8706c909a50f00e6a79a4f9546"
+    },
+    {
+      "path": "skills/szl-reproducibility-capsule/scripts/run.py",
+      "sha256": "da4f00fb8ff25bd8cd3c6f076e9b9109d69f1cb824d3a72e947e8a404c1657ed"
+    }
+  ],
+  "packages_total": 10,
+  "real_sidecar": "NOT_RUN",
+  "science_selected": 8,
+  "status": "PASS"
+}

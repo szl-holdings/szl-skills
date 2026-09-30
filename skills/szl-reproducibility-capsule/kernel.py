@@ -103,6 +103,8 @@ def szl_validate_replay(replay, file_entries):
         raise ValueError("Replay argv must be a bounded inert string list")
     if argv[0] not in ("python", "python3"):
         raise ValueError("Replay declaration supports a Python source entrypoint only")
+    if argv[1].startswith("-"):
+        raise ValueError("Replay entrypoint cannot be an interpreter option or stdin marker")
     szl_capsule_path(argv[1])
     if argv[1] not in by_path or by_path[argv[1]].get("role") != "source" or not argv[1].endswith(".py"):
         raise ValueError("Replay entrypoint must be a retained .py source file")

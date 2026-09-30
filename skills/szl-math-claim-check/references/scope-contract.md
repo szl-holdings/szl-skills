@@ -33,7 +33,11 @@ equivalence from theorem text. Numeric semantics are `integer`, `rational`, `bin
 overflow, conditioning, implementation correctness or a floating-point error bound.
 
 Domains map names to `{lower, upper, lower_inclusive, upper_inclusive}`. Endpoints are finite
-numbers or `null` for an unbounded endpoint; unbounded endpoints must be exclusive. Runtime
+integers or floats, or `null` for an unbounded endpoint; unbounded endpoints must be exclusive.
+Integer endpoints retain exact integer semantics, including adjacent values above binary64's
+exact-integer range. Float endpoints retain their already supplied binary64 value; the helper
+cannot recover precision lost by a caller before validation. Reversed and empty intervals
+are invalid even when their integer endpoints would round to the same float. Runtime
 variables must exactly match theorem variables and each runtime interval must be a subset,
 including boundary inclusion. Required theorem assumptions must occur in runtime assumptions.
 Arbitrary predicates, quantified structures, implicit units and predicate implications need

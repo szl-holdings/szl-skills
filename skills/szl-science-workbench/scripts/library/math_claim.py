@@ -71,6 +71,13 @@ def szl_scope_ids(value, field):
     return set(result)
 
 
+def szl_scope_endpoint(value):
+    """Keep integer endpoints exact; floats retain their supplied binary64 value."""
+    if type(value) is int or (type(value) is float and math.isfinite(value)):
+        return value
+    raise ValueError("Expected a finite integer or float interval endpoint")
+
+
 def szl_scope_domain(value):
     if not isinstance(value, dict) or not value or len(value) > 64:
         raise ValueError("domain must contain 1 to 64 named intervals")
@@ -81,9 +88,9 @@ def szl_scope_domain(value):
             raise ValueError("Each domain interval needs lower/upper and inclusive flags")
         low, high = interval["lower"], interval["upper"]
         if low is not None:
-            low = szl_math_number(low)
+            low = szl_scope_endpoint(low)
         if high is not None:
-            high = szl_math_number(high)
+            high = szl_scope_endpoint(high)
         li, ui = interval["lower_inclusive"], interval["upper_inclusive"]
         if type(li) is not bool or type(ui) is not bool:
             raise ValueError("Interval inclusive flags must be booleans")

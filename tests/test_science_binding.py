@@ -119,6 +119,28 @@ class DatasetLeakageTests(unittest.TestCase):
         self.assertEqual(report["leakage_checks"]["temporal"]["status"], "UNKNOWN")
         self.assertIn("LEAKAGE_EVIDENCE_INCOMPLETE", report["issues"])
 
+    def test_utc_normalization_underflow_is_incomplete_evidence(self):
+        self.payload["rows"][1]["prediction_time"] = "0001-01-01T00:00:00+23:59"
+        report = self.audit(**self.payload)
+        check = report["leakage_checks"]["temporal"]
+        self.assertEqual(check["status"], "UNKNOWN")
+        self.assertIn("LEAKAGE_EVIDENCE_INCOMPLETE", report["issues"])
+        self.assertTrue(any(isinstance(item, dict) and item.get("row_index") == 1
+                            and item.get("column") == "prediction_time"
+                            and item.get("reason") == "MISSING_AMBIGUOUS_OR_OUT_OF_RANGE_TIME"
+                            for item in check["missing_evidence"]))
+
+    def test_utc_overflow_is_unknown_and_adjacent_representable_edges_normalize(self):
+        self.payload["rows"][1]["prediction_time"] = "9999-12-31T23:59:59-23:59"
+        report = self.audit(**self.payload)
+        self.assertEqual(report["leakage_checks"]["temporal"]["status"], "UNKNOWN")
+        self.assertIn("LEAKAGE_EVIDENCE_INCOMPLETE", report["issues"])
+        stamp = runpy.run_path(str(DATASET / "kernel.py"))["szl_dataset_stamp"]
+        for value, expected in (("0001-01-01T01:00:00+01:00", "0001-01-01T00:00:00+00:00"),
+                                ("9999-12-31T22:59:59-01:00", "9999-12-31T23:59:59+00:00")):
+            with self.subTest(value=value):
+                self.assertEqual(stamp(value).isoformat(), expected)
+
     def test_fit_heldout_rows_cannot_hide_behind_train_declaration(self):
         self.payload["leakage_spec"]["transforms"][0]["fit_row_ids"] = ["test-a"]
         report = self.audit(**self.payload)
