@@ -114,6 +114,39 @@ class MathScopeTests(unittest.TestCase):
         self.assertIn("RUNTIME_OUTSIDE_THEOREM_DOMAIN", codes)
         self.assertIn("MISSING_RUNTIME_ASSUMPTIONS", codes)
 
+    def test_adjacent_large_integer_domain_extension_is_blocked(self):
+        self.fixture["theorem"]["domain"]["n"]["upper"] = 9007199254740992
+        self.fixture["runtime"]["domain"]["n"]["upper"] = 9007199254740993
+        report = self.audit(self.fixture)
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertIn("RUNTIME_OUTSIDE_THEOREM_DOMAIN", self.codes(report))
+
+    def test_large_integer_lower_and_mixed_float_upper_extensions_block(self):
+        for mode in ("negative-lower", "mixed-upper"):
+            with self.subTest(mode=mode):
+                fixture = scope_fixture()
+                if mode == "negative-lower":
+                    fixture["theorem"]["domain"]["n"]["lower"] = -9007199254740992
+                    fixture["runtime"]["domain"]["n"]["lower"] = -9007199254740993
+                else:
+                    fixture["theorem"]["domain"]["n"]["upper"] = float(9007199254740992)
+                    fixture["runtime"]["domain"]["n"]["upper"] = 9007199254740993
+                self.assertIn("RUNTIME_OUTSIDE_THEOREM_DOMAIN", self.codes(self.audit(fixture)))
+
+    def test_large_integer_reversed_and_half_open_intervals_stay_distinct(self):
+        interval = self.fixture["theorem"]["domain"]["n"]
+        interval.update(lower=9007199254740993, upper=9007199254740992)
+        with self.assertRaisesRegex(ValueError, "empty or reversed"):
+            self.audit(self.fixture)
+        interval.update(lower=9007199254740992, upper=9007199254740993, lower_inclusive=False)
+        self.fixture["runtime"]["domain"]["n"] = copy.deepcopy(interval)
+        self.assertEqual(self.audit(self.fixture)["status"], "STRUCTURAL_CHECKS_PASSED")
+
+    def test_integer_scope_endpoints_can_exceed_binary64_range(self):
+        for kind in ("theorem", "runtime"):
+            self.fixture[kind]["domain"]["n"]["upper"] = 10 ** 400
+        self.assertEqual(self.audit(self.fixture)["status"], "STRUCTURAL_CHECKS_PASSED")
+
     def test_boundary_inclusion_and_narrowing(self):
         self.fixture["theorem"]["domain"]["n"]["lower_inclusive"] = False
         self.assertEqual(self.audit(self.fixture)["status"], "BLOCKED")

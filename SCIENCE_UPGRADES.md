@@ -26,7 +26,15 @@ The upgrade-only PR selects eight science skills and excludes the two evidence s
 The combined candidate adds four standalone audits for twelve science skills; all fourteen
 repository packages remain split into twelve science and two evidence skills.
 
-The three new author suites contain 73 synthetic acceptance tests. They ran with the
+The P2 review follow-up preserves exact integer theorem/runtime interval endpoints,
+records out-of-range UTC normalization as UNKNOWN, and refuses option-shaped replay
+entrypoints. Nine new regression methods cover the reported failures and adjacent
+integer, datetime and interpreter-option boundaries. All 82 upgrade tests pass in the
+same isolated runner; source-bound reports are `validation/science/p2-upgrades-*`.
+Replay argv remains inert. The original four-defect reproduction is retained in the
+companion acceptance record, including its three failed assertions and one exception.
+
+The initial three author suites contained 73 synthetic acceptance tests. They ran with the
 four companion audit packages in a non-root Python 3.12.3 Linux snapshot; all 132 author
 tests passed. An independent reviewer exercised all ten candidate packages in 13 further
 synthetic scenarios; all passed after correcting two implementation bugs and clarifying

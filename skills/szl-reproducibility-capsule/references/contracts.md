@@ -44,7 +44,10 @@ A replay is exactly these fields:
 The illustrative digest descriptions above are explanatory notation, not valid digests.
 Use digests of actual selected bytes. All five `input/source/environment/analysis_plan/
 output` roles must exist. `argv` contains 2..64 bounded nonempty strings. The interpreter
-is `python` or `python3`; its second element is a retained `.py` source path. Shell-like,
+is `python` or `python3`; its second element is a retained canonical `.py` source path
+that must not start with `-`. Interpreter options and the stdin marker are refused,
+including a retained filename such as `-cprint(7)#.py`. A canonical nested path whose
+basename starts with a dash is a path, while a leading `./` remains noncanonical. Shell-like,
 multiline or credential-like arguments are refused. All arguments are inert text, never
 passed to an interpreter. This validates a declaration, not the safety of its source.
 

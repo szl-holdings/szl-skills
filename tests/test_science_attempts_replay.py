@@ -169,6 +169,42 @@ class ReplayManifestTests(unittest.TestCase):
         self.assertEqual(report["scientific_performance"], "NOT_MEASURED")
         self.assertEqual(sorted(self.contents), [item["path"] for item in report["files"]])
 
+    def test_option_shaped_retained_source_is_not_a_replay_entrypoint(self):
+        entrypoint = "-cprint(7)#.py"
+        (self.root / entrypoint).write_bytes(self.contents["analysis.py"])
+        files = [dict(item, path=entrypoint) if item["role"] == "source" else item
+                 for item in self.files]
+        replay = copy.deepcopy(self.replay)
+        replay["argv"] = ["python", entrypoint]
+        with self.assertRaisesRegex(ValueError, "entrypoint.*interpreter option"):
+            self.make(files=files, replay=replay)
+
+    def test_adjacent_python_option_forms_and_stdin_are_rejected(self):
+        for entrypoint in ("-mprobe.py", "-Iprobe.py", "--.py", "-.py", "-m", "-I", "--", "-"):
+            with self.subTest(entrypoint=entrypoint):
+                (self.root / entrypoint).write_bytes(self.contents["analysis.py"])
+                files = [dict(item, path=entrypoint) if item["role"] == "source" else item
+                         for item in self.files]
+                replay = copy.deepcopy(self.replay)
+                replay["argv"] = ["python3", entrypoint]
+                with self.assertRaisesRegex(ValueError, "entrypoint.*interpreter option"):
+                    self.make(files=files, replay=replay)
+
+    def test_nested_dash_basename_remains_a_bound_inert_source_path(self):
+        (self.root / "nested").mkdir()
+        entrypoint = "nested/-cprint(7)#.py"
+        (self.root / entrypoint).write_bytes(self.contents["analysis.py"])
+        files = [dict(item, path=entrypoint) if item["role"] == "source" else item
+                 for item in self.files]
+        replay = copy.deepcopy(self.replay)
+        replay["argv"] = ["python", entrypoint, "--seed", "7"]
+        report = self.kernel["szl_verify_capsule"](self.root, self.make(files=files, replay=replay))
+        self.assertTrue(report["replay_ready"])
+        self.assertEqual(report["execution"], "NOT_RUN")
+        replay["argv"][1] = "./" + entrypoint
+        with self.assertRaisesRegex(ValueError, "Noncanonical"):
+            self.make(files=files, replay=replay)
+
     def test_legacy_strings_and_no_replay_are_supported(self):
         capsule = self.kernel["szl_make_capsule"](self.root, ["input.txt"], {"seed": 7})
         report = self.kernel["szl_verify_capsule"](self.root, capsule)

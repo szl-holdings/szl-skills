@@ -111,11 +111,11 @@ def szl_dataset_stamp(value):
         return None
     try:
         parsed = datetime.datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed.astimezone(datetime.timezone.utc)
     except (ValueError, OverflowError):
         return None
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        return None
-    return parsed.astimezone(datetime.timezone.utc)
 
 
 def szl_dataset_audit_leakage(rows, split_column, spec):
@@ -191,7 +191,7 @@ def szl_dataset_audit_leakage(rows, split_column, spec):
             parsed = tuple(szl_dataset_stamp(row.get(c)) for c in columns)
             for col, stamp in zip(columns, parsed):
                 if stamp is None:
-                    check["missing_evidence"].append({"row_index": i, "column": col, "reason": "MISSING_OR_AMBIGUOUS_TIME"})
+                    check["missing_evidence"].append({"row_index": i, "column": col, "reason": "MISSING_AMBIGUOUS_OR_OUT_OF_RANGE_TIME"})
             if None in parsed:
                 continue
             times[i] = parsed
