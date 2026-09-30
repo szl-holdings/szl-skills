@@ -32,7 +32,7 @@
   {
     "path": "scripts/library/paired.py",
     "source": "skills/szl-paired-science/scripts/qualify.py",
-    "sha256": "b75e0da8151ba2bca8a2528733e8a93511d83a0ac697cd0e1bedda2cd35e9910"
+    "sha256": "22fae48e5a184dd6c786aad792ce9c35c119f6fd6f37d2fbed6dfc18862ca054"
   },
   {
     "path": "scripts/library/calibration_reference.py",
