@@ -1,0 +1,28 @@
+{
+  "observed_on": "2026-09-29",
+  "scope": "Source and metadata references, not evidence of deployed products or qualified models",
+  "github": {
+    "szl-holdings/a11oy": "3831b4475ed16d78efc337496a87847a6320b06c",
+    "szl-holdings/szl-calibration": "b2e317877abed98e70f9cf6730944a797837faf1",
+    "szl-holdings/szl-formulas": "65c800b59249f27559de575bc66f5054fa585fa5",
+    "szl-holdings/szl-invariants": "e9621c5d95e1b6a336981346e473980cfe2d037b",
+    "szl-holdings/szl-kernels": "7b59de18d35b1edca3c54a4647fb324b918563a8",
+    "szl-holdings/lutar-lean": "ff4bfecbf6585677f75684c72dd4014c78135366",
+    "szl-holdings/anatomy": "8f96f5dd49c42edfad94927370363533be0cfdc0"
+  },
+  "datasets": [
+    {"id": "SZLHOLDINGS/canonical-formulas-v1", "revision": "99c45c0989676f9a842a707ab5af60f1e2de99ce", "declared_license": "apache-2.0"},
+    {"id": "SZLHOLDINGS/lean-theorem-tree", "revision": "8283cc8b75a54142016c8ac7fac5695903a9e6ba", "declared_license": "apache-2.0"},
+    {"id": "SZLHOLDINGS/governed-receipts-bench", "revision": "9e8a4921740f310d144012e27e3bb0cb34e733af", "declared_license": "apache-2.0"},
+    {"id": "SZLHOLDINGS/szl-second-brain-inrepo", "revision": "c9823ec107fc1fd4df6166c4ad0a37c776ee7e64", "declared_license": "other", "included": false}
+  ],
+  "derivations": [{"file": "skills/szl-model-evaluation/kernel.py", "from": "szl-holdings/szl-calibration/src/szl_calibration/metrics.py", "adaptation": "No dataclass or underscore-prefixed globals; finite/type validation, cohort reports, null single-class AUROC"}],
+  "lambda": "Conjecture 1 (OPEN)",
+  "model_candidates": [
+    {"id": "SZLHOLDINGS/brain-navigator-r2", "revision": "7fe3872fcb78ec8f5cc2f0c7464538b50b34e4b2", "role_to_evaluate": "Research artifact navigation", "qualification": "NOT_ASSESSED"},
+    {"id": "SZLHOLDINGS/MiniEmbed-Nano", "revision": "01e82f36ff722528233f76daf899c18f8cb5aaa2", "role_to_evaluate": "Retrieval against a lexical baseline, if its vocabulary supports the corpus", "qualification": "NOT_ASSESSED"},
+    {"id": "SZLHOLDINGS/szl-triage-qwen3.5-0.8b-lora-study5", "revision": "eb79a26a2934d5eaa667984720feacdcb90dcc28", "role_to_evaluate": "Task-specific evidence triage with the declared label set", "qualification": "NOT_ASSESSED"}
+  ],
+  "bundled_models": [], "bundled_datasets": [], "bundled_external_services": [],
+  "credentials_required": [], "default_network_access": false
+}
