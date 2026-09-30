@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.2.0 candidate (unreleased)
+## 0.2.0-rc.1
+
+- Connected the science pack through a self-contained workbench with immutable run directories,
+  observed input/implementation hashes, retained capsules, persistent anatomy and transitive
+  invalidation for changed, missing or unsafe files. Concurrent writers are rejected.
+- Added categorical evaluation that joins retained targets and ignores stored correctness
+  flags; integrated the pinned public triage study without downloading model weights.
+- Execute the reviewed SZL geometric-mean formula and calibration source; numerical kernel
+  agreement precedes actual local CPU timing. Integrated paired comparison and negative controls.
+- Generate helper copies through tools/sync_workbench.py and enforce drift checks in CI.
+- Package eight self-contained science skills, plus supported Claude Science SDK registration
+  and a curated specialist. SDK contract tests are separate from actual application import.
+- Retained stable two-skill v0.1.3 import; publish this pack as an explicit prerelease and submit
+  its exact source pin to the community index. No automatic updates or owner merge.
+
+## Initial 0.2.0 candidate
 
 - Added six offline scientific skills: living research anatomy, mathematical claim checks,
   dataset readiness, binary model evaluation, numerical kernel comparison and reproducibility

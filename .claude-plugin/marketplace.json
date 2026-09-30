@@ -1,18 +1,18 @@
 {
   "name": "szl-skills",
   "owner": { "name": "SZL Holdings", "url": "https://github.com/szl-holdings" },
-  "metadata": { "description": "Evidence, decisions and reproducible research skills from SZL Holdings", "version": "0.2.0" },
+  "metadata": { "description": "Evidence, decisions and reproducible research skills from SZL Holdings", "version": "0.2.0-rc.1" },
   "plugins": [
     {
       "name": "szl-evidence-skills",
       "description": "TypeSafe Jev as a second reader (never the gate) and governed decisions that carry their own evidence.",
       "source": "./",
       "strict": false,
-      "skills": ["./skills/szl-typesafe-ai", "./skills/szl-governed-decision", "./skills/szl-paired-science"]
+      "skills": ["./skills/szl-typesafe-ai", "./skills/szl-governed-decision"]
     },
     {
       "name": "szl-science-skills",
-      "description": "Living research anatomy, mathematical claims, dataset leakage checks, prediction metrics, numerical kernel comparisons and reproducibility capsules. Offline first; no credentials required.",
+      "description": "Integrated research workbench and living anatomy, mathematical checks, datasets, model evaluations, kernel comparisons and capsules. Optional pinned public study fetch; no credentials required.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -21,7 +21,9 @@
         "./skills/szl-dataset-readiness",
         "./skills/szl-model-evaluation",
         "./skills/szl-kernel-comparison",
-        "./skills/szl-reproducibility-capsule"
+        "./skills/szl-reproducibility-capsule",
+        "./skills/szl-science-workbench",
+        "./skills/szl-paired-science"
       ]
     }
   ]

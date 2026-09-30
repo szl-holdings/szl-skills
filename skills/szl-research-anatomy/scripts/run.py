@@ -40,6 +40,15 @@ def main():
         if match is None:
             raise ValueError("Missing skill name")
         skill_name = match.group(1)
+        if skill_name == "szl-model-evaluation" and "records" in payload:
+            report = functions["szl_evaluate_categories"](**payload)
+            output = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+            if args.output:
+                with args.output.open("x", encoding="utf-8") as file:
+                    file.write(output)
+            else:
+                sys.stdout.write(output)
+            return 0
         names = {"szl-research-anatomy": "szl_anatomy_assess", "szl-math-claim-check": "szl_check_math_cases",
                  "szl-dataset-readiness": "szl_audit_dataset", "szl-model-evaluation": "szl_evaluate_predictions"}
         if skill_name in names:

@@ -1,6 +1,6 @@
 ---
 name: szl-model-evaluation
-description: Evaluate binary predictions with calibration, discrimination and cohort metrics while recording model, data and split evidence separately. Use for scientific classifiers, scored-prediction comparisons, or checking held-out evidence behind a model-quality claim.
+description: Evaluate binary probabilities or saved categorical triage outputs while recording model, data and split evidence separately. Use for scientific classifiers, scored-prediction comparisons, or checking held-out evidence behind a model-quality claim.
 license: Apache-2.0
 ---
 
@@ -20,7 +20,15 @@ from `kernel.py`. It supports binary integer labels 0/1 and positive-class proba
 Metrics: Brier, clipped log loss, ECE/MCE, tie-aware AUROC, accuracy, confusion counts and
 reliability bins. Cohorts use the same settings. Bins compare mean positive probability with
 positive frequency, not confidence of the predicted class. Multiclass, regression, survival
-and generative tasks need different metrics.
+and general generative tasks need different metrics.
+
+For saved SZL triage outputs, call `szl_evaluate_categories(records, held_rows, label_set, metadata)`.
+It requires one prediction per retained held-out row id, exact target/family matches and a
+declared label set. It recomputes label/state/evidence correctness from `parsed`, ignores saved
+correctness flags and includes invalid outputs in the denominator. It reports categorical
+confusion and exact-match accuracy, never fake binary probabilities. It verifies the target
+join to these retained files; it does not authenticate the model that generated the records.
+The CLI routes an input with `records` to this evaluator.
 
 Declare thresholds and bins before comparison; separate tuning from final evaluation. Show
 denominators. AUROC is null for a single-class cohort, never an invented 0 or 1. Small cohorts

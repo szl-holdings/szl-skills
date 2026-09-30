@@ -14,4 +14,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: python tools/selfcheck.py
+      - run: python tools/sync_workbench.py --check
       - run: python -B -m unittest discover -s tests -v
