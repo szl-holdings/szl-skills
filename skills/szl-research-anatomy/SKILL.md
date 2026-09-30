@@ -44,6 +44,11 @@ Input contains `graph` and optional `current_digests`. The command prints an ass
 `--output` writes a new file exclusively. Updates use the Python function. The example is
 synthetic and demonstrates source-change propagation.
 
+For automatic file observations and retained graph revisions across a whole research
+project, use the companion szl-science-workbench skill. Its self-contained runner includes
+this kernel, observes selected artifact and implementation bytes, and saves each run and
+capsule without overwriting earlier runs. This anatomy helper remains usable on its own.
+
 SZL basis: evidence boundaries from Ayllu and Anatomy Ledger in the
 [pinned A11oy source](https://github.com/szl-holdings/a11oy/tree/3831b4475ed16d78efc337496a87847a6320b06c).
 This helper is a standalone adaptation, not an integration with a running A11oy service.
