@@ -286,7 +286,8 @@ class PackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             destination = pathlib.Path(temp)
             reports = package["package_skills"](destination)
-            self.assertEqual(len(reports), 8)
+            expected_count = len(json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())["plugins"][1]["skills"])
+            self.assertEqual(len(reports), expected_count)
             for report in reports:
                 with self.subTest(skill=report["skill"]):
                     unpacked = destination / ("imported-" + report["skill"])
@@ -306,13 +307,17 @@ class PackagingTests(unittest.TestCase):
                         self.assertTrue((unpacked / "scripts" / "qualify.py").is_file())
                         continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
-                    p = subprocess.run([sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
-                                        str(unpacked / "assets" / "example.json"), "--root", str(unpacked)], capture_output=True, text=True)
+                    command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
+                               str(unpacked / "assets" / "example.json")]
+                    if report["skill"] == "szl-reproducibility-capsule":
+                        command.extend(["--root", str(unpacked)])
+                    p = subprocess.run(command, capture_output=True, text=True)
                     self.assertEqual(p.returncode, 0, p.stderr)
                     json.loads(p.stdout)
 
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
-        for name in NAMES:
+        for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
+                             "szl-negative-control-audit", "szl-analysis-plan-audit"]:
             with self.subTest(skill=name):
                 path = ROOT / "skills" / name / "kernel.py"
                 tree = ast.parse(path.read_text())

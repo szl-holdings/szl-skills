@@ -66,13 +66,13 @@ class SetupTests(unittest.TestCase):
     def test_supported_calls_publish_readback_and_curated_profile(self):
         result = SETUP["install"](self.host, self.resources, self.path)
         self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
-        self.assertEqual(len(result["skills"]), 8)
+        self.assertEqual(len(result["skills"]), len(SETUP["NAMES"]))
         self.assertEqual(result["agent"]["connectors"], [])
         self.assertFalse(result["agent"]["unrestricted"])
         self.assertEqual(result["runtime_task_evaluation"], "NOT_EXECUTED")
         second = SETUP["install"](self.host, self.resources, self.path.with_name("second.json"))
         self.assertEqual(second["status"], "PUBLISHED_AND_READ_BACK")
-        self.assertEqual(len(self.host.skills.published), 8)
+        self.assertEqual(len(self.host.skills.published), len(SETUP["NAMES"]))
 
     def test_collision_preflight_does_not_modify_other_resources(self):
         name = SETUP["NAMES"][-1]

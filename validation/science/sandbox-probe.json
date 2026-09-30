@@ -1,0 +1,22 @@
+{
+  "status": "CONTROLS_VERIFIED",
+  "controls": {
+    "landlock_abi": 3,
+    "seccomp": "ENFORCED",
+    "no_new_privs": true,
+    "uid": 1000,
+    "network": "DENIED",
+    "child_process": "DENIED",
+    "outside_files": "DENIED",
+    "memory_bytes": 536870912,
+    "cpu_seconds": 60,
+    "file_size_bytes": 2097152
+  },
+  "preflight": {
+    "outside_fake_secret": "DENIED",
+    "host_mount": "DENIED",
+    "network_socket": "DENIED",
+    "child_process": "DENIED"
+  },
+  "candidate_execution": "NOT_RUN"
+}

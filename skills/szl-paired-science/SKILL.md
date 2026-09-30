@@ -1,17 +1,36 @@
 ---
 name: szl-paired-science
-description: Qualify a paired scientific benchmark from complete per-trial losses, training-only normalization, an identity negative control, and exact input hashes. Use for comparing algorithms or model checkpoints before making a measured improvement claim.
+description: Bind paired scientific evaluation results to separately frozen case inputs, targets, corpus, scorer and training-only normalization bytes, then verify losses and identity controls before bounded paired inference. Use when auditing supplied offline comparison evidence; this does not run models or prove scientific validity.
 license: Apache-2.0
 ---
 
-Use this skill when a researcher needs a reproducible comparison from supplied measurements. It works offline with Python 3.9 or later and contacts no external service.
+Modified 2026-09-30; original SZL additions. Python 3.9+, stdlib, offline.
 
-Read `references/protocol.md` to prepare the declared experimental plan and measurements. Run `scripts/qualify.py` on the JSON file. The helper rejects missing or duplicated pairs, overlapping train/test identifiers, nonfinite losses, zero normalization scales, failed identity controls, and incomplete provenance declarations. It reports each task in its own dimensionless scale and applies a declared minimum effect and a conservative multiple-task correction to exact paired sign-flip tests.
+Read [the binding contract](references/binding-contract.md) to prepare v2 evidence.
+Obtain the expected manifest digest from a separately frozen input/target/corpus/
+scorer/normalization source before reviewing prediction payloads. Never derive the
+trusted digest from the predictions being checked or refresh it to make a failure
+pass. Run `scripts/qualify.py experiment.json --expected-manifest-sha256 DIGEST`.
 
-Treat the helper's output as **local comparison evidence**. The plan, independence, train-only scale, source, and dataset identifiers are researcher declarations; the helper cannot establish that they are true merely by checking their syntax. Inspect the underlying prediction files, split construction, plan timestamp, dependencies, hardware, wall time, and memory evidence before using those declarations. Do not combine unrelated units as a raw mean or treat correlated horizons as independent experimental replications.
+The helper checks actual supplied byte digests, case membership, frozen-manifest
+continuity and prediction envelope bindings, then recomputes supported MAE/MSE
+losses and training scale. Missing bytes or an absent lock remain DECLARED and
+block v2 inference. The expected digest's authenticity, model consumption, plan
+timing and independence still require independent evidence. Document ids and
+self-declared support are not scientific entailment.
 
-An identity negative control uses the baseline predictions unchanged. Its losses must match the baseline within the plan's tolerance. A treatment that appears to improve under this control is a measurement or pairing fault requiring investigation.
+After binding succeeds, preserve the identity control, minimum effect and exact
+sign-flip procedure in [the inference protocol](references/protocol.md). Do not
+count correlated horizons as independent replications or average unrelated units.
+v1 is retained for compatibility and explicitly reports declaration-only binding;
+its historical status cannot establish the stronger v2 evidence boundary.
 
-For a real checkpoint tested on synthetic signals, retain both facts: **real checkpoint, synthetic inputs**. A successful local result does not establish performance on external data, a novel scientific contribution, clinical suitability, independent replication, or production admission. Hashes establish which bytes were checked; they are not signatures or proof of rights. Never replace a failed or unavailable measurement with an estimate.
+Report local artifact consistency and measured losses within their actual scope.
+Keep real-checkpoint/synthetic-input distinctions. Scientific performance stays
+NOT_MEASURED; source authenticity and consumption are unverified. No result grants
+production admission, data rights, novelty, clinical suitability or replication.
 
-The helper does not train, download models, execute supplied code, upload data, publish results, change a gate, or grant permission to use third-party data. A researcher must decide which experiment is appropriate and obtain any required data rights.
+Artifacts are inert UTF-8/JSON data. No supplied code, model, provider, network or
+GPU is executed. Human review remains required for sensitive scientific use and
+licensing decisions. Source provenance and synthetic acceptance cases are in the
+binding reference; use the separate fixture lock only for the bundled toy example.
