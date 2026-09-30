@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Self-check for szl-skills. Stdlib only. Exit 1 on any failure."""
-import json, pathlib, re, sys
+import json, pathlib, re, sys, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
@@ -52,6 +52,10 @@ for p in ROOT.rglob("*"):
     if SECRET.search(t): fails.append("%s: secret-shaped string" % rel)
     if PERSONAL.search(t): fails.append("%s: personal path or private IP" % rel)
 
+suite = unittest.defaultTestLoader.discover(str(ROOT / "tools"), pattern="test_*.py")
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+if not result.wasSuccessful():
+    fails.append("behavioral tests failed")
 for f in fails: print("FAIL ", f)
 print("selfcheck: %s (%d failure(s))" % ("PASS" if not fails else "FAIL", len(fails)))
 sys.exit(1 if fails else 0)
