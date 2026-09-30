@@ -8,7 +8,7 @@
       "description": "TypeSafe Jev as a second reader (never the gate) and governed decisions that carry their own evidence.",
       "source": "./",
       "strict": false,
-      "skills": ["./skills/szl-typesafe-ai", "./skills/szl-governed-decision"]
+      "skills": ["./skills/szl-typesafe-ai", "./skills/szl-governed-decision", "./skills/szl-paired-science"]
     },
     {
       "name": "szl-science-skills",

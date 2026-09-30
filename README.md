@@ -16,6 +16,7 @@ Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills
 |---|---|---|
 | szl-typesafe-ai | Uses TypeSafe Jev (Choice / Noul / Score) as an optional second reader for evidence-class triage. Fail-closed: any error gives UNAVAILABLE, never PASS. | Not a gate. Not TypeScript, Zod, Pydantic, mypy, or JSON Schema. Never marks anything LIVE. |
 | szl-governed-decision | Wraps a classifier, policy engine, or System One model so each decision carries its own evidence. | Does not prove a model output is true. Receipts cover integrity and origin only. |
+| szl-paired-science | Checks complete paired measurements, training-only normalization, identity controls, exact input hashes, and corrected paired comparisons offline. | Does not verify researcher declarations, certify science, or admit a model to production. |
 
 ## Science pack (0.2.0 candidate)
 
