@@ -3,6 +3,7 @@
 import contextlib
 import copy
 import decimal
+import hashlib
 import io
 import json
 import pathlib
@@ -283,6 +284,98 @@ class UnitInvariantTests(unittest.TestCase):
 
 
 class CliContractTests(unittest.TestCase):
+    def unit_raw(self, token, *, quantity_id='"tiny"', dimension="0", low="0", high="0"):
+        return ('{"schema":"szl.unit-invariants.v1","quantities":[{"id":' + quantity_id +
+                ',"unit":"1","dimension":[' + dimension + ',0,0,0,0,0,0],"values":[' + token +
+                '],"range_si":{"min":' + low + ',"max":' + high + '} }],"invariants":[]}')
+
+    def unit_cli(self, raw):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "numeric.json"
+            source.write_bytes(raw.encode("utf-8"))
+            main = runpy.run_path(str(package("szl-unit-invariants") / "scripts" / "run.py"))["main"]
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                code = main([str(source)])
+            return code, stdout.getvalue(), stderr.getvalue()
+
+    def test_raw_nonzero_json_underflow_cannot_pass_zero_range(self):
+        raw = ('{"schema":"szl.unit-invariants.v1","quantities":[{"id":"tiny",'
+               '"unit":"1","dimension":[0,0,0,0,0,0,0],"values":[1e-400],'
+               '"range_si":{"min":0,"max":0}}],"invariants":[]}')
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "underflow.json"
+            source.write_text(raw, encoding="utf-8")
+            main = runpy.run_path(str(package("szl-unit-invariants") / "scripts" / "run.py"))["main"]
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                self.assertEqual(main([str(source)]), 2)
+            self.assertEqual(stdout.getvalue(), "")
+
+    def test_raw_underflow_overflow_and_exact_magnitude_limits_fail_closed(self):
+        for token in ("1e-400", "-1e-400", "1e400", "-1e400",
+                      "1.0000000000000000000001e100", "9.9999999999999999999999e-101"):
+            with self.subTest(token=token):
+                code, output, diagnostic = self.unit_cli(self.unit_raw(token))
+                self.assertEqual(code, 2)
+                self.assertEqual(output, "")
+                self.assertIn("magnitude", diagnostic)
+
+    def test_raw_decimal_precision_preserves_range_violation(self):
+        code, output, diagnostic = self.unit_cli(self.unit_raw("1.0000000000000000000001", low="1", high="1"))
+        self.assertEqual(code, 1)
+        self.assertEqual(diagnostic, "")
+        report = json.loads(output)
+        self.assertEqual(report["quantities"][0]["values_si"], ["1.0000000000000000000001"])
+        self.assertEqual(report["findings"][0]["code"], "RANGE_VIOLATION")
+
+    def test_exact_json_zero_and_supported_extremes_remain_accepted(self):
+        for token in ("0e-400", "-0e400", "1e-100", "1.0", "1e100"):
+            with self.subTest(token=token):
+                code, output, diagnostic = self.unit_cli(self.unit_raw(token, low=token, high=token))
+                self.assertEqual(code, 0)
+                self.assertEqual(diagnostic, "")
+                self.assertEqual(json.loads(output)["finding_count"], 0)
+
+    def test_raw_nonfinite_json_numbers_never_produce_reports(self):
+        for token in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(token=token):
+                code, output, diagnostic = self.unit_cli(self.unit_raw(token))
+                self.assertEqual(code, 2)
+                self.assertEqual(output, "")
+                self.assertIn("Non-finite", diagnostic)
+
+    def test_decimal_decoding_does_not_coerce_identifiers_or_dimension_integers(self):
+        for raw in (self.unit_raw("0", quantity_id="1.0"), self.unit_raw("0", dimension="1.0")):
+            with self.subTest(raw=raw):
+                code, output, diagnostic = self.unit_cli(raw)
+                self.assertEqual(code, 2)
+                self.assertEqual(output, "")
+                self.assertTrue(diagnostic)
+
+    def test_decimal_input_digest_distinguishes_strings_and_binds_exact_bytes(self):
+        records = [self.unit_raw(token, low="1", high="1") for token in ("1.0", '"1.0"')]
+        reports = []
+        for raw in records:
+            code, output, diagnostic = self.unit_cli(raw)
+            self.assertEqual(code, 0)
+            self.assertEqual(diagnostic, "")
+            report = json.loads(output)
+            self.assertEqual(report["input_bytes_sha256"], hashlib.sha256(raw.encode("utf-8")).hexdigest())
+            self.assertEqual(report["input_digest_encoding"], "canonical_json_with_decimal_tags.v1")
+            reports.append(report)
+        self.assertEqual(reports[0]["quantities"], reports[1]["quantities"])
+        self.assertNotEqual(reports[0]["input_sha256"], reports[1]["input_sha256"])
+        self.assertNotEqual(reports[0]["input_bytes_sha256"], reports[1]["input_bytes_sha256"])
+
+    def test_raw_decimal_token_limits_apply_before_exponent_normalization(self):
+        for token in ("1e0001", "1e+" + "0" * 78 + "1"):
+            with self.subTest(token=token):
+                code, output, diagnostic = self.unit_cli(self.unit_raw(token))
+                self.assertEqual(code, 2)
+                self.assertEqual(output, "")
+                self.assertIn("unsupported decimal representation", diagnostic)
+
     def test_standalone_cli_reports_and_exclusive_output_without_processes(self):
         for name in ("szl-artifact-lineage", "szl-unit-invariants"):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:

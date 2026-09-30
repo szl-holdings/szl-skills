@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# Modified 2026-09-30: exact JSON decimal validation and type-preserving input binding.
 """Finite SI normalization and declared numerical invariants, with no expression eval or I/O."""
 import decimal
 import hashlib
@@ -35,7 +36,7 @@ SZL_UNITS = {
 
 
 def szl_unit_number(value, label):
-    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+    if isinstance(value, bool) or not isinstance(value, (int, float, str, decimal.Decimal)):
         raise ValueError(label + " must be a finite decimal number, not a boolean")
     token = str(value)
     if len(token) > 80 or re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,3})?", token) is None:
@@ -52,6 +53,13 @@ def szl_unit_format(value):
         return "0"
     text = format(value, "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def szl_unit_json_default(value):
+    """Bind Decimal inputs as typed numeric tokens, distinct from quoted strings."""
+    if isinstance(value, decimal.Decimal):
+        return {"szl_decimal": str(value)}
+    raise TypeError("Unsupported canonical input type")
 
 
 def szl_unit_id(value, label):
@@ -198,8 +206,9 @@ def szl_audit_unit_invariants(record):
         findings.sort(key=lambda item: (item["code"], item["quantity"] or "", item["invariant"] or ""))
         reports.sort(key=lambda item: item["id"])
         invariant_reports.sort(key=lambda item: item["id"])
-        digest = hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False, default=szl_unit_json_default).encode("utf-8")).hexdigest()
         return {"schema": "szl.unit-invariants-report.v1", "status": "REVIEW_REQUIRED" if findings else "PASS_DECLARED_CHECKS",
-                "input_sha256": digest, "quantities": reports, "invariants": invariant_reports, "findings": findings,
+                "input_sha256": digest, "input_digest_encoding": "canonical_json_with_decimal_tags.v1",
+                "quantities": reports, "invariants": invariant_reports, "findings": findings,
                 "finding_count": len(findings), "arithmetic_precision_decimal_digits": 50, "observed_units_verified": False,
                 "physical_law_verified": False, "scientific_validity": "NOT_MEASURED", "behavioral_performance": "NOT_MEASURED"}

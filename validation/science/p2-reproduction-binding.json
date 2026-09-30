@@ -1,0 +1,17 @@
+{
+  "errors": 1,
+  "failures": 3,
+  "implementation_inputs": "Exact retained source commit bytes",
+  "inventory_entries": 72,
+  "note": "Historical failed run; test overlays are newly authored, not committed at the original source pin.",
+  "receipt_path": "validation/science/p2-reproduction.json",
+  "schema": "szl.p2-reproduction-binding.v1",
+  "scientific_evaluation": "NOT_MEASURED",
+  "source_commit": "c325a5ee054fd6269a8a0da9a6c82d9c9496800a",
+  "status": "INPUT_BYTES_MATCH",
+  "supplied_replay_execution": "NOT_RUN",
+  "test_inputs": "Exact regression-overlay Git object bytes",
+  "test_overlay": "Four original synthetic regression methods; one per reported defect",
+  "test_overlay_git_object": "98b42cd82aba67ee0ee6c7058102410feae49207",
+  "tests_run": 105
+}

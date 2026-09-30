@@ -20,7 +20,7 @@ Generated workbench helpers remain byte copies of their reviewed sources.
 
 ## Reproduce the bounded acceptance run
 
-The final Python 3.12.3 snapshot passed **132 author tests and 13 independent forward
+The initial Python 3.12.3 snapshot passed **132 author tests and 13 independent forward
 scenarios**, with no failures, errors or skips. The initial combined run found an
 incomplete-fit status bug and an overbroad capsule credential guard; both were corrected
 with regressions. Two independent fixture assumptions were aligned with the documented
@@ -62,6 +62,18 @@ and logs are `validation/science/notice-author-suite.json` and
 `notice-inventory.json` and `notice-structural.json`. All prior reports, including the
 initial failures, remain unchanged. Comments/notices and install documentation changed;
 the scientific helper algorithms and workbench dispatch scope did not.
+
+The P2 review follow-up first reproduced all four reported defects against the retained
+source: three failed assertions and one UTC-normalization exception in 105 selected tests.
+That failure receipt is `validation/science/p2-reproduction.json`; it is dated pre-fix
+evidence, not the current result. Exact integer interval bounds, fail-closed UTC conversion,
+option-shaped replay entrypoint rejection and exact unit JSON numeric parsing now have
+17 new regression methods. All **149 author tests and the existing 13 independent forward
+scenarios** pass with the same OS-denial probes, without executing any supplied replay argv.
+The 82-test upgrade and 36-test lineage/unit subsets also pass. Current source inventories,
+logs and static notice/routing/mirror checks are retained as `validation/science/p2-*`.
+Unit input digests preserve numeric/string types and the CLI binds exact raw input bytes.
+No host registration, scientific benchmark, provider call or release gate is exercised.
 
 Source routing is fourteen packages: twelve science skills selected by the SDK installer,
 and two evidence skills intentionally excluded from it. Acceptance covers the ten

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
+# Modified 2026-09-30: preserve bounded numeric lexemes before validation and bind raw bytes.
 """Check an explicit bounded unit/invariant JSON record offline."""
 import argparse
 import decimal
+import hashlib
 import json
 import pathlib
 import runpy
@@ -34,9 +36,13 @@ def main(argv=None):
             raw = source.read(1024 * 1024 + 1)
         if len(raw) > 1024 * 1024:
             raise ValueError("Input exceeds 1 MiB")
-        payload = json.loads(raw, object_pairs_hook=unique_keys, parse_constant=reject_constant)
         functions = runpy.run_path(str(pathlib.Path(__file__).resolve().parents[1] / "kernel.py"))
+        def exact_decimal(token):
+            return functions["szl_unit_number"](token, "JSON decimal")
+        payload = json.loads(raw, object_pairs_hook=unique_keys, parse_constant=reject_constant,
+                             parse_float=exact_decimal)
         report = functions["szl_audit_unit_invariants"](payload)
+        report["input_bytes_sha256"] = hashlib.sha256(raw).hexdigest()
         output = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
         if args.output:
             with args.output.open("x", encoding="utf-8") as destination:

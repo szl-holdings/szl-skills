@@ -4,6 +4,23 @@ The top-level object has exactly `schema`, `quantities`, and `invariants`. Unkno
 
 `dimension` is a seven-integer vector ordered **length, mass, time, electric current, thermodynamic temperature, amount of substance, luminous intensity**; each exponent is in `-8..8`. For example `m/s` is `[1,0,-1,0,0,0,0]`. A unit's table dimension is authoritative for arithmetic; disagreement with the declared dimension creates a finding. `range_si` is either null or exactly `{"min": decimal, "max": decimal}` in canonical SI units; bounds are inclusive.
 
+The CLI validates each raw noninteger JSON numeric token before constructing a Decimal;
+it never first rounds through binary64. Nonzero underflow such as `1e-400`, overflow,
+out-of-bound exact values and overlong exponent spellings fail closed. Exact zero with
+a supported exponent spelling remains zero. Integer-only fields remain integer-only:
+numeric `1.0` does not become an integer dimension exponent or a string identifier.
+The direct Python API also accepts Decimal values. A float supplied by a caller has
+already lost any original lexical precision; use Decimal or decimal strings for exact
+inputs. Arithmetic still uses the documented 50-digit context, rather than unlimited precision.
+
+`input_sha256` binds sorted compact UTF-8 JSON with Decimal values represented by the
+typed object `{"szl_decimal": "<Decimal str>"}`. This representation distinguishes a
+Decimal number from a quoted decimal string; schema validation rejects caller objects
+in numeric fields. Existing records without Decimal values retain their digest encoding.
+`input_digest_encoding` names `canonical_json_with_decimal_tags.v1`. The CLI additionally
+reports `input_bytes_sha256` of the exact supplied bytes, preserving distinctions in
+whitespace and numeric lexeme spelling. Neither digest authenticates the evidence.
+
 Allowlisted symbols and scale to SI:
 
 | Symbols | Scales | SI dimension |
