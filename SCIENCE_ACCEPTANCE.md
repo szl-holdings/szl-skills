@@ -55,6 +55,19 @@ as data; they do not establish scientific or behavioral safety. Existing CI runs
 the repository's broader regression, packaging and SDK-test-double checks; its
 results are distinct from this OS-isolated acceptance evidence.
 
+The 2026-09-30 notice/documentation follow-up reran all **132 author tests and 13
+independent scenarios**, with no failures, errors or skips. Its exact input inventories
+and logs are `validation/science/notice-author-suite.json` and
+`notice-forward-review.json`; notice/routing and structural/mirror checks are
+`notice-inventory.json` and `notice-structural.json`. All prior reports, including the
+initial failures, remain unchanged. Comments/notices and install documentation changed;
+the scientific helper algorithms and workbench dispatch scope did not.
+
+Source routing is fourteen packages: twelve science skills selected by the SDK installer,
+and two evidence skills intentionally excluded from it. Acceptance covers the ten
+upgraded/new packages; workbench and kernel-comparison retain separate existing checks.
+Historical eight-skill tags, test counts and archive sizes are not new candidate results.
+
 The independent forward reviewer receives the packages and invented research task,
 without author test expectations. Its fixture outcomes cover one synthetic handoff
 per package. That exercise establishes limited usability evidence, not measured

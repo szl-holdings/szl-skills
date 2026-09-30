@@ -1,7 +1,11 @@
 # Science pack validation
 
-These observations cover the actual local workflow, numerical helpers and distributable
-packages. They do not establish successful application import or measured agent efficacy.
+The observations below describe the earlier eight-science-skill prerelease. They are
+historical evidence, not measurements of the expanded source candidate or a new run.
+For the current six upgrades and four new packages, including the notice follow-up,
+see [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). Current routing is fourteen total
+packages, twelve science skills selected by the installer and two excluded evidence skills.
+Neither evidence set establishes application import or measured agent efficacy.
 
 ## Checks
 
@@ -52,9 +56,11 @@ binding was performed, and this is not an external-data benchmark or production 
 
 ## Distribution and application boundary
 
-Eight individual ZIPs include SKILL.md, explicit resources, LICENSE and NOTICE. The largest
+In that earlier prerelease, eight individual ZIPs included SKILL.md, explicit resources,
+LICENSE and NOTICE. The largest
 workbench ZIP was approximately 34 KB compressed and 93 KB uncompressed; all eight total
-about 104 KB compressed. No weights, private second-brain records or downloaded study data
+about 104 KB compressed. These sizes have not been measured for the current twelve-skill
+candidate. No weights, private second-brain records or downloaded study data
 are included. Selected artifact downloads are explicit and their byte receipts are unsigned.
 
 Claude Science's own control-plane SDK is unavailable in the authoring Codex session.

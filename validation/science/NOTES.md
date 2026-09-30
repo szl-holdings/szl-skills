@@ -7,6 +7,19 @@
 - source-inputs.json: supported Library consumer-local materialization, actual byte
   counts and SHA-256 for the four authorized source-evidence artifacts.
 
+Notice/documentation follow-up (prior files above remain unchanged):
+
+- notice-author-suite.json: 132 cases PASS, no failures/errors/skips.
+- notice-forward-review.json: 13 independent scenarios PASS, no failures/errors/skips.
+- notice-structural.json: ten-package frontmatter/reference/AST and mirror consistency PASS.
+- notice-inventory.json: six dated/baseline notices; fourteen total, twelve selected science
+  skills and two excluded evidence skills; LICENSE terms unchanged, NOTICE path corrected.
+- notice-upgrades-* retain the separate six-upgrade branch's 73-case PASS and static checks.
+
+The latest inventories bind the notice-bearing source bytes. The earlier author/forward
+receipts and the private Library evidence bundle continue to describe their original
+7348bf37124b09e084e36073e4aef60160f34665 snapshot, not an automatically updated release.
+
 The initial failures led to an incomplete-fit UNKNOWN correction and a replay
 credential-guard correction. The independent geometric-mean and control fixtures
 were aligned with explicit contract limits. Math documentation now states that

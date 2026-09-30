@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased science acceptance candidate
+
+- Substantially upgrade six existing science packages and add four original offline audits.
+  Source inventory is fourteen packages: twelve science and two separate evidence skills.
+  The SDK installer selects only the twelve science skills; ten upgraded/new packages have
+  bounded synthetic acceptance evidence. Workbench and kernel-comparison retain their scopes.
+- Add precise modification notices to six model/capsule files, synchronize mirrors and
+  correct install/profile inventory and helper-format documentation. Preserve license terms,
+  calibration/MIT attribution, initial failure evidence and the previous acceptance receipts.
+- Existing release tags remain unchanged. Actual host/sidecar registration and scientific
+  performance remain NOT_RUN and NOT_MEASURED, respectively.
+
 ## 0.2.0-rc.1
 
 - Connected the science pack through a self-contained workbench with immutable run directories,
