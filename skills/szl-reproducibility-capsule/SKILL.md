@@ -24,7 +24,7 @@ python scripts/run.py assets/example.json --root .
 Creates a `szl.reproducibility-capsule.v1` record listing `assets/protocol.txt` (270 bytes, its
 SHA-256), the synthetic metadata, `signed: false` and a `capsule_sha256`. Verification on retained
 bytes reports changed, missing and unsafe or unreadable files separately. `assets/replay-example.json`
-adds a replay declaration over `assets/replay/`.
+adds a replay declaration over the files in `assets/replay`.
 
 ## Creating and verifying
 
