@@ -1,0 +1,87 @@
+{
+  "skill": "szl-analysis-mutation-test",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Would our QC notice if two plates got duplicated in the merge?",
+      "should_trigger": true
+    },
+    {
+      "query": "Generate corrupted versions of this dataset so we can test whether the validation step catches unit errors.",
+      "should_trigger": true
+    },
+    {
+      "query": "A reviewer asked how we detect data errors. Show which classes of corruption our checks catch and miss.",
+      "should_trigger": true
+    },
+    {
+      "query": "Stress-test the pipeline's sanity checks: shuffled labels, dropped rows, a dose column in the wrong unit.",
+      "should_trigger": true
+    },
+    {
+      "query": "Before freezing the analysis plan, list the failure classes our validation does not cover.",
+      "should_trigger": true
+    },
+    {
+      "query": "Mutation-test our data validation: build the variants and score the outcomes.",
+      "should_trigger": true
+    },
+    {
+      "query": "Our dose column arrives in micrograms once a year. Would the pipeline flag a x1000 error?",
+      "should_trigger": true
+    },
+    {
+      "query": "Create adversarial copies of the training table to see if the preprocessing checks fire.",
+      "should_trigger": true
+    },
+    {
+      "query": "Score these QC outcomes against the mutation plan we generated yesterday.",
+      "should_trigger": true
+    },
+    {
+      "query": "How robust are our schema and range checks to type confusion and injected missing values?",
+      "should_trigger": true
+    },
+    {
+      "query": "Clean this dataset and fix the units.",
+      "should_trigger": false
+    },
+    {
+      "query": "Impute the missing values in the dose column.",
+      "should_trigger": false
+    },
+    {
+      "query": "Run our pipeline on the data and report the results.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is the test set contaminated by training rows?",
+      "should_trigger": false
+    },
+    {
+      "query": "Write unit tests for this Python function.",
+      "should_trigger": false
+    },
+    {
+      "query": "What is mutation testing in software engineering?",
+      "should_trigger": false
+    },
+    {
+      "query": "Estimate the real-world error rate of our instrument.",
+      "should_trigger": false
+    },
+    {
+      "query": "Remove duplicate rows from this table.",
+      "should_trigger": false
+    },
+    {
+      "query": "Audit the negative controls in this experiment.",
+      "should_trigger": false
+    },
+    {
+      "query": "Detect outliers in the response column.",
+      "should_trigger": false
+    }
+  ]
+}

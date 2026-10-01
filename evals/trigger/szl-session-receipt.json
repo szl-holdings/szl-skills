@@ -1,0 +1,87 @@
+{
+  "skill": "szl-session-receipt",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Record what we just did in this session so a collaborator can verify it: inputs, scripts, outputs, commands.",
+      "should_trigger": true
+    },
+    {
+      "query": "The journal wants a reproducibility statement. Produce the Methods paragraph with file hashes.",
+      "should_trigger": true
+    },
+    {
+      "query": "Before I hand this analysis to my PI, create a receipt of every file it read and wrote.",
+      "should_trigger": true
+    },
+    {
+      "query": "Verify my colleague's analysis folder against the receipt she sent before I read her conclusions.",
+      "should_trigger": true
+    },
+    {
+      "query": "Months later the numbers differ. Check whether data/raw.csv is still the same bytes as in the receipt.",
+      "should_trigger": true
+    },
+    {
+      "query": "Write the session receipt for this notebook run and the paragraph for supplementary material.",
+      "should_trigger": true
+    },
+    {
+      "query": "Hash all inputs, code and outputs of this analysis into one verifiable record.",
+      "should_trigger": true
+    },
+    {
+      "query": "Produce a verifiable record of this agent-assisted analysis session.",
+      "should_trigger": true
+    },
+    {
+      "query": "Re-verify the receipt in results/receipt.json against the current project directory.",
+      "should_trigger": true
+    },
+    {
+      "query": "Give me a methods paragraph that can be re-checked by re-hashing the files.",
+      "should_trigger": true
+    },
+    {
+      "query": "Sign this PDF with my private key.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is my analysis correct?",
+      "should_trigger": false
+    },
+    {
+      "query": "Summarize what we discussed in this chat.",
+      "should_trigger": false
+    },
+    {
+      "query": "Hash this one file for me.",
+      "should_trigger": false
+    },
+    {
+      "query": "Set up git for this project.",
+      "should_trigger": false
+    },
+    {
+      "query": "Write the methods section describing the statistical model.",
+      "should_trigger": false
+    },
+    {
+      "query": "Capture every command run on this machine today.",
+      "should_trigger": false
+    },
+    {
+      "query": "Create a Docker container for the analysis.",
+      "should_trigger": false
+    },
+    {
+      "query": "Check whether the claims in the paper have artifacts behind them.",
+      "should_trigger": false
+    },
+    {
+      "query": "Archive the experiment files into a capsule with a replay declaration.",
+      "should_trigger": false
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "skill": "szl-compute-energy-receipt",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Add an energy statement to the methods section for our fine-tuning run; here is the NVML log.",
+      "should_trigger": true
+    },
+    {
+      "query": "The model card needs a compute and carbon figure. We only have the cloud bill, not power samples.",
+      "should_trigger": true
+    },
+    {
+      "query": "Write the sentence that discloses CO2e for this training run with the regional grid factor.",
+      "should_trigger": true
+    },
+    {
+      "query": "How many kWh did the MD simulation use? Here are the RAPL samples.",
+      "should_trigger": true
+    },
+    {
+      "query": "A reviewer asked how much compute the inference sweep took. Produce a receipt from these watt readings.",
+      "should_trigger": true
+    },
+    {
+      "query": "Turn these power samples into a measured energy figure with a methods sentence.",
+      "should_trigger": true
+    },
+    {
+      "query": "We have no energy measurement for the exploratory runs. Write the honest statement for the paper.",
+      "should_trigger": true
+    },
+    {
+      "query": "Estimate energy from TDP and duration and label it correctly as an estimate.",
+      "should_trigger": true
+    },
+    {
+      "query": "Produce the energy receipt for run lora-seed-011 and say whether it is measured or reported.",
+      "should_trigger": true
+    },
+    {
+      "query": "What should the carbon disclosure say if the grid factor is a published national average?",
+      "should_trigger": true
+    },
+    {
+      "query": "Monitor my GPU power draw in real time.",
+      "should_trigger": false
+    },
+    {
+      "query": "Make the training run more energy efficient.",
+      "should_trigger": false
+    },
+    {
+      "query": "Compare the energy efficiency of two models.",
+      "should_trigger": false
+    },
+    {
+      "query": "What is the carbon footprint of the whole data center?",
+      "should_trigger": false
+    },
+    {
+      "query": "Calculate embodied emissions for our hardware purchase.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is 0.002 kWh a lot for a fine-tune?",
+      "should_trigger": false
+    },
+    {
+      "query": "Read the NVML counters on this machine.",
+      "should_trigger": false
+    },
+    {
+      "query": "Convert 8072 joules to kilowatt-hours.",
+      "should_trigger": false
+    },
+    {
+      "query": "Write a sustainability section for the grant without any data.",
+      "should_trigger": false
+    },
+    {
+      "query": "Which cloud region has the cleanest grid?",
+      "should_trigger": false
+    }
+  ]
+}

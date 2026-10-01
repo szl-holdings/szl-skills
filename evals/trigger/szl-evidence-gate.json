@@ -1,0 +1,87 @@
+{
+  "skill": "szl-evidence-gate",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Does every number in our results section actually point at a file in the repo? Here is the manuscript and the supplementary folder.",
+      "should_trigger": true
+    },
+    {
+      "query": "Audit this Hugging Face model card: which of its claims have an artifact behind them?",
+      "should_trigger": true
+    },
+    {
+      "query": "A reviewer asked for the data behind the sentence 'ECE < 0.05'. Which file supports it, and does its hash match what we archived?",
+      "should_trigger": true
+    },
+    {
+      "query": "Before we submit, check that each claim in the README is backed by something in artifacts/.",
+      "should_trigger": true
+    },
+    {
+      "query": "Is this claim backed up? 'Held-out accuracy 0.912 across three seeds.'",
+      "should_trigger": true
+    },
+    {
+      "query": "Build the artifact index for the supplementary material: claim, file, digest.",
+      "should_trigger": true
+    },
+    {
+      "query": "Our grant report lists six results; confirm each has the underlying output file and that nothing was swapped since the run.",
+      "should_trigger": true
+    },
+    {
+      "query": "Which statements in this dataset card are unverifiable because no evidence is declared?",
+      "should_trigger": true
+    },
+    {
+      "query": "Verify the figure captions against the CSVs that generated them, with hashes.",
+      "should_trigger": true
+    },
+    {
+      "query": "Check the paper's claims against the artifacts directory and tell me what is missing.",
+      "should_trigger": true
+    },
+    {
+      "query": "Is this claim scientifically correct? The effect size seems too large for the sample.",
+      "should_trigger": false
+    },
+    {
+      "query": "Recompute the accuracy from these predictions and labels.",
+      "should_trigger": false
+    },
+    {
+      "query": "Summarize the main findings of this paper in three bullets.",
+      "should_trigger": false
+    },
+    {
+      "query": "Hash all files in this directory for me.",
+      "should_trigger": false
+    },
+    {
+      "query": "Write a model card for my new classifier.",
+      "should_trigger": false
+    },
+    {
+      "query": "Does this statistical test fit the design of the study?",
+      "should_trigger": false
+    },
+    {
+      "query": "Download the artifacts referenced in the README.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is my test set leaking into training?",
+      "should_trigger": false
+    },
+    {
+      "query": "Compare the R and Python outputs for Table 2.",
+      "should_trigger": false
+    },
+    {
+      "query": "Fact-check this news article about a clinical trial.",
+      "should_trigger": false
+    }
+  ]
+}

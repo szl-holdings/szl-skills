@@ -1,0 +1,87 @@
+{
+  "skill": "szl-reviewer-pack",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Summarize what we checked and what is still open before we submit.",
+      "should_trigger": true
+    },
+    {
+      "query": "Build the pre-review page for the PI from the workbench runs.",
+      "should_trigger": true
+    },
+    {
+      "query": "Give the reviewer one page: every check, its status, and each unresolved finding quoted.",
+      "should_trigger": true
+    },
+    {
+      "query": "Render REVIEW.md for this project and include the evidence gate and session receipt reports.",
+      "should_trigger": true
+    },
+    {
+      "query": "What is still open in this project? Pull it from the retained check reports, not from memory.",
+      "should_trigger": true
+    },
+    {
+      "query": "Prepare the response-to-reviewers appendix from the retained evidence.",
+      "should_trigger": true
+    },
+    {
+      "query": "Produce the reviewer bundle with the declared weights for each check.",
+      "should_trigger": true
+    },
+    {
+      "query": "Which findings from the last workbench run remain unresolved?",
+      "should_trigger": true
+    },
+    {
+      "query": "Make a one-page summary of the leakage, math, paired and model checks for the lab meeting.",
+      "should_trigger": true
+    },
+    {
+      "query": "Turn the five JSON check reports into something a non-programmer can read.",
+      "should_trigger": true
+    },
+    {
+      "query": "Review this manuscript and write a peer review.",
+      "should_trigger": false
+    },
+    {
+      "query": "Re-run all the checks on the project.",
+      "should_trigger": false
+    },
+    {
+      "query": "Approve this paper for publication.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is the science in this project correct?",
+      "should_trigger": false
+    },
+    {
+      "query": "Summarize this PDF for me.",
+      "should_trigger": false
+    },
+    {
+      "query": "Run the dataset leakage check on this table.",
+      "should_trigger": false
+    },
+    {
+      "query": "Write a response letter to reviewer 2's statistical objections.",
+      "should_trigger": false
+    },
+    {
+      "query": "Compute an overall quality score for the model.",
+      "should_trigger": false
+    },
+    {
+      "query": "Format my results section in Markdown.",
+      "should_trigger": false
+    },
+    {
+      "query": "List the files in the project directory.",
+      "should_trigger": false
+    }
+  ]
+}
