@@ -311,6 +311,15 @@ class PackagingTests(unittest.TestCase):
                                str(unpacked / "assets" / "example.json")]
                     if report["skill"] == "szl-reproducibility-capsule":
                         command.extend(["--root", str(unpacked)])
+                    elif report["skill"] == "szl-analysis-mutation-test":
+                        command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), "generate",
+                                   str(unpacked / "assets" / "example.json"), "--out-dir", str(destination / "mutation-variants")]
+                    elif report["skill"] == "szl-session-receipt":
+                        command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), "record",
+                                   str(unpacked / "assets" / "example.json"), "--root", str(unpacked / "assets" / "project")]
+                    elif report["skill"] == "szl-reviewer-pack":
+                        command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), str(unpacked / "assets" / "project"),
+                                   "--json", str(destination / "pack.json"), "--output", str(destination / "REVIEW.md")]
                     p = subprocess.run(command, capture_output=True, text=True)
                     self.assertEqual(p.returncode, 0, p.stderr)
                     json.loads(p.stdout)

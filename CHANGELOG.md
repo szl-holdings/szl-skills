@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0
+
+- Six new science skills, all stdlib and offline: szl-evidence-gate (PASS/FAIL/ABSTAIN/ERROR per
+  claim against named artifacts), szl-cross-implementation-check (CONSISTENT/DIVERGENT/INCOMPARABLE
+  per quantity under declared tolerances with input-digest binding), szl-analysis-mutation-test
+  (ten synthetic corruption classes, two-phase generate/score, pipeline never executed),
+  szl-compute-energy-receipt (MEASURED/REPORTED/UNAVAILABLE typing, trapezoidal integration,
+  methods sentence), szl-session-receipt (per-role file digests, root digest, Methods paragraph,
+  verify, optional DSSE signing via szl-receipt-dsse), szl-reviewer-pack (REVIEW.md from retained
+  workbench runs and standalone reports, with an advisory reviewer-declared weighted geometric mean).
+- Rewrote every science SKILL.md for working scientists: trigger-oriented descriptions, a quick
+  start with the fixture's real output, domain examples, and one consolidated boundary section.
+  Kernels, contracts and fixtures are unchanged; the 208 existing tests still pass.
+- Removed SZL-internal vocabulary from the science pack prose; the open-conjecture status of the
+  demo aggregator is still recorded in reports, now explained in plain language.
+- Converted the two evidence skills' folded YAML descriptions to single-line strings.
+- Marketplace plugin szl-science-skills now lists eighteen skills; installer and packaging tests
+  cover the new CLIs. 229 tests; selfcheck PASS; skills/ under 1 MB.
+- Scientific and agent performance remain NOT_MEASURED until a pilot runs in Claude Science.
+
 ## Unreleased science acceptance candidate
 
 - Substantially upgrade six existing science packages and add four original offline audits.

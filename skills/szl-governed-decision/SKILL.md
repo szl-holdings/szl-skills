@@ -1,13 +1,7 @@
 ---
 name: szl-governed-decision
-description: >
-  Make decisions that carry their own evidence. Wrap any classifier, policy engine or System
-  One model in a fail-closed record that names why it refused, cites a digest rather than the
-  text, and never asserts a number without a receipt on disk. Use when a decision must survive
-  audit, when a model's output should be advisory rather than authoritative, or when a claim
-  needs a state - MEASURED, BLOCKED, UNVERIFIED, UNAVAILABLE, NOT_CLAIMED - instead of a
-  confident sentence. Complements typed-primitive skills: they produce the judgement, this
-  governs what the judgement is allowed to do.
+description: "Make decisions that carry their own evidence. Wrap any classifier, policy engine or System One model in a fail-closed record that names why it refused, cites a digest rather than the text, and never asserts a number without a receipt on disk. Use when a decision must survive audit, when a model's output should be advisory rather than authoritative, or when a claim needs a state - MEASURED, BLOCKED, UNVERIFIED, UNAVAILABLE, NOT_CLAIMED - instead of a confident sentence. Complements typed-primitive skills: they produce the judgement, this governs what the judgement is allowed to do."
+
 ---
 
 # Governed decision

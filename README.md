@@ -1,118 +1,109 @@
 # SZL Skills
 
-Fail-closed evidence and decision skills for Claude (Claude Science, Claude Code, claude.ai).
+Executable, offline checks that make scientific claims carry their evidence. Twenty skills for
+Claude Science, Claude Code and claude.ai: eighteen science checks and two evidence skills.
+Every check is Python standard library, runs without network or credentials, and reports what it
+did not verify alongside what it did.
 
 ## Import
 
 Claude Science: Skills > Import from GitHub, paste:
 
-    szl-holdings/szl-skills@v0.1.3
+    szl-holdings/szl-skills@v0.3.0
 
-Claude Code: copy a folder from skills/ into .claude/skills/ or ~/.claude/skills/.
+Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
+into `.claude/skills/` or `~/.claude/skills/`.
 
-## Skills
+Community index with pinned commits and automated checks: https://github.com/ai4science-skills/skills
+
+## Start here
+
+| If you want to... | Use | It tells you |
+|---|---|---|
+| run every check on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
+| know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
+| confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
+| know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
+| write an honest energy or CO2e sentence for the methods section | szl-compute-energy-receipt | MEASURED / REPORTED / UNAVAILABLE with the sentence |
+| record what an analysis session read, ran and produced, verifiably | szl-session-receipt | hashed receipt, Methods paragraph, MATCH / MISMATCH later |
+| give a reviewer one page of what was checked and what is open | szl-reviewer-pack | REVIEW.md with every unresolved finding quoted |
+
+## Science checks
+
+| Skill | Question it answers | Boundary |
+|---|---|---|
+| szl-dataset-readiness | Is the test set contaminated (duplicates, shared subjects, future labels, held-out fitting)? | Does not clean data or approve suitability |
+| szl-model-evaluation | How good and how calibrated are these predictions, counting every attempt? | Does not run inference; binary and categorical only |
+| szl-math-claim-check | Does this formula or theorem claim hold on tested cases, and is the proof actually bound to the code? | Not a prover or CAS |
+| szl-kernel-comparison | Does the fast implementation give the same numbers, and was the timing fair? | Does not measure energy |
+| szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
+| szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
+| szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
+| szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
+| szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
+| szl-negative-control-audit | Do the negative controls actually rule out the mechanism they claim to, and were outcomes retained? | Does not design interventions |
+| szl-analysis-plan-audit | Did the analysis that ran match the frozen plan, or is the result exploratory now? | No p value, power or efficacy |
+| szl-evidence-gate | Does each stated claim have an intact artifact behind it? | Does not judge scientific correctness |
+| szl-cross-implementation-check | Do two independent implementations agree within declared tolerances on the same input? | Does not say which one is right |
+| szl-analysis-mutation-test | Which classes of data corruption would the project's QC catch? | Never runs the pipeline; not a quality score |
+| szl-compute-energy-receipt | What did this run cost in energy, and was that measured or estimated? | Not a hardware monitor or carbon standard |
+| szl-session-receipt | What exactly did this session read, run and write, and is it still the same? | A MATCH is not correctness |
+| szl-reviewer-pack | What was checked, what is still open, in one page? | Does not re-run checks or approve publication |
+| szl-science-workbench | All of the above on one project directory, with immutable runs and invalidation | Not an experiment runner |
+
+Every skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
+under `references/` where the input format is non-trivial, and tests in `tests/`. The workbench
+bundles its own copies of the check implementations (`tools/sync_workbench.py --check` keeps them
+identical to the reviewed originals).
+
+## Evidence skills
 
 | Skill | What it does | What it does not do |
 |---|---|---|
 | szl-typesafe-ai | Uses TypeSafe Jev (Choice / Noul / Score) as an optional second reader for evidence-class triage. Fail-closed: any error gives UNAVAILABLE, never PASS. | Not a gate. Not TypeScript, Zod, Pydantic, mypy, or JSON Schema. Never marks anything LIVE. |
 | szl-governed-decision | Wraps a classifier, policy engine, or System One model so each decision carries its own evidence. | Does not prove a model output is true. Receipts cover integrity and origin only. |
-| szl-paired-science | Checks complete paired measurements, training-only normalization, identity controls, exact input hashes, and corrected paired comparisons offline. | Does not verify researcher declarations, certify science, or admit a model to production. |
 
-## Science pack source candidate
-
-The source candidate contains fourteen skills: twelve science skills and two evidence skills.
-The twelve science skills are offline-first, stdlib-only and prefixed with szl to avoid
-personal-skill name collisions. Each includes a SKILL.md, explicit resources, a command-line
-workflow and synthetic fixtures. Ten expose kernel.py; paired-science and workbench use CLI
-resources instead. No weight downloads, private second-brain data or keys are bundled.
-
-- **szl-research-anatomy** maintains persistent project memory and propagates source changes
-  to dependent claims, proofs and runs without erasing previous records.
-- **szl-math-claim-check** records numerical counterexamples and formal proof obligations;
-  Lambda uniqueness remains Conjecture 1 (OPEN).
-- **szl-dataset-readiness** detects exact feature and subject leakage across splits and
-  retains missing provenance/reuse findings.
-- **szl-model-evaluation** adapts the SZL calibration implementation for binary probability
-  metrics and cohorts, without equating supplied predictions with verified model quality.
-- **szl-kernel-comparison** compares finite numerical outputs before considering a timing
-  ratio; incompatible or incomplete timing context suppresses the ratio.
-- **szl-reproducibility-capsule** hashes explicitly selected files and detects changes
-  relative to a retained unsigned manifest. Integrity is not authenticity or scientific truth.
-- **szl-paired-science** applies a declared paired comparison with complete trials and an
-  identity negative control; declarations are distinct from independent verification.
-- **szl-science-workbench** runs the selected checks together, observes actual input/code
-  bytes, saves immutable results and propagates changed or missing sources through anatomy.
-  Its helper copies are generated and checked against the reviewed originals, not hand-maintained.
-- **szl-artifact-lineage** audits required stages and producer/consumer digest continuity.
-- **szl-unit-invariants** checks a restricted SI dimension, conversion, range and invariant grammar.
-- **szl-negative-control-audit** audits retained computational controls and outcomes without execution.
-- **szl-analysis-plan-audit** compares frozen analysis settings with retained run declarations.
-
-Historical eight-science-skill prerelease import:
-
-    szl-holdings/szl-skills@v0.2.0-rc.1
-
-Four original audit packages add artifact-lineage continuity, SI unit/invariant checks,
-computational negative-control evidence and frozen analysis-plan comparison. See
-[SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md) for the six substantial upgrades, four additions,
-bounded synthetic acceptance procedure and remaining scientific/application boundaries.
-These additions are reviewed through draft source branches; existing release tags are
-unchanged. Use the reviewed source revision when inspecting this candidate.
-The historical tag above does not contain the expanded twelve-skill candidate.
-
-The science plugin and SDK installer select exactly these twelve skills; the separate
-evidence plugin contains the two existing skills, excluded from that installer. Ten
-acceptance packages are six upgraded skills and four new audits. Existing workbench and
-kernel-comparison checks remain separate, and the four standalone additions do not expand
-the workbench's check-dispatch graph. No duplicated names occur across plugins. This is an
-unreleased draft at a signed source revision; Stephen reviews and merges source PRs.
-
-The workbench is also self-contained if imported alone. Start a synthetic project:
+## Try it in two minutes
 
 ```bash
 python -B skills/szl-science-workbench/scripts/workbench.py init ../research-project
 python -B skills/szl-science-workbench/scripts/workbench.py run ../research-project
 python -B skills/szl-science-workbench/scripts/workbench.py check ../research-project
+python -B skills/szl-reviewer-pack/scripts/run.py ../research-project --output ../research-project/REVIEW.md
 ```
 
-The demo deliberately reports leakage, a counterexample and a rejected paired comparison.
-Run exit 0 means execution completed without checked findings, 1 means completed with
-findings, and 2 means an execution/input error. Check exit 1 means retained evidence became
-stale or mismatched. Neither exit 0 nor matching files verifies scientific truth.
+The demo deliberately reports leakage, a counterexample and a rejected paired comparison; the
+reviewer pack turns those into one page. `run` exit 0 means no checked findings, 1 means findings,
+2 means an execution or input error. `check` exit 1 means retained evidence became stale.
 
-For the pinned public triage study, fetch-triage explicitly downloads four small study
-files from Hugging Face and records their hashes; no model weights are downloaded. Then
-run and check that project. The categorical evaluator recomputes outputs against retained
-targets rather than trusting stored correctness flags. See [VALIDATION.md](VALIDATION.md).
+For the pinned public triage study, `fetch-triage` downloads four small study files from Hugging
+Face and records their hashes; no model weights are downloaded. See [VALIDATION.md](VALIDATION.md).
+[MODEL_INTEGRATIONS.md](MODEL_INTEGRATIONS.md) describes optional SZL model roles;
+[SCIENCE_SOURCES.json](SCIENCE_SOURCES.json) records inspected source and Hub revisions.
 
-[MODEL_INTEGRATIONS.md](MODEL_INTEGRATIONS.md) describes optional SZL model roles and evidence
-to check before using them. [SCIENCE_SOURCES.json](SCIENCE_SOURCES.json) records inspected source
-and Hub revisions. These references are not certifications of those assets.
-
-For individual upload packages (no installs), run:
+## Packaging and verification
 
 ```bash
-python tools/package_science.py --output-dir ../science-skill-packages
-```
-
-Each ZIP has SKILL.md at its root plus its explicit helpers, CLI, resources and license notices.
-For releases, pass --revision with the full 40-character commit: the builder reads immutable
-Git blobs and writes deterministic archives, so Windows line endings or local edits cannot
-change what is attributed to that source revision.
-Use the import mechanism available in your Claude Science version. [CLAUDE_SCIENCE_SETUP.md](CLAUDE_SCIENCE_SETUP.md)
-provides the supported SDK installer and curated SZL_SCIENCE specialist with application
-readbacks. Actual application registration and agent task performance remain unverified
-until that procedure and pilot run in Claude Science's own control-plane repl. This Codex
-session has no access to that SDK; local tests and SDK test doubles do not establish import.
-The stable two-skill import remains v0.1.3; the science pack is an explicit prerelease.
-
-All tests are offline:
-
-```bash
+python tools/package_science.py --output-dir ../science-skill-packages   # one ZIP per science skill
 python -B tools/selfcheck.py
 python -B tools/sync_workbench.py --check
 python -B -m unittest discover -s tests -v
 ```
+
+Each ZIP has SKILL.md at its root plus its helpers, CLI, fixtures and license notices. Pass
+`--revision <40-char commit>` to build deterministic archives from immutable Git blobs.
+[CLAUDE_SCIENCE_SETUP.md](CLAUDE_SCIENCE_SETUP.md) covers the SDK installer and the curated
+specialist. Actual registration and agent task performance in Claude Science remain unverified
+until a pilot runs there; local tests do not establish them.
+
+## Where these checks come from
+
+The kernels descend from SZL Holdings' published, Apache-2.0 Python packages: calibration metrics
+(szl-calibration), cross-implementation and verifier mutation testing (szl-crosscheck, szl-eclipse),
+typed energy evidence (szl-energy-attest), the PASS/FAIL/ABSTAIN/ERROR evidence gate
+(szl-evidence-mandate), signed receipts (szl-receipt-dsse, optional) and the weighted geometric mean
+aggregator used by the reviewer pack. The skill versions are stdlib-only re-expressions for research
+data rather than receipt chains; the package names are listed so the lineage can be inspected.
 
 ## Setup for szl-typesafe-ai (existing skill)
 
