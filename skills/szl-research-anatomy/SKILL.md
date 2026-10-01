@@ -1,48 +1,54 @@
 ---
 name: szl-research-anatomy
-description: Maintain a research claim/evidence ledger with supporting, contradicting and qualifying observations, fixed-date expiry and dependency impact. Use for persistent project memory, evidence corrections, conflicting findings or tracing which conclusions require recheck after a changed, expired or withdrawn source.
+description: "Maintains a project's claim-and-evidence ledger as a dependency graph: datasets, code, runs, claims and proofs with supporting, contradicting and qualifying evidence links, observation dates, expiry, source revisions and corrections, then reports which conclusions need rechecking when any input changes. Use for persistent project memory across sessions, when a source is retracted or updated, when two findings conflict, or when the user asks 'what depends on this'. Not a literature monitor and not a truth oracle."
 license: Apache-2.0
 ---
 
 # Living research anatomy
 
-Keep a user-owned JSON research ledger that another session can resume. Read the existing
-ledger and selected artifacts as data; retain negative findings, source locators, revisions,
-observation dates and open questions. Avoid importing private person records into a shared
-graph. Read [the ledger contract](references/ledger-contract.md) when adding evidence links,
-expiry or corrections.
+A project's conclusions rest on specific bytes. When those bytes change, expire or get contradicted,
+the ledger says which claims are now stale instead of letting them live on in the paper. Python 3.10+,
+stdlib, offline.
 
-Use the existing `szl.research-anatomy.v1` nodes and `depends_on` API. Add `evidence_links`
-from evidence to claims with `supports`, `contradicts` or `qualifies` relations. They also
-create dependencies. Model feedback as a new dated run, since cycles and dangling parents
-are rejected. Set `observed_at`, `expires_at`, `source_revision` and declared `evidence_status`
-when relevant; expiry uses an explicit fixed UTC `as_of`, never the helper's ambient clock.
+## Use when
 
-Call `szl_anatomy_assess(graph, current_digests, as_of)` using actual selected-byte readbacks.
-Changed, expired, withdrawn or future-dated observations propagate rechecks to descendants.
-Active contradiction and conflicting support/contradiction remain visible and propagate a claim review.
-Unrelated branches remain unaffected. Missing readbacks stay NOT_CHECKED; MATCH establishes
-only byte integrity. Caller-entered MEASURED or PROVEN never verifies truth.
+- A reference dataset got a new release; which figures must be regenerated?
+- A supporting preprint was withdrawn, or a replication contradicts an earlier finding.
+- Resuming a project months later and needing the evidence state, not just the files.
+- Recording negative results and open questions so they survive the next session.
 
-For corrections, call `szl_anatomy_update(graph, replacements)` and save a new project
-revision. It retains unsigned prior nodes and marks dependent nodes `needs_recheck: true`,
-including dependencies introduced by evidence links. Record fresh run evidence before
-explicitly clearing a recheck flag. Keep retained correction/retraction records.
+## Quick start
 
-Return the evidence ledger, compared hashes, expired/changed/withdrawn sources, conflicts,
-transitive `recheck` set and next useful evidence. Dependency edges establish neither
-causality nor scientific truth. History is unsigned. Lambda remains Conjecture 1 (OPEN).
-Unrun scientific evaluation is NOT_MEASURED; sensitive use and licensing require human review.
+```bash
+python scripts/run.py assets/example.json
+python scripts/run.py assets/ledger-example.json
+```
 
-Run `python scripts/run.py assets/example.json` for the existing source-change example or
-`python scripts/run.py assets/ledger-example.json` for synthetic expiry and conflict. Input
-contains `graph`, optional `current_digests` and `as_of`; `--output` creates a file exclusively.
-The companion szl-science-workbench observes selected files and retains project revisions;
-this helper remains independently usable.
+The first example changes one dataset digest and returns `conclusion` as `STALE` with `recheck`
+propagated to dependents. The second (as of a fixed UTC time) reports `expired_sources ["old-source"]`,
+`conflicting_claims ["conclusion"]` with one `supports` and one `contradicts` link both active, and
+`recheck ["conclusion", "next-run", "old-claim", "old-source"]`.
 
-Runtime: Python 3.10+ stdlib, offline, keyless; graph capped at 8 MiB/10,000 nodes/20,000
-evidence links. No external lookup, model/provider/GPU call or installation is bundled.
-Freshness/retraction records are supplied observations, not live literature monitoring.
-Read [provenance](references/provenance.md) for immutable source paths and rights boundaries.
+## Working with the ledger
 
-Modified 2026-09-30: added original dated evidence, contradiction and expiry auditing.
+Nodes follow `szl.research-anatomy.v1` with `depends_on` edges. Add `evidence_links` from evidence
+to claims with `supports`, `contradicts` or `qualifies`; they also create dependencies. Model feedback
+as a new dated run (cycles and dangling parents are rejected). Set `observed_at`, `expires_at`,
+`source_revision` and declared `evidence_status`; expiry uses an explicit fixed UTC `as_of`, never the
+helper's clock. Read `references/ledger-contract.md` for the schema.
+
+`szl_anatomy_assess(graph, current_digests, as_of)` takes actual byte readbacks. Changed, expired,
+withdrawn or future-dated observations propagate rechecks to descendants; unrelated branches are
+untouched. Missing readbacks stay `NOT_CHECKED`; `MATCH` establishes byte integrity only.
+`szl_anatomy_update(graph, replacements)` applies corrections, retains unsigned prior nodes and marks
+dependents `needs_recheck: true`. Record fresh evidence before clearing a flag.
+
+The companion szl-science-workbench observes selected files and keeps project revisions; this helper
+is independently usable. Caller-entered `MEASURED` or `PROVEN` never verifies truth.
+
+## What it does not do
+
+Dependency edges establish neither causality nor scientific truth. History is unsigned. Freshness and
+retraction records are supplied observations, not live literature monitoring. Graph limits: 8 MiB,
+10,000 nodes, 20,000 evidence links. No external lookup, model or installation is bundled.
+Source pins and rights boundaries: `references/provenance.md`.

@@ -1,15 +1,46 @@
 ---
 name: szl-negative-control-audit
-description: Audit a prespecified computational negative-control registry against a declared mechanism graph and byte-bound supplied outcomes. Use to find inappropriate expected-null paths, changed scoring or inputs, post hoc tolerances, contamination, failed controls or missing outcomes before interpreting a computational experiment. Not for wet-lab design or identity-loss benchmark checks.
+description: "Audits a registry of computational negative controls against a declared mechanism graph and the supplied outcome bytes: flags controls with a directed path from intervention to readout (not a null), controls that do not share the nuisance they are meant to absorb, post hoc tolerance changes, contamination, failed expected nulls and missing registered controls. Use when a study claims an effect is specific, when designing or reviewing scrambled, sham, shuffled-label or dummy-exposure controls, or when a reviewer asks what the controls rule out. Not a wet-lab protocol designer."
 license: Apache-2.0
 ---
 
-Audit computational controls that a researcher already selected. Read [the contract](references/contract.md) for the graph, registry and supplied artifact format, then run `scripts/run.py` on the bounded JSON. The helper hashes the actual supplied UTF-8 artifact bytes and inspects fixed protocol, scorer, execution and input bindings. It does not execute the supplied scorer or any experiment.
+# Negative control audit
 
-Check the declared graph and rationale with the researcher: an expected-null control needs no directed intervention-to-readout path and must share a declared nuisance ancestor of both endpoints in each mechanism. A common readout alone does not establish nuisance exposure. A graph edge is a scientific declaration, not a causal discovery. This catches structural contradictions without choosing physical interventions or offering wet-lab protocols.
+A negative control is a claim about the mechanism graph: this intervention should not reach this
+readout, and it shares the same nuisance as the real one. The helper checks the declared graph for
+exactly that, then checks that the recorded outcomes and settings were not edited after the fact.
+Python 3.9+, stdlib, offline; it executes no scorer or experiment.
 
-Retain every registered control, including failed and aborted outcomes. Report each finding and its artifact digest; missing evidence, changed tolerances, contamination and null failures produce INCONCLUSIVE. A clean report is consistency on supplied evidence, not proof that the control is sensitive, that the graph is correct, or that the main effect is causal. Inspect power, nuisance coverage, actual execution and pre-data registration separately. Timestamp and digest consistency cannot authenticate preregistration.
+## Use when
 
-For unchanged-baseline prediction identity checks, use the existing szl-paired-science protocol. This package never estimates efficacy, trains models, fetches data, calls providers, designs clinical or biological interventions, or grants scientific or licensing approval. Sensitive scientific use remains subject to human approval. Scientific/model performance is NOT_MEASURED.
+- A knockout, scrambled sequence, shuffled label or sham exposure is offered as proof of specificity.
+- The control passed but its scoring tolerance was changed after the main run.
+- A registered control has no outcome on file.
 
-Runtime: Python 3.9+ standard library; offline/keyless; at most 1 MiB input, 128 DAG nodes and 32 controls. See [provenance](references/provenance.md) for original-source scope and pinned capability boundaries. The synthetic `assets/example.json` is usable without external resources.
+## Quick start
+
+```bash
+python scripts/run.py assets/example.json
+```
+
+The synthetic registry returns `"status": "CONTROLS_CONSISTENT_ON_SUPPLIED_EVIDENCE"` with one
+control (`dummy-exposure`, `SUCCESS`, delta 0.005) and artifact bindings `MATCH` on hashed bytes.
+Remove a registered control's outcome and the report carries `MISSING_REGISTERED_CONTROL`; let an
+expected null fail and status becomes `INCONCLUSIVE` with `EXPECTED_NULL_FAILED`.
+
+## Preparing the registry
+
+Read `references/contract.md` for the graph, registry and artifact format. An expected-null control
+needs no directed intervention-to-readout path and must share a declared nuisance ancestor of both
+endpoints in each mechanism; a common readout alone does not establish nuisance exposure. Graph edges
+are scientific declarations, not causal discoveries. Retain every registered control including failed
+and aborted ones. Missing evidence, changed tolerances, contamination and null failures produce
+`INCONCLUSIVE`. For unchanged-baseline prediction identity checks use szl-paired-science.
+
+## What it does not do
+
+A clean report is consistency on supplied evidence, not proof that the control is sensitive, that the
+graph is right, or that the main effect is causal. Power, nuisance coverage, actual execution and
+pre-data registration need separate inspection; timestamps and digests cannot authenticate
+preregistration. Limits: 1 MiB input, 128 DAG nodes, 32 controls. No efficacy estimate, model training,
+data fetch, provider call or intervention design. Provenance: `references/provenance.md`.

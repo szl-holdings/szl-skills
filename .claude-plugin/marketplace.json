@@ -1,18 +1,27 @@
 {
   "name": "szl-skills",
-  "owner": { "name": "SZL Holdings", "url": "https://github.com/szl-holdings" },
-  "metadata": { "description": "Evidence, decisions and reproducible research skills from SZL Holdings", "version": "0.2.0-rc.1" },
+  "owner": {
+    "name": "SZL Holdings",
+    "url": "https://github.com/szl-holdings"
+  },
+  "metadata": {
+    "description": "Evidence, decisions and reproducible research skills from SZL Holdings: executable, offline checks that make scientific claims carry their evidence.",
+    "version": "0.3.0"
+  },
   "plugins": [
     {
       "name": "szl-evidence-skills",
       "description": "TypeSafe Jev as a second reader (never the gate) and governed decisions that carry their own evidence.",
       "source": "./",
       "strict": false,
-      "skills": ["./skills/szl-typesafe-ai", "./skills/szl-governed-decision"]
+      "skills": [
+        "./skills/szl-typesafe-ai",
+        "./skills/szl-governed-decision"
+      ]
     },
     {
       "name": "szl-science-skills",
-      "description": "Integrated research workbench and living anatomy, mathematical checks, datasets, model evaluations, kernel comparisons and capsules. Optional pinned public study fetch; no credentials required.",
+      "description": "Eighteen offline science checks: research workbench and claim ledger, dataset leakage, model evaluation, math and kernel checks, paired qualification, capsules, lineage, units, negative controls, analysis plans, plus evidence gate, cross-implementation check, mutation coverage, energy receipts, session receipts and a reviewer pack. Optional pinned public study fetch; no credentials required.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -27,7 +36,13 @@
         "./skills/szl-artifact-lineage",
         "./skills/szl-unit-invariants",
         "./skills/szl-negative-control-audit",
-        "./skills/szl-analysis-plan-audit"
+        "./skills/szl-analysis-plan-audit",
+        "./skills/szl-evidence-gate",
+        "./skills/szl-cross-implementation-check",
+        "./skills/szl-analysis-mutation-test",
+        "./skills/szl-compute-energy-receipt",
+        "./skills/szl-session-receipt",
+        "./skills/szl-reviewer-pack"
       ]
     }
   ]

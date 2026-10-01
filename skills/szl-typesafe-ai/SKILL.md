@@ -1,15 +1,8 @@
 ---
 name: szl-typesafe-ai
 license: Apache-2.0
-description: >
-  TypeSafe/Jev: Choice/Noul/Score in code, not TypeScript types. System One
-  models turn natural language and application state into probabilities
-  that software can compose. Use when building routing, ranking,
-  extraction, verification, or replacing an LLM prompt-and-parse step
-  with structured decisions; also when brainstorming what TypeSafe could
-  make possible. Do not use for TypeScript/Java/Rust static types,
-  Zod/Pydantic/mypy/JSON Schema/protobuf codegen, or asking whether a
-  pipeline is type-safe. At SZL, Jev is an optional second reader only.
+description: "TypeSafe/Jev: Choice/Noul/Score in code, not TypeScript types. System One models turn natural language and application state into probabilities that software can compose. Use when building routing, ranking, extraction, verification, or replacing an LLM prompt-and-parse step with structured decisions; also when brainstorming what TypeSafe could make possible. Do not use for TypeScript/Java/Rust static types, Zod/Pydantic/mypy/JSON Schema/protobuf codegen, or asking whether a pipeline is type-safe. At SZL, Jev is an optional second reader only."
+
 ---
 
 # TypeSafe at SZL — second reader, not the gate

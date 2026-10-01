@@ -1,15 +1,46 @@
 ---
 name: szl-analysis-plan-audit
-description: Compare a frozen computational analysis plan with a supplied run manifest and versioned deviation log. Use to audit prespecified hypotheses, outcomes, estimands, sampling/group units, splits, multiplicity, practical margins, exclusions, fixed stopping and complete attempts before calling an analysis confirmatory. Not a statistical test or efficacy estimator.
+description: "Compares a frozen analysis plan (primary metric and direction, estimand, sampling and group units, split digest, multiplicity allocation, practical margin, exclusions, fixed attempt schedule) with a run manifest and a versioned deviation log, and reports whether the run followed the plan or became exploratory. Use when a study was preregistered or an analysis plan was frozen before data access, when a reviewer asks about deviations, or when the user wants to know if a result is still confirmatory. Not a statistics engine; it computes no p value or power."
 license: Apache-2.0
 ---
 
-Read [the contract](references/contract.md), retain the original frozen plan, and run `scripts/run.py` on the supplied plan, run manifest and deviation log. The helper computes canonical plan/run digests and compares each declared setting by hypothesis or family identifier. It does not load datasets or execute experiments.
+# Analysis plan audit
 
-Audit the primary metric and direction, estimand, independent sampling/group units, split digest, family error allocation, practical margin, exclusion criteria and fixed attempt schedule together. Keep failures and aborts in the attempt ledger. A result digest names a declared artifact; this audit does not verify its underlying bytes or recompute its metric. Use the appropriate paired benchmark or model-evaluation helper for those separate checks.
+The difference between confirmatory and exploratory is whether the analysis that ran is the analysis
+that was declared. This helper diffs the two, setting by setting, and keeps failed and aborted
+attempts in the ledger. Python 3.9+, stdlib, offline.
 
-Treat any deviation or incomplete attempt evidence as EXPLORATORY relative to this frozen plan, including a documented amendment. Log the original plan version, changed path, original/new value hashes, reason and declared time; retain the fixed original instead of silently rewriting it. A consistent report means the supplied run follows the declared plan. Precommit declarations, timestamps and hashes cannot prove that registration preceded access to outcome data; authenticated preregistration and independence need separate evidence.
+## Use when
 
-This package never supplies a p value, power or efficacy conclusion, chooses scientific hypotheses, certifies causality, trains a model, calls a provider, uploads data, or grants scientific/licensing approval. Sensitive scientific use remains subject to human approval. Scientific/model performance is NOT_MEASURED.
+- A preregistered endpoint was swapped for a secondary one that reached significance.
+- The exclusion criteria in the paper differ from the frozen plan.
+- Three attempts were scheduled, one failed, and the report mentions only the successes.
 
-Runtime: Python 3.9+ standard library, offline/keyless, 1 MiB JSON, 32 hypotheses/families and 256 scheduled attempts. Only fixed-attempt stopping is supported; sequential/adaptive plans need a different explicit contract. See [provenance](references/provenance.md). `assets/example.json` is a synthetic plan with a retained failed attempt.
+## Quick start
+
+```bash
+python scripts/run.py assets/example.json
+```
+
+The synthetic plan with a retained failed attempt returns `"status": "CONSISTENT_WITH_DECLARED_PLAN"`,
+plan and run digests, `attempt_counts {"SUCCESS": 1, "FAILED": 1, "ABORTED": 0}`,
+`preregistration: "DECLARED_ONLY"` and `statistical_inference: "NOT_PERFORMED"`. Change a setting after
+run start and the amended status becomes `EXPLORATORY` with `DEVIATION_AFTER_RUN_START`.
+
+## Preparing the audit
+
+Read `references/contract.md`, retain the original frozen plan, and run the helper on the plan, run
+manifest and deviation log. It computes canonical plan and run digests and compares each declared
+setting by hypothesis or family id. Treat any deviation or incomplete attempt as `EXPLORATORY`
+relative to the frozen plan, documented amendments included; log plan version, changed path, old and
+new value hashes, reason and declared time, and keep the fixed original rather than rewriting it. A
+result digest names a declared artifact; use szl-paired-science or szl-model-evaluation to check bytes
+or recompute metrics.
+
+## What it does not do
+
+Never supplies a p value, power or efficacy conclusion, chooses hypotheses, certifies causality, trains
+a model, calls a provider or uploads data. Precommit declarations, timestamps and hashes cannot prove
+that registration preceded access to outcome data. Only fixed-attempt stopping is supported; sequential
+or adaptive designs need a different explicit contract. Limits: 1 MiB input, 32 hypotheses or families,
+256 scheduled attempts. Provenance: `references/provenance.md`.
