@@ -1,0 +1,87 @@
+{
+  "skill": "szl-cross-implementation-check",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "I rewrote the lme4 model in statsmodels; do I get the same estimates and standard errors?",
+      "should_trigger": true
+    },
+    {
+      "query": "A student re-derived Table 2 in Python and some p-values differ from the R version. Reconcile them under a 1% tolerance.",
+      "should_trigger": true
+    },
+    {
+      "query": "We refactored the pipeline; prove the output metrics did not move.",
+      "should_trigger": true
+    },
+    {
+      "query": "Two labs computed the same metrics on the shared dataset. Are they consistent?",
+      "should_trigger": true
+    },
+    {
+      "query": "Compare the MATLAB and NumPy results for the same input file, with the input digest recorded on both sides.",
+      "should_trigger": true
+    },
+    {
+      "query": "Does the ported Julia solver reproduce the reference numbers within 1e-6?",
+      "should_trigger": true
+    },
+    {
+      "query": "Check whether these two result JSON files agree quantity by quantity and tell me which ones diverge.",
+      "should_trigger": true
+    },
+    {
+      "query": "Before trusting the GPU port, confirm its summary statistics match the CPU reference run.",
+      "should_trigger": true
+    },
+    {
+      "query": "Our old and new scoring scripts give slightly different AUCs. Is the difference within tolerance?",
+      "should_trigger": true
+    },
+    {
+      "query": "Validate that the vendor's re-implementation matches our published numbers.",
+      "should_trigger": true
+    },
+    {
+      "query": "Which implementation is correct, the R one or the Python one?",
+      "should_trigger": false
+    },
+    {
+      "query": "Port this R script to Python.",
+      "should_trigger": false
+    },
+    {
+      "query": "Why do lme4 and statsmodels compute standard errors differently?",
+      "should_trigger": false
+    },
+    {
+      "query": "Benchmark how fast the two implementations run.",
+      "should_trigger": false
+    },
+    {
+      "query": "Run both scripts and collect their outputs.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is 0.42 a large effect size in this field?",
+      "should_trigger": false
+    },
+    {
+      "query": "Check whether a claim in the paper has an artifact behind it.",
+      "should_trigger": false
+    },
+    {
+      "query": "Compare two kernels' outputs elementwise and report the speedup.",
+      "should_trigger": false
+    },
+    {
+      "query": "Merge these two CSV files.",
+      "should_trigger": false
+    },
+    {
+      "query": "Explain what a tolerance is.",
+      "should_trigger": false
+    }
+  ]
+}
