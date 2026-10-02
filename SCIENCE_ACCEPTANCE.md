@@ -1,5 +1,8 @@
 # Science integrity acceptance
 
+Historical candidate receipt: the package counts and routing below describe this bounded
+acceptance candidate. See [SKILL_INVENTORY.json](SKILL_INVENTORY.json) for the current source tree.
+
 This candidate extends source main `9668f1571315e93ca2059b9a44f12beef483532d`.
 Six existing packages receive substantial additive contracts; four original packages
 cover separate handoff failures. Kernel comparison retains its numerical/timing scope.
