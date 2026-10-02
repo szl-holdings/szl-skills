@@ -98,6 +98,9 @@ def build(root):
     if (multiplicity != set(grouped.get("szl-science-multiplicity-skills", []))
             or multiplicity & (selected | replay)):
         raise ValueError("installer/multiplicity catalog mismatch")
+    assay = set(installer_names(root, "ASSAY_NAMES", required=False))
+    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | replay | multiplicity):
+        raise ValueError("installer/assay catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",

@@ -1,15 +1,16 @@
 # Claude Science setup
 
-The unreleased source candidate contains twenty-eight skills: twenty-six science tools and two
-evidence skills. The default core family selects twenty-four science tools; the separate replay
-and multiplicity families select szl-experiment-replay and szl-multiplicity-audit. Each complete
-family must fit the existing 1 MB resource limit. All three exclude szl-typesafe-ai and
-szl-governed-decision. The published v0.4.0 tag contains
-twenty-three science tools; experiment replay, clustered replication and multiplicity audit remain
-source candidates until their releases are separately verified. The historical v0.2.0-rc.1 tag
-contains eight science skills. GitHub importing skills does not create a specialist. The workbench
-integrates seven core checks; the other tools run separately. SCIENCE_ACCEPTANCE.md retains the
-historical ten-package acceptance scope, which does not cover all current science tools.
+The unreleased source candidate contains twenty-nine skills: twenty-seven science tools and two
+evidence skills. The default core family selects twenty-four science tools; separate replay,
+assay and multiplicity families select szl-experiment-replay, szl-assay-measurement-audit and
+szl-multiplicity-audit respectively. Each complete family must fit the existing 1 MB resource
+limit. All four exclude szl-typesafe-ai and szl-governed-decision. The published v0.4.0 tag
+contains twenty-three science tools; experiment replay, clustered replication, assay measurement
+audit and multiplicity audit remain source candidates until their releases are separately
+verified. The historical v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills
+does not create a specialist. The workbench integrates seven core checks; the other tools run
+separately. SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which
+does not cover all current science tools.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
 bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
@@ -27,12 +28,15 @@ receipt = setup["install"](host, resources, "claude-science-install-receipt.json
 replay = setup["bundle"](".", family="replay")
 replay_receipt = setup["install"](host, replay, "claude-science-replay-receipt.json",
                                   update=True, family="replay")
+assay = setup["bundle"](".", family="assay")
+assay_receipt = setup["install"](host, assay, "claude-science-assay-receipt.json",
+                                 update=True, family="assay")
 multiplicity = setup["bundle"](".", family="multiplicity")
 multiplicity_receipt = setup["install"](host, multiplicity,
                                         "claude-science-multiplicity-receipt.json",
                                         update=True, family="multiplicity")
 print({"core": receipt["status"], "replay": replay_receipt["status"],
-       "multiplicity": multiplicity_receipt["status"]})
+       "assay": assay_receipt["status"], "multiplicity": multiplicity_receipt["status"]})
 ```
 
 The core SDK procedure stages twenty-four science tools, checks returned sidecar gates for edited
@@ -40,8 +44,8 @@ kernel.py resources, publishes through host.skills and reads every resource back
 SZL_SCIENCE profile requests exactly those twenty-four tools and zero connectors on
 creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
-`update=True` updates only the names in the selected family; the separate replay and multiplicity
-calls add or update their one named tool each. Protected bundled-name collisions
+`update=True` updates only the names in the selected family; separate replay, assay and
+multiplicity calls add or update their one named tool each. Protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles
 retain additional skills and their existing connectors/mode, which the receipt reports
 explicitly. Creation and updating a matching profile therefore have different inventories.
@@ -62,6 +66,8 @@ Select the new specialist using the application's normal conversation picker. Pi
 2. Change the prediction input; check again and require downstream invalidation.
 3. Run again; confirm old snapshots persist and the scientist's conclusion needs review.
 4. If wanted, explicitly fetch the pinned public triage study and compare saved outputs.
+5. Exercise the assay audit with its two invented plates: the passing declaration and the
+   deliberately failed QC. Confirm the failed run withholds every sample concentration.
 
 This host SDK is documented by the installed Claude Science customize skill. It is not
 available as a tool in the Codex session that authored this pack; actual application

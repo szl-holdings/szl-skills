@@ -1,0 +1,27 @@
+{
+  "skill": "szl-assay-measurement-audit",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 synthetic requests: 10 should load this bounded assay-run audit and 10 near misses should not. No Claude Science or model trigger run has occurred; rates are NOT_MEASURED.",
+  "queries": [
+    {"query": "Our unweighted linear plate has calibrators, a blank, two QC wells and sample signals. Check the declared limits before reporting concentrations.", "should_trigger": true},
+    {"query": "Audit one increasing signal-versus-concentration assay run and hold any sample outside the calibrated range.", "should_trigger": true},
+    {"query": "The low QC recovered too high. Does this synthetic plate withhold all sample concentrations?", "should_trigger": true},
+    {"query": "Check my assay JSON for unique well IDs, residual limits, blank limit and QC recovery.", "should_trigger": true},
+    {"query": "Apply this run's predeclared quantification minimum to each inverted sample signal.", "should_trigger": true},
+    {"query": "I have an invented three-point linear standard curve, independent blank reading and two QC readings; audit the run.", "should_trigger": true},
+    {"query": "Why is sample S7 on HOLD in the declared linear assay report?", "should_trigger": true},
+    {"query": "Check that a dilution-corrected sample has uncertainty declared for the final reported concentration.", "should_trigger": true},
+    {"query": "Run the offline plate example and show which measured control fails in the negative fixture.", "should_trigger": true},
+    {"query": "For this nonclinical research plate, compute concentrations only if the declared calibration, blank and QC checks pass.", "should_trigger": true},
+    {"query": "Validate this analytical method across laboratories for regulatory use.", "should_trigger": false},
+    {"query": "Interpret a patient's LIAT result and decide treatment.", "should_trigger": false},
+    {"query": "Fit a weighted four-parameter logistic calibration curve to my assay.", "should_trigger": false},
+    {"query": "Estimate the detection and quantification limits from raw replicate blanks.", "should_trigger": false},
+    {"query": "Propagate pipetting and calibration uncertainty for this diluted sample.", "should_trigger": false},
+    {"query": "Convert these mg/L results to mol/L using a chemical formula.", "should_trigger": false},
+    {"query": "Compare three assay batches and establish between-run precision.", "should_trigger": false},
+    {"query": "Design an independent sample-preparation and QC study for a new method.", "should_trigger": false},
+    {"query": "Check whether this model's predicted probabilities are calibrated.", "should_trigger": false},
+    {"query": "Send instrument HL7 messages to our production laboratory system.", "should_trigger": false}
+  ]
+}

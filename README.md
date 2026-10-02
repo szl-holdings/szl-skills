@@ -1,16 +1,17 @@
 # SZL Skills
 
 Executable, offline checks that make scientific claims carry their evidence. The unreleased
-source candidate contains twenty-eight skills for Claude Science, Claude Code and claude.ai:
-twenty-six science tools and two evidence skills.
+source candidate contains twenty-nine skills for Claude Science, Claude Code and claude.ai:
+twenty-seven science tools and two evidence skills.
 The checks use the Python standard library and report what they did not verify alongside what
 they did. Normal checks are offline. Repository pins also use the local Git executable; optional
 session-receipt signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate
 optional service and credential requirements below.
 
-The science tools have three import families: twenty-four core checks, one bounded experiment
-replay check and one complete-family multiplicity audit. Each SDK bundle retains the 1 MB limit,
-licenses and notices. All three families use the same installer and can attach to the same specialist. The published v0.4.0 tag retains
+The science tools have four import families: twenty-four core checks, one bounded experiment
+replay check, one declared assay-run audit and one complete-family multiplicity audit. Each SDK
+bundle retains the 1 MB limit, licenses and notices. All four families use the same installer and
+can attach to the same specialist. The published v0.4.0 tag retains
 its original twenty-three-tool science scope.
 
 ## Import
@@ -20,9 +21,9 @@ Claude Science: Skills > Import from GitHub, paste:
     szl-holdings/szl-skills@v0.4.0
 
 The published v0.4.0 tag contains twenty-three science tools and two evidence skills. The new
-experiment-replay, clustered-replication and multiplicity-audit skills below are unreleased
-source candidates; use a reviewed immutable source commit for testing until a separately
-verified release is published.
+experiment-replay, clustered-replication, assay-measurement-audit and multiplicity-audit skills
+below are unreleased source candidates; use a reviewed immutable source commit for testing until a
+separately verified release is published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -54,6 +55,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 |---|---|---|
 | szl-dataset-readiness | Is the test set contaminated (duplicates, shared subjects, future labels, held-out fitting)? | Does not clean data or approve suitability |
 | szl-model-evaluation | How good and how calibrated are these predictions, counting every attempt? | Does not run inference; binary and categorical only |
+| szl-assay-measurement-audit | Did one declared linear assay run meet its calibration, blank, QC, range and uncertainty-disclosure checks? | Does not validate the method, verify uncertainty, or qualify clinical use |
 | szl-math-claim-check | Does this formula or theorem claim hold on tested cases, and is the proof actually bound to the code? | Not a prover or CAS |
 | szl-kernel-comparison | Does the fast implementation give the same numbers, and was the timing fair? | Does not measure energy |
 | szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
