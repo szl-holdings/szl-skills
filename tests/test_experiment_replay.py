@@ -140,7 +140,7 @@ class ExperimentReplayTests(unittest.TestCase):
     def test_installer_selected_replay_resources_are_cli_only(self):
         installer = runpy.run_path(str(ROOT / "tools" / "install_claude_science.py"))
         resources = installer["bundle"](ROOT, family="replay")
-        self.assertEqual(set(resources), {"szl-experiment-replay", "szl-figure-data-contract"})
+        self.assertEqual(set(resources), {"szl-experiment-replay", "szl-figure-data-contract", "szl-measurement-harmonizer"})
         files = resources["szl-experiment-replay"]
         self.assertEqual(set(files), {"SKILL.md", "LICENSE", "NOTICE", "scripts/run.py",
                                       "scripts/engine.py", "assets/declaration.json",

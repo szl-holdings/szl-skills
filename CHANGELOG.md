@@ -2,6 +2,11 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
+- Add offline measurement harmonization with declared specimen ID maps, source hashes and
+  affine unit conversions. Ambiguous or incomplete joins retain no usable rows; the result
+  does not establish identity, calibration or scientific agreement. Package it with the
+  replay family (CSV mean replay and figure-data contract) so the bundle stays within the
+  1 MB SDK batch limit.
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.

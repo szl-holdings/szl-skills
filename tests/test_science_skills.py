@@ -395,6 +395,18 @@ class PackagingTests(unittest.TestCase):
                             (unpacked / "assets" / "example.json").read_bytes()).hexdigest())
                         self.assertFalse((unpacked / "kernel.py").exists())
                         continue
+                    if report["skill"] == "szl-measurement-harmonizer":
+                        self.assertTrue((unpacked / "scripts" / "harmonizer.py").is_file())
+                        output = destination / "harmonized-report.json"
+                        p = subprocess.run([sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
+                                            str(unpacked / "assets" / "example.json"),
+                                            "--root", str(unpacked / "assets"), "--output", str(output)],
+                                           capture_output=True, text=True)
+                        self.assertEqual(p.returncode, 0, p.stderr)
+                        normalized = json.loads(output.read_text(encoding="utf-8"))
+                        self.assertEqual(normalized["status"], "HARMONIZED")
+                        self.assertEqual(len(normalized["rows"]), 4)
+                        continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
                                str(unpacked / "assets" / "example.json")]

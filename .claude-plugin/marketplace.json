@@ -83,12 +83,13 @@
     },
     {
       "name": "szl-science-replay-skills",
-      "description": "Two bounded offline replay skills: pin and rerun a CSV mean, or render and inspect a declared CSV-to-SVG figure with point and caption evidence. No supplied code, network or credentials.",
+      "description": "Three bounded offline replay skills: pin and rerun a CSV mean, render and inspect a declared CSV-to-SVG figure, or align CSV exports under declared specimen IDs and unit conversions. No supplied code, network or credentials.",
       "source": "./",
       "strict": false,
       "skills": [
         "./skills/szl-experiment-replay",
-        "./skills/szl-figure-data-contract"
+        "./skills/szl-figure-data-contract",
+        "./skills/szl-measurement-harmonizer"
       ]
     },
     {
