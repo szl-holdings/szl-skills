@@ -97,7 +97,7 @@ class SetupTests(unittest.TestCase):
         assay = SETUP["bundle"](ROOT, family="assay")
         change = SETUP["bundle"](ROOT, family="change")
         multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
-        self.assertEqual(set(replay), {"szl-experiment-replay"})
+        self.assertEqual(set(replay), {"szl-experiment-replay", "szl-rare-disease-evidence-replay"})
         self.assertEqual(set(paper), {"szl-paper-evidence-audit"})
         self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
         self.assertEqual(set(change), {"szl-research-change-impact"})

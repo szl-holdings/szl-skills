@@ -361,6 +361,19 @@ class PackagingTests(unittest.TestCase):
                         self.assertEqual(replay.returncode, 0, replay.stderr)
                         self.assertEqual(json.loads(replay.stdout)["status"], "MATCH")
                         continue
+                    if report["skill"] == "szl-rare-disease-evidence-replay":
+                        runner = str(unpacked / "scripts" / "replay.py")
+                        replay = subprocess.run(
+                            [sys.executable, "-I", "-B", runner, "--root", str(unpacked),
+                             "--manifest", "assets/manifest.json", "--output", "rare-replay-report.json"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(replay.returncode, 0, replay.stderr)
+                        parsed = json.loads(replay.stdout)
+                        self.assertEqual((parsed["status"], parsed["readiness"], parsed["qualification"]),
+                                         ("DECLARED_ONLY", "HOLD", "NOT_EVALUATED"))
+                        self.assertEqual(parsed, json.loads((unpacked / "rare-replay-report.json").read_text(encoding="utf-8")))
+                        continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
                                str(unpacked / "assets" / "example.json")]

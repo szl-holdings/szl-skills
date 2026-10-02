@@ -1,14 +1,14 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty-one skills for Claude Science, Claude Code and claude.ai: twenty-nine science
+contains thirty-two skills for Claude Science, Claude Code and claude.ai: thirty science
 tools and two evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have six import families: twenty-four core checks, one bounded experiment
-replay check, one paper evidence audit, one declared assay-run audit, one multiplicity audit and
+The science tools have six import families: twenty-four core checks, two bounded offline
+replay checks, one paper evidence audit, one declared assay-run audit, one multiplicity audit and
 one research change-impact check. Each SDK bundle retains the 1 MB limit, licenses and notices.
 All six families use the same installer and can attach to
 the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
@@ -24,8 +24,8 @@ measurement. The stable v0.4.0 tag still contains twenty-three science tools and
 skills. A GitHub tag does not prove Claude Science host registration or measured skill
 effectiveness; verify those separately.
 
-Multiplicity and research change impact remain source-candidate work until a separately
-reviewed tag and byte readback are published.
+Multiplicity, research change impact and synthetic rare-disease evidence replay remain
+source-candidate work until a separately reviewed tag and byte readback are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -38,6 +38,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 |---|---|---|
 | run the seven integrated core checks on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
+| replay a synthetic rare-disease evidence timeline without future leakage | szl-rare-disease-evidence-replay | selected HPO/ClinVar-shaped source snapshots, source/provenance ablations and a permanent HOLD readiness |
 | check that a PDF table quote or figure caption has a pinned page and source region | szl-paper-evidence-audit | exact text locator or unresolved, always requiring human review |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
 | know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
@@ -65,6 +66,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
+| szl-rare-disease-evidence-replay | What synthetic case-feature and HPO/ClinVar-shaped evidence was declared at a UTC cutoff, and what disappears under source/provenance ablation? | Synthetic source candidate only; readiness always HOLD; no diagnosis, ranking or model evaluation |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
