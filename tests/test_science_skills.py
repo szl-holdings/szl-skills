@@ -289,7 +289,7 @@ class PackagingTests(unittest.TestCase):
             market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
                         if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills",
-                                              "szl-paper-evidence-skills"}
+                                              "szl-paper-evidence-skills", "szl-science-assay-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
@@ -383,7 +383,8 @@ class PackagingTests(unittest.TestCase):
 
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
         for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
-                             "szl-negative-control-audit", "szl-analysis-plan-audit", "szl-clustered-replication"]:
+                             "szl-negative-control-audit", "szl-analysis-plan-audit", "szl-clustered-replication",
+                             "szl-assay-measurement-audit"]:
             with self.subTest(skill=name):
                 path = ROOT / "skills" / name / "kernel.py"
                 tree = ast.parse(path.read_text())

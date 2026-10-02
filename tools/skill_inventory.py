@@ -97,6 +97,9 @@ def build(root):
     paper = set(installer_names(root, "PAPER_NAMES", required=False))
     if paper != set(grouped.get("szl-paper-evidence-skills", [])) or paper & (selected | replay):
         raise ValueError("installer/paper catalog mismatch")
+    assay = set(installer_names(root, "ASSAY_NAMES", required=False))
+    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | replay | paper):
+        raise ValueError("installer/assay catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",
