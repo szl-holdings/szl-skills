@@ -1,12 +1,11 @@
 # Claude Science setup
 
-The source candidate contains twenty-eight skills: twenty-six science tools and two evidence
+The v0.5.0-rc.1 prerelease contains twenty-eight skills: twenty-six science tools and two evidence
 skills. The default core family selects twenty-four science tools; the separate replay and assay
 families select szl-experiment-replay and szl-assay-measurement-audit respectively. Each complete
 family must fit the existing 1 MB resource limit. All three exclude szl-typesafe-ai and
-szl-governed-decision. The published v0.4.0 tag contains
-twenty-three science tools and two evidence skills; clustered replication and the assay audit
-remain source candidates until separately verified release.
+szl-governed-decision. The stable v0.4.0 tag contains twenty-three science tools and two evidence
+skills; the clustered-replication and assay audits were added in v0.5.0-rc.1.
 The historical v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills does not
 create a specialist. The workbench integrates seven core checks; the other tools run separately.
 SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does not cover

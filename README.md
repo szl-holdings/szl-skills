@@ -1,7 +1,7 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. The source candidate
-contains twenty-eight skills for Claude Science, Claude Code and claude.ai: twenty-six science
+Executable, offline checks that make scientific claims carry their evidence. The v0.5.0-rc.1
+prerelease contains twenty-eight skills for Claude Science, Claude Code and claude.ai: twenty-six science
 tools and two evidence skills.
 The checks use the Python standard library and report what they did not verify alongside what
 they did. Normal checks are offline. Repository pins also use the local Git executable; optional
@@ -11,18 +11,17 @@ optional service and credential requirements below.
 The science tools have three import families: twenty-four core checks, one bounded experiment
 replay check and one declared assay-run audit. Each SDK bundle retains the 1 MB limit, licenses
 and notices. All three families use the same installer and can attach to the same specialist.
-The published v0.4.0 tag retains
-its original twenty-three-tool science scope.
+The stable v0.4.0 tag retains its original twenty-three-tool science scope.
 
 ## Import
 
 Claude Science: Skills > Import from GitHub, paste:
 
-    szl-holdings/szl-skills@v0.4.0
+    szl-holdings/szl-skills@v0.5.0-rc.1
 
-The published v0.4.0 tag contains twenty-three science tools and two evidence skills. The new
-clustered-replication and assay-measurement-audit skills below are unreleased source candidates;
-use the reviewed immutable source commit for testing until a separately verified release is published.
+This prerelease includes clustered-replication and assay-measurement-audit. The stable v0.4.0 tag
+still contains twenty-three science tools and two evidence skills. A GitHub tag does not prove
+Claude Science host registration or measured skill effectiveness; verify those separately.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.

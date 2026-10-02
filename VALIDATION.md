@@ -1,7 +1,7 @@
 # Science pack validation
 
 The observations below describe the earlier eight-science-skill prerelease. They are
-historical evidence, not measurements of the expanded source candidate or a new run.
+historical evidence, not measurements of the expanded v0.5.0-rc.1 prerelease or a new run.
 For the later six-upgrade, four-audit candidate and its notice follow-up, see
 [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That candidate routed fourteen packages:
 twelve science skills selected by its installer and two separate evidence skills.

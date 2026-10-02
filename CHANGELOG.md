@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased 0.5.0-rc.1 candidate
+## 0.5.0-rc.1
 
 - Added szl-assay-measurement-audit, a stdlib-only offline check for one researcher-declared
   increasing linear assay run. It gates calibration residuals, a separately identified blank,
@@ -8,7 +8,7 @@
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
 - Source inventory becomes twenty-four core science tools, one replay tool, one assay tool and
-  two evidence skills. This source candidate is not proof of Claude Science host registration, method
+  two evidence skills. This source release is not proof of Claude Science host registration, method
   validation or clinical use.
 - Add szl-clustered-replication: distinguish observations from declared experimental units,
   equal-cluster paired effects, an exact conditional cluster sign-flip calculation and
@@ -19,7 +19,7 @@
   Published v0.4.0 and earlier tags retain their original inventories.
 - New numerical tests use an independent Cartesian sign-vector oracle and invariance to
   technical replication; test execution and app efficacy are reported separately.
-- Preserve the separately developed experiment replay contract in a second import family.
+- Preserve the separately developed experiment replay contract in a separate import family.
   All three science families retain complete helpers, licenses and notices and the 1 MB SDK
   bundle limit; the shared installer attaches all twenty-six science tools across three calls.
 
