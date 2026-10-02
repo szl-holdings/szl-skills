@@ -123,7 +123,9 @@ python -B tools/sync_workbench.py --check
 python -B -m unittest discover -s tests -v
 ```
 
-Each ZIP has SKILL.md at its root plus its helpers, CLI, fixtures and license notices. Pass
+Each ZIP has one enclosing skill directory containing SKILL.md, helpers, CLI, fixtures and
+license notices for manual claude.ai upload. This packaging is not evidence of a successful
+Claude Science import or runtime check. Pass
 `--revision <40-char commit>` to build deterministic archives from immutable Git blobs.
 [CLAUDE_SCIENCE_SETUP.md](CLAUDE_SCIENCE_SETUP.md) covers the SDK installer and the curated
 specialist. Actual registration and agent task performance in Claude Science remain unverified
