@@ -8,7 +8,7 @@ import pathlib
 import re
 
 NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check", "szl-dataset-readiness",
-         "szl-model-evaluation", "szl-kernel-comparison", "szl-reproducibility-capsule", "szl-paired-science",
+         "szl-model-evaluation", "szl-kernel-comparison", "szl-reproducibility-capsule", "szl-experiment-replay", "szl-paired-science",
          "szl-artifact-lineage", "szl-unit-invariants", "szl-negative-control-audit", "szl-analysis-plan-audit",
          "szl-evidence-gate", "szl-cross-implementation-check", "szl-analysis-mutation-test",
          "szl-compute-energy-receipt", "szl-session-receipt", "szl-reviewer-pack",

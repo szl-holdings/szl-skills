@@ -6,7 +6,8 @@ For the later six-upgrade, four-audit candidate and its notice follow-up, see
 [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That candidate routed fourteen packages:
 twelve science skills selected by its installer and two separate evidence skills.
 The published v0.4.0 tag has twenty-three science skills; this later source candidate adds
-szl-multiplicity-audit as a twenty-fourth. Its synthetic tests and review findings are in
+szl-experiment-replay and szl-multiplicity-audit as the twenty-fourth and twenty-fifth.
+Their synthetic tests are in `tests/test_experiment_replay.py` and
 `tests/test_science_multiplicity.py`; no Claude Science host run is claimed.
 The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL.md files
 and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These

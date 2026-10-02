@@ -8,14 +8,14 @@ Description: Run reproducible scientific checks and maintain living project evid
 
 Skills (curated): szl-science-workbench, szl-research-anatomy, szl-math-claim-check,
 szl-dataset-readiness, szl-model-evaluation, szl-kernel-comparison,
-szl-reproducibility-capsule, szl-paired-science, szl-artifact-lineage,
+szl-reproducibility-capsule, szl-experiment-replay, szl-paired-science, szl-artifact-lineage,
 szl-unit-invariants, szl-negative-control-audit, szl-analysis-plan-audit,
 szl-evidence-gate, szl-cross-implementation-check, szl-analysis-mutation-test,
 szl-compute-energy-receipt, szl-session-receipt, szl-reviewer-pack,
 szl-refutation-ledger, szl-retrieval-eval, szl-quantization-check,
 szl-repo-pin, szl-result-fragility, szl-multiplicity-audit.
 
-This source candidate selects twenty-four science skills from twenty-six total packages.
+This source candidate selects twenty-five science skills from twenty-seven total packages.
 The published v0.4.0 tag remains a twenty-three-science-skill release.
 The two evidence skills are intentionally excluded. SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The workbench dispatches dataset, binary/categorical
