@@ -289,7 +289,8 @@ class PackagingTests(unittest.TestCase):
             market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
                         if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills",
-                                              "szl-science-assay-skills", "szl-science-multiplicity-skills"}
+                                              "szl-paper-evidence-skills", "szl-science-assay-skills",
+                                              "szl-science-multiplicity-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
@@ -309,6 +310,35 @@ class PackagingTests(unittest.TestCase):
                         continue
                     if report["skill"] == "szl-paired-science":
                         self.assertTrue((unpacked / "scripts" / "qualify.py").is_file())
+                        continue
+                    if report["skill"] == "szl-paper-evidence-audit":
+                        entrypoint = unpacked / "scripts" / "audit.py"
+                        self.assertTrue(entrypoint.is_file())
+                        pdf = destination / "paper-evidence-fixture.pdf"
+                        extracted = destination / "paper-evidence-fixture.json"
+                        claims = destination / "paper-evidence-claims.json"
+                        pdf.write_bytes(b"%PDF-1.7\nsynthetic package contract\n")
+                        doc = {"tables": [{"prov": [{"page_no": 1, "bbox":
+                               {"l": 0, "t": 10, "r": 20, "b": 0,
+                                "coord_origin": "BOTTOMLEFT"}}],
+                               "data": {"table_cells": [{"text": "7 mg/L"}]}}]}
+                        extracted.write_text(json.dumps(doc), encoding="utf-8")
+                        claim = {"schema": "szl.paper-evidence-claims.v1",
+                                 "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+                                 "document_json_sha256": hashlib.sha256(extracted.read_bytes()).hexdigest(),
+                                 "extraction": {"tool": "synthetic", "version": "test",
+                                                "pipeline": "test", "ocr_engine": "none"},
+                                 "claims": [{"id": "dose", "ref": "#/tables/0", "quote": "7 mg/L"}]}
+                        claims.write_text(json.dumps(claim), encoding="utf-8")
+                        command = [sys.executable, "-B", str(entrypoint), "--pdf", str(pdf),
+                                   "--document-json", str(extracted), "--claims", str(claims)]
+                        checked = subprocess.run(command, capture_output=True, text=True)
+                        self.assertEqual(checked.returncode, 0, checked.stderr)
+                        self.assertEqual(json.loads(checked.stdout)["status"], "REVIEW_REQUIRED")
+                        pdf.write_bytes(b"%PDF-1.7\nchanged synthetic bytes\n")
+                        rejected = subprocess.run(command, capture_output=True, text=True)
+                        self.assertEqual(rejected.returncode, 2, rejected.stderr)
+                        self.assertEqual(json.loads(rejected.stdout)["status"], "UNRESOLVED")
                         continue
                     if report["skill"] == "szl-experiment-replay":
                         runner = str(unpacked / "scripts" / "run.py")
@@ -358,7 +388,7 @@ class PackagingTests(unittest.TestCase):
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
         for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
                              "szl-negative-control-audit", "szl-analysis-plan-audit", "szl-clustered-replication",
-                             "szl-multiplicity-audit", "szl-assay-measurement-audit"]:
+                             "szl-assay-measurement-audit"]:
             with self.subTest(skill=name):
                 path = ROOT / "skills" / name / "kernel.py"
                 tree = ast.parse(path.read_text())
@@ -372,6 +402,51 @@ class PackagingTests(unittest.TestCase):
                             ast.literal_eval(default)
                 namespace = load(name)
                 self.assertTrue(any(k.startswith("szl_") and callable(v) for k, v in namespace.items()))
+
+    def test_multiplicity_sidecar_has_pure_top_level_and_one_public_entrypoint(self):
+        # Like the existing replay and receipt kernels, this separate family uses
+        # private helpers. Keep its import-time boundary explicit and test it.
+        def check(source):
+            tree = ast.parse(source)
+            public = []
+            for node in tree.body:
+                if isinstance(node, ast.Expr):
+                    self.assertIsInstance(node.value, ast.Constant)
+                    self.assertIsInstance(node.value.value, str)
+                elif isinstance(node, ast.Import):
+                    self.assertTrue(all(item.name in {"hashlib", "json", "re"} for item in node.names))
+                elif isinstance(node, ast.ImportFrom):
+                    self.assertIn(node.module, {"__future__", "decimal"})
+                elif isinstance(node, ast.Assign):
+                    self.assertTrue(all(isinstance(target, ast.Name) for target in node.targets))
+                    if isinstance(node.value, ast.Call):
+                        self.assertIsInstance(node.value.func, ast.Attribute)
+                        self.assertIsInstance(node.value.func.value, ast.Name)
+                        self.assertEqual((node.value.func.value.id, node.value.func.attr), ("re", "compile"))
+                        self.assertEqual(len(node.value.args), 1)
+                        self.assertEqual(node.value.keywords, [])
+                        self.assertIsInstance(ast.literal_eval(node.value.args[0]), str)
+                    else:
+                        try:
+                            ast.literal_eval(node.value)
+                        except (ValueError, TypeError) as error:
+                            raise AssertionError("non-literal top-level assignment") from error
+                elif isinstance(node, ast.FunctionDef):
+                    self.assertEqual(node.decorator_list, [])
+                    for default in node.args.defaults + [d for d in node.args.kw_defaults if d is not None]:
+                        ast.literal_eval(default)
+                    if not node.name.startswith("_"):
+                        public.append(node.name)
+                else:
+                    self.fail("unexpected import-time statement")
+            self.assertEqual(public, ["szl_audit_multiplicity"])
+
+        source = (ROOT / "skills" / "szl-multiplicity-audit" / "kernel.py").read_text()
+        check(source)
+        for unsafe in ("import os", "open('untrusted')", "cached = open('untrusted')"):
+            with self.subTest(unsafe=unsafe), self.assertRaises(AssertionError):
+                check(source + "\n" + unsafe + "\n")
+        self.assertTrue(callable(load("szl-multiplicity-audit")["szl_audit_multiplicity"]))
 
     def test_every_example_runs_as_standalone_skill(self):
         for name in NAMES:

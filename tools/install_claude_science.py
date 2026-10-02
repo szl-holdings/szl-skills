@@ -17,6 +17,7 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
 AGENT = "SZL_SCIENCE"
 REPLAY_NAMES = ["szl-experiment-replay"]
 MULTIPLICITY_NAMES = ["szl-multiplicity-audit"]
+PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]
 PROMPT = """You are SZL Science Workbench, a scientific workflow assistant. Connect the scientist's
 question to inspectable artifacts, selected calculations, actual outputs and retained
@@ -36,6 +37,8 @@ def family_names(family):
         return REPLAY_NAMES
     if family == "multiplicity":
         return MULTIPLICITY_NAMES
+    if family == "paper":
+        return PAPER_NAMES
     if family == "assay":
         return ASSAY_NAMES
     raise ValueError("Unknown reviewed science family")
