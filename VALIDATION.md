@@ -2,9 +2,10 @@
 
 The observations below describe the earlier eight-science-skill prerelease. They are
 historical evidence, not measurements of the expanded source candidate or a new run.
-For the current six upgrades and four new packages, including the notice follow-up,
-see [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). Current routing is fourteen total
-packages, twelve science skills selected by the installer and two excluded evidence skills.
+For the earlier six upgrades and four new packages, including the notice follow-up,
+see [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That acceptance document is historical.
+Current source routing is twenty-six total packages: twenty-four science tools selected by the
+installer and two excluded evidence skills. This count is not a new behavioral acceptance result.
 Neither evidence set establishes application import or measured agent efficacy.
 
 ## Checks

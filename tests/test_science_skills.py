@@ -324,13 +324,16 @@ class PackagingTests(unittest.TestCase):
                     elif report["skill"] == "szl-reviewer-pack":
                         command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), str(unpacked / "assets" / "project"),
                                    "--json", str(destination / "pack.json"), "--output", str(destination / "REVIEW.md")]
+                    elif report["skill"] == "szl-clustered-replication":
+                        lock = json.loads((unpacked / "assets" / "fixture-lock.json").read_bytes())
+                        command.extend(["--expected-plan-sha256", lock["plan_sha256"]])
                     p = subprocess.run(command, capture_output=True, text=True)
                     self.assertEqual(p.returncode, 0, p.stderr)
                     json.loads(p.stdout)
 
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
         for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
-                             "szl-negative-control-audit", "szl-analysis-plan-audit"]:
+                             "szl-negative-control-audit", "szl-analysis-plan-audit", "szl-clustered-replication"]:
             with self.subTest(skill=name):
                 path = ROOT / "skills" / name / "kernel.py"
                 tree = ast.parse(path.read_text())
