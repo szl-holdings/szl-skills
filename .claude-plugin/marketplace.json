@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Evidence, decisions and reproducible research skills from SZL Holdings: executable, offline checks that make scientific claims carry their evidence.",
-    "version": "0.5.0-rc.1"
+    "version": "0.5.0-rc.2"
   },
   "plugins": [
     {

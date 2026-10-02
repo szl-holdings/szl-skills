@@ -19,7 +19,10 @@ the two evidence skills are excluded. Separate design-, replay-, paper-, assay-,
 change-impact-family installs can attach szl-experiment-contract, szl-experiment-replay,
 szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
 szl-research-change-impact to the same profile, giving thirty science tools across seven families. The stable v0.4.0 tag
-has twenty-three science tools; multiplicity and change impact remain source candidates. The workbench
+has twenty-three science tools; replay, paper, assay and clustered replication are in
+v0.5.0-rc.1, while multiplicity and corrected manual-upload packaging are in
+v0.5.0-rc.2. Change impact and prospective experiment design remain unpublished
+source candidates. The workbench
 integrates seven core checks; all other tools run separately. SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 
