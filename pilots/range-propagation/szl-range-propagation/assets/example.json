@@ -1,0 +1,14 @@
+{
+  "schema": "szl.range-propagation.v1",
+  "inputs": [
+    {"id": "length", "unit": "m", "lower": "1.9", "upper": "2.1"},
+    {"id": "width", "unit": "m", "lower": "0.9", "upper": "1.1"}
+  ],
+  "steps": [
+    {"id": "area", "operation": "product", "operands": ["length", "width"]}
+  ],
+  "claims": [
+    {"id": "area", "dimension": [2, 0, 0, 0, 0, 0, 0],
+     "lower_si": "1.8", "upper_si": "2.2"}
+  ]
+}
