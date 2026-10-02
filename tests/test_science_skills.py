@@ -286,8 +286,11 @@ class PackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             destination = pathlib.Path(temp)
             reports = package["package_skills"](destination)
-            expected_count = len(json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())["plugins"][1]["skills"])
-            self.assertEqual(len(reports), expected_count)
+            market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
+            expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
+                        if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills"}
+                        for path in plugin["skills"]}
+            self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
                 with self.subTest(skill=report["skill"]):
                     unpacked = destination / ("imported-" + report["skill"])
@@ -305,6 +308,23 @@ class PackagingTests(unittest.TestCase):
                         continue
                     if report["skill"] == "szl-paired-science":
                         self.assertTrue((unpacked / "scripts" / "qualify.py").is_file())
+                        continue
+                    if report["skill"] == "szl-experiment-replay":
+                        runner = str(unpacked / "scripts" / "run.py")
+                        prepare = subprocess.run(
+                            [sys.executable, "-B", runner, "prepare", "assets/declaration.json",
+                             "--root", str(unpacked), "--output", "replay-pin.json"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(prepare.returncode, 0, prepare.stderr)
+                        self.assertEqual(json.loads(prepare.stdout)["status"], "PINNED")
+                        replay = subprocess.run(
+                            [sys.executable, "-B", runner, "replay", "replay-pin.json",
+                             "--root", str(unpacked), "--receipt", "replay-receipt.json"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(replay.returncode, 0, replay.stderr)
+                        self.assertEqual(json.loads(replay.stdout)["status"], "MATCH")
                         continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),

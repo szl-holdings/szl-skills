@@ -50,6 +50,15 @@
         "./skills/szl-result-fragility",
         "./skills/szl-clustered-replication"
       ]
+    },
+    {
+      "name": "szl-science-replay-skills",
+      "description": "One bounded offline experiment replay skill: pin a local CSV, reference and helper, rerun its built-in mean, and retain match, divergence or incomplete evidence. No supplied code, network or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-experiment-replay"
+      ]
     }
   ]
 }

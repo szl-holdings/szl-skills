@@ -1,7 +1,8 @@
 # Claude Science setup
 
-The source candidate contains twenty-six skills: twenty-four science tools and two evidence
-skills. The SDK installer selects the twenty-four science tools; it excludes szl-typesafe-ai
+The source candidate contains twenty-seven skills: twenty-five science tools and two evidence
+skills. The default core family selects twenty-four science tools; the separate replay family selects
+szl-experiment-replay. Each complete family must fit the existing 1 MB resource limit. Both exclude szl-typesafe-ai
 and szl-governed-decision. The published v0.4.0 tag contains twenty-three science tools; the
 clustered-replication addition is unreleased until its source and release are separately verified.
 The historical v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills does not
@@ -22,7 +23,10 @@ import runpy
 setup = runpy.run_path("tools/install_claude_science.py")
 resources = setup["bundle"](".")
 receipt = setup["install"](host, resources, "claude-science-install-receipt.json", update=True)
-print({"status": receipt["status"], "agent": receipt["agent"]})
+replay = setup["bundle"](".", family="replay")
+replay_receipt = setup["install"](host, replay, "claude-science-replay-receipt.json",
+                                  update=True, family="replay")
+print({"core": receipt["status"], "replay": replay_receipt["status"]})
 ```
 
 The SDK procedure stages twenty-four science tools, checks returned sidecar gates for edited
