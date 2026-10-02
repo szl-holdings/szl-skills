@@ -8,5 +8,6 @@ PINNED requires every repository CLEAN.
 
 `verify` -> `{"status": MATCH | DRIFT | ERROR, "repos": [{name, path, state: MATCH | DRIFT | DIRTY | MISSING, recorded_head, current_head}], "composite_sha256_recorded"}`.
 Overall MATCH only when an internally consistent `PINNED` record with a non-empty repository list is present and every repository is MATCH. A formerly dirty or incomplete record cannot later become a pin by verification.
+Each recorded `uncommitted_changes` must be the integer `0`; JSON booleans and floating-point zeroes are not valid clean counts.
 
 Exit 0 = ran (read `status`), 2 = ERROR. Requires the `git` executable; no network.
