@@ -342,12 +342,17 @@ class PackagingTests(unittest.TestCase):
                         command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), str(unpacked / "assets" / "project"),
                                    "--json", str(destination / "pack.json"), "--output", str(destination / "REVIEW.md")]
                     p = subprocess.run(command, capture_output=True, text=True)
+                    if report["skill"] in {"szl-outcome-preservation", "szl-release-continuity"}:
+                        self.assertEqual(p.returncode, 1, p.stderr)
+                        self.assertIn(json.loads(p.stdout)["status"], {"REGRESSION_OR_GAP", "GAP_OR_CONFLICT"})
+                        continue
                     self.assertEqual(p.returncode, 0, p.stderr)
                     json.loads(p.stdout)
 
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
         for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
-                             "szl-negative-control-audit", "szl-analysis-plan-audit"]:
+                             "szl-negative-control-audit", "szl-analysis-plan-audit",
+                             "szl-outcome-preservation", "szl-release-continuity"]:
             with self.subTest(skill=name):
                 path = ROOT / "skills" / name / "kernel.py"
                 tree = ast.parse(path.read_text())

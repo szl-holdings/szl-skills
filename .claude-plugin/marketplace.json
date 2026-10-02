@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Evidence, decisions and reproducible research skills from SZL Holdings: executable, offline checks that make scientific claims carry their evidence.",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "plugins": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-four offline science skills: research workbench, claim and refutation ledgers, dataset leakage, model and retrieval evaluation, quantization, math and kernel checks, paired qualification, capsules, bounded experiment replay, lineage, units, negative controls, analysis plans, evidence gates, cross-implementation checks, mutation coverage, energy and session receipts, repository pins, result fragility and reviewer packs. Optional pinned public study fetch; no credentials required.",
+      "description": "Twenty-six offline science skills: research workbench, claim and refutation ledgers, dataset leakage, model and retrieval evaluation, quantization, math and kernel checks, paired qualification, capsules, bounded experiment replay, lineage, units, negative controls, analysis plans, evidence gates, cross-implementation checks, mutation coverage, energy and session receipts, repository pins, result fragility, scientific outcome preservation, release continuity and reviewer packs. Optional pinned public study fetch; no credentials required.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -48,7 +48,9 @@
         "./skills/szl-retrieval-eval",
         "./skills/szl-quantization-check",
         "./skills/szl-repo-pin",
-        "./skills/szl-result-fragility"
+        "./skills/szl-result-fragility",
+        "./skills/szl-outcome-preservation",
+        "./skills/szl-release-continuity"
       ]
     }
   ]

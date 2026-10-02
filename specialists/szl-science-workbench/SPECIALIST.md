@@ -13,12 +13,14 @@ szl-unit-invariants, szl-negative-control-audit, szl-analysis-plan-audit,
 szl-evidence-gate, szl-cross-implementation-check, szl-analysis-mutation-test,
 szl-compute-energy-receipt, szl-session-receipt, szl-reviewer-pack,
 szl-refutation-ledger, szl-retrieval-eval, szl-quantization-check,
-szl-repo-pin, szl-result-fragility.
+szl-repo-pin, szl-result-fragility, szl-outcome-preservation, szl-release-continuity.
 
-The v0.4.0 source selects twenty-three science skills from twenty-five total packages.
+This proposed v0.5.0 checkout selects twenty-five science skills from twenty-seven total packages.
+The published v0.4.0 tag selects twenty-three science skills.
 The two evidence skills are intentionally excluded. SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The workbench dispatches dataset, binary/categorical
-model, math, kernel, calibration and paired checks; the other audits retain their own CLIs.
+model, math, kernel, calibration, paired, outcome preservation and release continuity;
+the other audits retain their own CLIs.
 The historical v0.2.0-rc.1 profile selected eight science skills.
 
 Connectors on creation: none. Attach a selected connector only when the scientific task needs it.
