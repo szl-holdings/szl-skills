@@ -306,6 +306,23 @@ class PackagingTests(unittest.TestCase):
                     if report["skill"] == "szl-paired-science":
                         self.assertTrue((unpacked / "scripts" / "qualify.py").is_file())
                         continue
+                    if report["skill"] == "szl-experiment-replay":
+                        runner = str(unpacked / "scripts" / "run.py")
+                        prepare = subprocess.run(
+                            [sys.executable, "-B", runner, "prepare", "assets/declaration.json",
+                             "--root", str(unpacked), "--output", "replay-pin.json"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(prepare.returncode, 0, prepare.stderr)
+                        self.assertEqual(json.loads(prepare.stdout)["status"], "PINNED")
+                        replay = subprocess.run(
+                            [sys.executable, "-B", runner, "replay", "replay-pin.json",
+                             "--root", str(unpacked), "--receipt", "replay-receipt.json"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(replay.returncode, 0, replay.stderr)
+                        self.assertEqual(json.loads(replay.stdout)["status"], "MATCH")
+                        continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
                                str(unpacked / "assets" / "example.json")]
