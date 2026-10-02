@@ -289,7 +289,7 @@ class PackagingTests(unittest.TestCase):
             market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
                         if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills", "szl-science-assay-skills",
-                                              "szl-science-change-impact-skills"}
+                                              "szl-science-change-impact-skills", "szl-paper-evidence-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
@@ -309,6 +309,35 @@ class PackagingTests(unittest.TestCase):
                         continue
                     if report["skill"] == "szl-paired-science":
                         self.assertTrue((unpacked / "scripts" / "qualify.py").is_file())
+                        continue
+                    if report["skill"] == "szl-paper-evidence-audit":
+                        entrypoint = unpacked / "scripts" / "audit.py"
+                        self.assertTrue(entrypoint.is_file())
+                        pdf = destination / "paper-evidence-fixture.pdf"
+                        extracted = destination / "paper-evidence-fixture.json"
+                        claims = destination / "paper-evidence-claims.json"
+                        pdf.write_bytes(b"%PDF-1.7\nsynthetic package contract\n")
+                        doc = {"tables": [{"prov": [{"page_no": 1, "bbox":
+                               {"l": 0, "t": 10, "r": 20, "b": 0,
+                                "coord_origin": "BOTTOMLEFT"}}],
+                               "data": {"table_cells": [{"text": "7 mg/L"}]}}]}
+                        extracted.write_text(json.dumps(doc), encoding="utf-8")
+                        claim = {"schema": "szl.paper-evidence-claims.v1",
+                                 "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+                                 "document_json_sha256": hashlib.sha256(extracted.read_bytes()).hexdigest(),
+                                 "extraction": {"tool": "synthetic", "version": "test",
+                                                "pipeline": "test", "ocr_engine": "none"},
+                                 "claims": [{"id": "dose", "ref": "#/tables/0", "quote": "7 mg/L"}]}
+                        claims.write_text(json.dumps(claim), encoding="utf-8")
+                        command = [sys.executable, "-B", str(entrypoint), "--pdf", str(pdf),
+                                   "--document-json", str(extracted), "--claims", str(claims)]
+                        checked = subprocess.run(command, capture_output=True, text=True)
+                        self.assertEqual(checked.returncode, 0, checked.stderr)
+                        self.assertEqual(json.loads(checked.stdout)["status"], "REVIEW_REQUIRED")
+                        pdf.write_bytes(b"%PDF-1.7\nchanged synthetic bytes\n")
+                        rejected = subprocess.run(command, capture_output=True, text=True)
+                        self.assertEqual(rejected.returncode, 2, rejected.stderr)
+                        self.assertEqual(json.loads(rejected.stdout)["status"], "UNRESOLVED")
                         continue
                     if report["skill"] == "szl-experiment-replay":
                         runner = str(unpacked / "scripts" / "run.py")

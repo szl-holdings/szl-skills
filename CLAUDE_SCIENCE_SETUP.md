@@ -1,14 +1,15 @@
 # Claude Science setup
 
-The source candidate contains twenty-nine skills: twenty-seven science tools and two evidence
-skills. The default core family selects twenty-four science tools; separate replay, assay and change
-families select szl-experiment-replay, szl-assay-measurement-audit and szl-research-change-impact.
-Each complete family must fit the existing 1 MB resource limit. All four exclude szl-typesafe-ai and
-szl-governed-decision. The published v0.4.0 tag contains
-twenty-three science tools and two evidence skills; clustered replication, the assay audit and change-impact
-remain source candidates until separately verified release.
-The historical v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills does not
-create a specialist. The workbench integrates seven core checks; the other tools run separately.
+The source candidate contains thirty skills: twenty-eight science tools and two evidence
+skills. The default core family selects twenty-four science tools; separate replay, paper, assay
+and change families select szl-experiment-replay, szl-paper-evidence-audit,
+szl-assay-measurement-audit and szl-research-change-impact. Each complete family must fit the
+existing 1 MB resource limit. All five exclude szl-typesafe-ai and szl-governed-decision.
+The published v0.4.0 tag contains twenty-three science tools and two evidence skills; clustered
+replication, replay, paper evidence, the assay audit and change-impact remain source candidates
+until separately verified release. The historical
+v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills does not create a
+specialist. The workbench integrates seven core checks; other tools run separately.
 SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does not cover
 all current science tools.
 
@@ -28,6 +29,9 @@ receipt = setup["install"](host, resources, "claude-science-install-receipt.json
 replay = setup["bundle"](".", family="replay")
 replay_receipt = setup["install"](host, replay, "claude-science-replay-receipt.json",
                                   update=True, family="replay")
+paper = setup["bundle"](".", family="paper")
+paper_receipt = setup["install"](host, paper, "claude-science-paper-receipt.json",
+                                 update=True, family="paper")
 assay = setup["bundle"](".", family="assay")
 assay_receipt = setup["install"](host, assay, "claude-science-assay-receipt.json",
                                  update=True, family="assay")
@@ -35,7 +39,8 @@ change = setup["bundle"](".", family="change")
 change_receipt = setup["install"](host, change, "claude-science-change-receipt.json",
                                   update=True, family="change")
 print({"core": receipt["status"], "replay": replay_receipt["status"],
-       "assay": assay_receipt["status"], "change": change_receipt["status"]})
+       "paper": paper_receipt["status"], "assay": assay_receipt["status"],
+       "change": change_receipt["status"]})
 ```
 
 The SDK procedure stages twenty-four core science tools, checks returned sidecar gates for edited
@@ -43,7 +48,7 @@ kernel.py resources, publishes through host.skills and reads every resource back
 SZL_SCIENCE profile requests exactly the twenty-four selected core tools and zero connectors on
 creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
-`update=True` updates only these twenty-four named core SZL skills per core call; protected bundled-name collisions
+`update=True` updates only the selected complete family; protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles
 retain additional skills and their existing connectors/mode, which the receipt reports
 explicitly. Creation and updating a matching profile therefore have different inventories.

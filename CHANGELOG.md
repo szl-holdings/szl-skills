@@ -7,14 +7,18 @@
   impact review, and produces an offline recheck order. The core twenty-four-skill SDK bundle
   stays unchanged and below 1 MB; the new single-skill family includes its license and notice.
   Graph impact and supplied digests do not establish scientific truth or host registration.
+- Add szl-paper-evidence-audit as a separate, bounded paper import family. It matches complete
+  extracted table-cell or figure-caption text to byte-pinned local inputs and separate PDF
+  regions, rejects inverted boxes, and always requires human visual review. It does not perform
+  OCR, prove extraction lineage or scientific truth, or authorize clinical use.
 - Added szl-assay-measurement-audit, a stdlib-only offline check for one researcher-declared
   increasing linear assay run. It gates calibration residuals, a separately identified blank,
   QC recovery, sample range, quantification minimum and final-result uncertainty declarations.
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
-- Source inventory becomes twenty-four core science tools, one replay tool, one assay tool, one change-impact tool and
-  two evidence skills. This source candidate is not proof of Claude Science host registration, method
-  validation or clinical use.
+- Source inventory becomes twenty-four core science tools, one replay tool, one paper audit,
+  one assay audit, one change-impact tool and two evidence skills. This source candidate is not proof of Claude Science
+  host registration, method validation or clinical use.
 - Add szl-clustered-replication: distinguish observations from declared experimental units,
   equal-cluster paired effects, an exact conditional cluster sign-flip calculation and
   leave-one-cluster sensitivity. Missing commitments or undeclared assumptions stay
@@ -24,9 +28,10 @@
   Published v0.4.0 and earlier tags retain their original inventories.
 - New numerical tests use an independent Cartesian sign-vector oracle and invariance to
   technical replication; test execution and app efficacy are reported separately.
-- Preserve the separately developed experiment replay contract in a second import family.
-  All four science families retain complete helpers, licenses and notices and the 1 MB SDK
-  bundle limit; the shared installer attaches all twenty-seven science tools across four calls.
+- Preserve the separately developed experiment replay contract and keep paper and assay audits
+  outside the core bundle. All five science families retain complete helpers, licenses and
+  notices and the 1 MB SDK bundle limit; the shared installer can attach all twenty-eight tools
+  across five separately verified calls.
 
 ## 0.4.0
 

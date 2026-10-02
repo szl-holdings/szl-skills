@@ -94,11 +94,14 @@ def build(root):
     replay = set(installer_names(root, "REPLAY_NAMES", required=False))
     if replay != set(grouped.get("szl-science-replay-skills", [])) or replay & selected:
         raise ValueError("installer/replay catalog mismatch")
+    paper = set(installer_names(root, "PAPER_NAMES", required=False))
+    if paper != set(grouped.get("szl-paper-evidence-skills", [])) or paper & (selected | replay):
+        raise ValueError("installer/paper catalog mismatch")
     assay = set(installer_names(root, "ASSAY_NAMES", required=False))
-    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | replay):
+    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | replay | paper):
         raise ValueError("installer/assay catalog mismatch")
     change = set(installer_names(root, "CHANGE_NAMES", required=False))
-    if change != set(grouped.get("szl-science-change-impact-skills", [])) or change & (selected | replay | assay):
+    if change != set(grouped.get("szl-science-change-impact-skills", [])) or change & (selected | replay | paper | assay):
         raise ValueError("installer/change catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
