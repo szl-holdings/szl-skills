@@ -15,7 +15,8 @@ publication binding.
 
 [The example](assets/example.json) declares schema `szl.release-continuity.v1`,
 one canonical source repository, its full commit and required surfaces.
-Supported kinds: `github`, `pypi`, `hf-model`, `hf-dataset`, `hf-space`, `runtime`.
+Kinds: `github`, `pypi`, `hf-model`, `hf-dataset`, `hf-space`, `hf-kernel`, `runtime`.
+Native kernels retain their own repository type and immutable revision.
 Each expected identity has revision and artifact_sha256 only. A wheel, dataset
 and build have separate expected hashes. GitHub, Hub and runtime pins must be
 full immutable revisions; PyPI uses a version. GitHub must match declared source.

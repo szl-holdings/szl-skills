@@ -42,7 +42,7 @@
   {
     "path": "scripts/library/release_continuity.py",
     "source": "skills/szl-release-continuity/kernel.py",
-    "sha256": "5be9aebd2a1c2f877cef588d1d6127f69909510e62c8be933d0dd89f82bb9f7e"
+    "sha256": "f57af4c7569bbbd6e13837a1306a686eaf50521a35b26f4985bfa7925d2c05e3"
   },
   {
     "path": "scripts/library/calibration_reference.py",

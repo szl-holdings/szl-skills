@@ -19,7 +19,7 @@ def szl_release_continuity(record):
     names = [s["id"] for s in surfaces]
     if any(not isinstance(n, str) or not n or len(n) > 200 for n in names) or len(set(names)) != len(names):
         raise ValueError("Unique nonempty surface ids required")
-    allowed = ("github", "pypi", "hf-model", "hf-dataset", "hf-space", "runtime")
+    allowed = ("github", "pypi", "hf-model", "hf-dataset", "hf-space", "hf-kernel", "runtime")
     results, findings = [], []
     for surface in surfaces:
         kind = surface["kind"]
