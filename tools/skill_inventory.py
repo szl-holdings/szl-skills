@@ -11,6 +11,7 @@ import json
 import pathlib
 import re
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = "SKILL_INVENTORY.json"
@@ -41,8 +42,11 @@ def build(root):
     if not isinstance(plugins, list) or not plugins:
         raise ValueError("marketplace has no plugins")
 
+    skills_root = root / "skills"
+    if not skills_root.is_dir() or skills_root.is_symlink():
+        raise ValueError("skills/ must be a regular directory")
     actual = set()
-    for directory in (root / "skills").iterdir():
+    for directory in skills_root.iterdir():
         if directory.name == "__pycache__":
             continue
         if not directory.is_dir() or directory.is_symlink():
@@ -51,8 +55,9 @@ def build(root):
         if not entry.is_file() or entry.is_symlink():
             raise ValueError("missing regular SKILL.md: " + directory.name)
         match = FRONTMATTER_NAME.match(entry.read_text(encoding="utf-8"))
-        name = None if match is None else re.search(r"(?m)^name:\s*(\S+)\s*$", match.group(1))
-        if name is None or name.group(1) != directory.name:
+        declarations = [] if match is None else re.findall(r"(?m)^name:[^\r\n]*$", match.group(1))
+        if len(declarations) != 1 or re.fullmatch(r"name:[ \t]*" + re.escape(directory.name) + r"[ \t]*",
+                                                    declarations[0]) is None:
             raise ValueError("SKILL.md frontmatter name mismatch: " + directory.name)
         actual.add(directory.name)
 
@@ -97,11 +102,33 @@ def render(root):
     return json.dumps(build(root), indent=2, ensure_ascii=False) + "\n"
 
 
+def inventory_path(root):
+    path = pathlib.Path(root) / OUTPUT
+    if path.is_symlink():
+        raise ValueError(OUTPUT + " must not be a symlink")
+    return path
+
+
 def check(root):
     expected = render(root)
-    path = pathlib.Path(root) / OUTPUT
+    path = inventory_path(root)
     if not path.is_file() or path.read_text(encoding="utf-8") != expected:
         raise ValueError(OUTPUT + " is stale; run python -B tools/skill_inventory.py --write")
+
+
+def write(root):
+    root = pathlib.Path(root)
+    expected = render(root)
+    path = inventory_path(root)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="\n", dir=root,
+                                     prefix=".skill-inventory-", suffix=".tmp", delete=False) as stream:
+        stream.write(expected)
+        temporary = pathlib.Path(stream.name)
+    try:
+        inventory_path(root)  # Recheck before atomically replacing the destination.
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def main():
@@ -110,7 +137,7 @@ def main():
     args = parser.parse_args()
     try:
         if args.write:
-            (ROOT / OUTPUT).write_text(render(ROOT), encoding="utf-8", newline="\n")
+            write(ROOT)
         else:
             check(ROOT)
     except (OSError, ValueError, KeyError, TypeError) as error:
