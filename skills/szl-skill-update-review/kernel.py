@@ -385,6 +385,12 @@ def _skill_changes(old_inv, new_inv):
                              "helper_bytes_changed": helper_changed, "documentation_only": docs_only})
     old_files = {f["path"]: f["sha256"] for f in old_inv["files"]}
     new_files = {f["path"]: f["sha256"] for f in new_inv["files"]}
+    package_delta = {**_delta(old_files, new_files),
+                     "changed": sorted(p for p in old_files.keys() & new_files.keys()
+                                       if old_files[p] != new_files[p])}
+    license_paths = sorted(p for field in package_delta.values() for p in field
+                           if Path(p).name.upper() in {"LICENSE", "NOTICE", "COPYING"} or
+                           Path(p).name.upper().startswith(("LICENSE.", "COPYING.")))
     return {"added_skills": [new_skills[p]["name"] for p in sorted(right)],
             "removed_skills": [old_skills[p]["name"] for p in sorted(left)],
             "added_skill_declarations": [{"name": new_skills[p]["name"], "path": p,
@@ -392,9 +398,7 @@ def _skill_changes(old_inv, new_inv):
             "removed_skill_declarations": [{"name": old_skills[p]["name"], "path": p,
                                              **_declarations(old_skills[p])} for p in sorted(left)],
             "equal_byte_rename_candidates": renames, "modified_skills": modified,
-            "package_files": {**_delta(old_files, new_files),
-                              "changed": sorted(p for p in old_files.keys() & new_files.keys()
-                                                if old_files[p] != new_files[p])}}
+            "package_files": package_delta, "license_artifact_changes": license_paths}
 
 
 def _rerun(changes):
@@ -423,6 +427,9 @@ def _rerun(changes):
     if changes["package_files"]["added"] or changes["package_files"]["removed"] or changes["package_files"]["changed"]:
         actions.append({"scope": "package", "reason": "package file set or bytes changed", "evidence_and_tests":
                         ["rerun package registration, inventory, and integration checks"]})
+    if changes["license_artifact_changes"]:
+        actions.append({"scope": "package licenses", "reason": "license or notice artifact bytes changed",
+                        "evidence_and_tests": ["review changed license text and attribution"]})
     return actions
 
 

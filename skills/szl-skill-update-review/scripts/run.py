@@ -26,6 +26,7 @@ def _render(report):
                     "equal_byte_rename_candidates", "modified_skills"):
             lines.append(f"- {key}: {json.dumps(changes[key], sort_keys=True)}")
         lines += ["", "## Package files", "", json.dumps(changes["package_files"], sort_keys=True),
+                  "", "License or notice artifacts changed: " + json.dumps(changes["license_artifact_changes"]),
                   "", "## Declared and literal evidence", "",
                   "Declared hosts, credentials, and licenses are metadata claims. Literal URL hosts and credential markers are string observations. Dynamic destinations are UNKNOWN.",
                   "", json.dumps(report["observations"], sort_keys=True), "", "## Evidence and tests to revisit", ""]

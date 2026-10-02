@@ -201,6 +201,14 @@ class PackageFixture(unittest.TestCase):
         self.assertEqual(report["status"], "CHANGES_REVIEW_REQUIRED")
         self.assertIn("MIT", json.dumps(report))
 
+    def test_license_file_bytes_trigger_terms_review(self):
+        self.put(self.roots["old"], "LICENSE", b"Old license text\n")
+        self.put(self.roots["new"], "LICENSE", b"New license text\n")
+        self.refresh()
+        report = self.assess()
+        self.assertEqual(report["changes"]["license_artifact_changes"], ["LICENSE"])
+        self.assertIn("review changed license text", json.dumps(report["rerun"]))
+
     def test_frontmatter_and_manifest_license_disagreement_fails_closed(self):
         self.skills["new"][0]["declared_license"] = "MIT"
         self.refresh()

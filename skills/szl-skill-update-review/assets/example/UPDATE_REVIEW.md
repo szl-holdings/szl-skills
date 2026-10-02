@@ -20,6 +20,8 @@ Retained lock SHA-256: 2ab9ed2008a31a97a4de306bf7f911d6ebb33d74c0d854217bdb6023d
 
 {"added": [], "changed": ["skills/demo/scripts/helper.py"], "removed": []}
 
+License or notice artifacts changed: []
+
 ## Declared and literal evidence
 
 Declared hosts, credentials, and licenses are metadata claims. Literal URL hosts and credential markers are string observations. Dynamic destinations are UNKNOWN.
