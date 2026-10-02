@@ -1,15 +1,16 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty skills for Claude Science, Claude Code and claude.ai: twenty-eight science
-tools and two evidence skills. They use the Python standard library and report what they did not
+contains thirty-two skills for Claude Science, Claude Code and claude.ai: twenty-nine science
+tools and three evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have five import families: twenty-four core checks, one bounded experiment
-replay check, one paper evidence audit, one declared assay-run audit, and one multiplicity audit. Each SDK bundle retains
-the 1 MB limit, licenses and notices. All four families use the same installer and can attach to
+The science tools have six import families: twenty-four core checks, one bounded experiment
+replay check, one paper evidence audit, one declared assay-run audit, one multiplicity audit and
+one research change-impact check. Each SDK bundle retains the 1 MB limit, licenses and notices.
+All six families use the same installer and can attach to
 the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
 
 ## Import
@@ -23,8 +24,8 @@ measurement. The stable v0.4.0 tag still contains twenty-three science tools and
 skills. A GitHub tag does not prove Claude Science host registration or measured skill
 effectiveness; verify those separately.
 
-That published v0.4.0 tag contains twenty-three science skills. The new multiplicity skill is
-source-candidate work until a separately reviewed tag and byte readback are published.
+Multiplicity and research change impact remain source-candidate work until a separately
+reviewed tag and byte readback are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -50,6 +51,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | know how many outcome changes stand between a result and p = 0.05 | szl-result-fragility | fragility index against the number lost to follow-up |
 | distinguish many measurements from independent replications | szl-clustered-replication | declared unit counts, conditional cluster sign-flip result and leave-one-unit sensitivity |
 | adjust a complete predeclared family without hiding missing tests | szl-multiplicity-audit | Holm FWER or declared-assumption BH FDR; HOLD if any planned result is missing |
+| see which conclusions need reassessment when a dependency disappears | szl-research-change-impact | retained before/after graph impact, missing required claims and deterministic recheck order |
 
 ## Science checks
 
@@ -82,6 +84,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-paper-evidence-audit | Where did an extracted table cell or figure caption come from in a pinned PDF? | Does not perform OCR or verify values in pixels |
 | szl-clustered-replication | Does a paired change survive equal experimental-unit weighting and removal of one cluster? | Independence and plan timing are declarations, not verified facts |
 | szl-multiplicity-audit | Were all planned tests reported, and what are their Holm/BH adjusted p-values? | Supplied plan hash is not preregistration; raw p-values and BH dependence are unverified |
+| szl-research-change-impact | Which conclusions still need review after a research dependency changes or disappears? | Uses declared retained graphs and supplied digests; does not verify scientific truth |
 | szl-science-workbench | Seven integrated core checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
 
 Each science skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
@@ -95,6 +98,7 @@ identical to the reviewed originals).
 |---|---|---|
 | szl-typesafe-ai | Uses TypeSafe Jev (Choice / Noul / Score) as an optional second reader for evidence-class triage. Fail-closed: any error gives UNAVAILABLE, never PASS. | Not a gate. Not TypeScript, Zod, Pydantic, mypy, or JSON Schema. Never marks anything LIVE. |
 | szl-governed-decision | Wraps a classifier, policy engine, or System One model so each decision carries its own evidence. | Does not prove a model output is true. Receipts cover integrity and origin only. |
+| szl-rare-disease-evidence-map | Reconciles synthetic phenotype and variant assertions into source-bound evidence with explicit HOLD results. | Not a diagnosis, clinical ranking, or validation of external source truth. |
 
 ## Try it in two minutes
 

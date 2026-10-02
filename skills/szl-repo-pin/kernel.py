@@ -55,7 +55,8 @@ def _git(path: Path, *args) -> tuple[int, str]:
                               env={"GIT_TERMINAL_PROMPT": "0", "PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")})
     except (OSError, subprocess.TimeoutExpired) as error:
         return 127, str(error)
-    return done.returncode, (done.stdout or "").strip()
+    output = done.stdout or ""
+    return done.returncode, output[:-1] if output.endswith("\n") else output
 
 
 def szl_inspect_repo(root: Path, relative: str) -> dict:
@@ -110,9 +111,10 @@ def szl_verify_pin(root, pin: dict) -> dict:
         if not isinstance(recorded, dict):
             return {"status": "ERROR", "error": "pin repos must be objects"}
         name, head = recorded.get("name"), recorded.get("head")
+        changes = recorded.get("uncommitted_changes")
         if (not isinstance(name, str) or not name or name in names or
                 not isinstance(recorded.get("path"), str) or not recorded["path"] or
-                recorded.get("state") != "CLEAN" or recorded.get("uncommitted_changes") != 0 or
+                recorded.get("state") != "CLEAN" or type(changes) is not int or changes != 0 or
                 not isinstance(head, str) or len(head) != 40 or
                 any(c not in "0123456789abcdef" for c in head)):
             return {"status": "ERROR", "error": "pin has an invalid clean repository record"}
