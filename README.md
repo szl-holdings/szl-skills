@@ -1,18 +1,16 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. The source candidate
-contains twenty-eight skills for Claude Science, Claude Code and claude.ai: twenty-six science
-tools and two evidence skills.
-The checks use the Python standard library and report what they did not verify alongside what
-they did. Normal checks are offline. Repository pins also use the local Git executable; optional
-session-receipt signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate
-optional service and credential requirements below.
+Executable checks that make scientific claims carry their evidence. This unreleased source
+candidate contains twenty-nine skills for Claude Science, Claude Code and claude.ai:
+twenty-seven science tools and two evidence skills. They use the Python standard library and
+report what they did not verify. Normal checks are offline. Repository pins also use local Git;
+optional session-receipt signing requires szl-receipt-dsse. The TypeSafe evidence skill declares
+its separate optional service and credential requirements below.
 
-The science tools have three import families: twenty-four core checks, one bounded experiment
-replay check and one declared assay-run audit. Each SDK bundle retains the 1 MB limit, licenses
-and notices. All three families use the same installer and can attach to the same specialist.
-The published v0.4.0 tag retains
-its original twenty-three-tool science scope.
+The science tools have four import families: twenty-four core checks, one bounded experiment
+replay check, one paper evidence audit, and one declared assay-run audit. Each SDK bundle retains
+the 1 MB limit, licenses and notices. All four families use the same installer and can attach to
+the same specialist. The published v0.4.0 tag retains its original twenty-three-tool science scope.
 
 ## Import
 
@@ -20,9 +18,10 @@ Claude Science: Skills > Import from GitHub, paste:
 
     szl-holdings/szl-skills@v0.4.0
 
-The published v0.4.0 tag contains twenty-three science tools and two evidence skills. The new
-clustered-replication and assay-measurement-audit skills below are unreleased source candidates;
-use the reviewed immutable source commit for testing until a separately verified release is published.
+The published v0.4.0 tag contains twenty-three science tools and two evidence skills. Paper
+evidence audit, clustered replication, experiment replay, and assay measurement below are
+unreleased source candidates; use a reviewed immutable source commit for testing until a
+separately verified release is published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -35,6 +34,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 |---|---|---|
 | run the seven integrated core checks on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
+| check that a PDF table quote or figure caption has a pinned page and source region | szl-paper-evidence-audit | exact text locator or unresolved, always requiring human review |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
 | know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
 | write an honest energy or CO2e sentence for the methods section | szl-compute-energy-receipt | MEASURED / REPORTED / UNAVAILABLE with the sentence |
@@ -75,6 +75,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-quantization-check | Does the quantized or ported model agree with the reference on these inputs? | Not accuracy; nothing about inputs not included |
 | szl-repo-pin | Which exact commits, in which repositories, with nothing uncommitted? | Not publication or correctness of the code |
 | szl-result-fragility | How many outcome flips remove significance, compared with the dropouts? | Not effect size, design or adjusted analyses |
+| szl-paper-evidence-audit | Where did an extracted table cell or figure caption come from in a pinned PDF? | Does not perform OCR or verify values in pixels |
 | szl-clustered-replication | Does a paired change survive equal experimental-unit weighting and removal of one cluster? | Independence and plan timing are declarations, not verified facts |
 | szl-science-workbench | Seven integrated core checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
 
