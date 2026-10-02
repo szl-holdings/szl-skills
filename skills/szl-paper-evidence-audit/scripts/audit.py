@@ -112,8 +112,8 @@ def _caption_matches(item, texts, quote):
         caption = texts[int(match.group(1))]
         if not isinstance(caption, dict) or not isinstance(caption.get("text"), str):
             return None
-        if quote in caption["text"]:
-            matches.append({"caption_ref": value})
+        if quote == caption["text"]:
+            matches.append({"caption_ref": value, "locators": _locator(caption)})
     return matches
 
 
@@ -151,7 +151,8 @@ def audit(pdf_path, document_path, claims_path):
         if match is None or not isinstance(quote, str) or not quote.strip() or len(quote) > 2048:
             raise ValueError("INVALID_CLAIM_REF_OR_QUOTE")
         finding = {"id": claim_id, "ref": ref, "quote_sha256": hashlib.sha256(quote.encode("utf-8")).hexdigest(),
-                   "status": "UNRESOLVED", "issues": [], "locators": [], "match": None}
+                   "status": "UNRESOLVED", "issues": [], "locators": [],
+                   "caption_locators": [], "match": None}
         if not pdf_bound:
             finding["issues"].append("PDF_DIGEST_MISMATCH")
         if not document_bound:
@@ -176,7 +177,20 @@ def audit(pdf_path, document_path, claims_path):
             elif len(matches) != 1:
                 finding["issues"].append("AMBIGUOUS_QUOTE")
             else:
-                finding["match"] = matches[0]
+                if kind == "pictures":
+                    caption_match = matches[0]
+                    finding["match"] = {"caption_ref": caption_match["caption_ref"]}
+                    caption_locators = caption_match["locators"]
+                    if caption_locators is None:
+                        finding["issues"].append("CAPTION_REGION_MISSING")
+                    else:
+                        finding["caption_locators"] = caption_locators
+                        if locators is not None and not {
+                            entry["page"] for entry in caption_locators
+                        }.issubset({entry["page"] for entry in locators}):
+                            finding["issues"].append("CAPTION_PICTURE_PAGE_MISMATCH")
+                else:
+                    finding["match"] = matches[0]
             if not finding["issues"]:
                 finding["status"] = ("TABLE_TEXT_LOCATED_REVIEW_REQUIRED" if kind == "tables"
                                      else "FIGURE_CAPTION_LOCATED_VISUAL_REVIEW_REQUIRED")

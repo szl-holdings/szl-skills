@@ -31,7 +31,9 @@ class PaperEvidenceTests(unittest.TestCase):
             "pictures": [{"prov": [{"page_no": 3, "bbox": {
                 "l": 3, "t": 50, "r": 70, "b": 2}}],
                 "captions": [{"$ref": "#/texts/0"}]}],
-            "texts": [{"text": "Figure 1. Synthetic dose-response panel."}]
+            "texts": [{"text": "Figure 1. Synthetic dose-response panel.",
+                       "prov": [{"page_no": 3, "bbox": {
+                           "l": 3, "t": 1, "r": 70, "b": 0}}]}]
         }
         self.manifest = {
             "schema": "szl.paper-evidence-claims.v1",
@@ -40,7 +42,8 @@ class PaperEvidenceTests(unittest.TestCase):
             "extraction": {"tool": "Docling", "version": "test-fixture",
                            "pipeline": "synthetic", "ocr_engine": "none"},
             "claims": [{"id": "table-dose", "ref": "#/tables/0", "quote": "12.5 mg/L"},
-                       {"id": "figure-caption", "ref": "#/pictures/0", "quote": "Synthetic dose-response"}]
+                       {"id": "figure-caption", "ref": "#/pictures/0",
+                        "quote": "Figure 1. Synthetic dose-response panel."}]
         }
         self.save()
 
@@ -64,6 +67,7 @@ class PaperEvidenceTests(unittest.TestCase):
         self.assertEqual(result["findings"][0]["locators"][0]["page"], 2)
         self.assertEqual(result["findings"][1]["status"], "FIGURE_CAPTION_LOCATED_VISUAL_REVIEW_REQUIRED")
         self.assertEqual(result["findings"][1]["locators"][0]["page"], 3)
+        self.assertEqual(result["findings"][1]["caption_locators"][0]["page"], 3)
 
     def test_changed_pdf_or_extraction_blocks_all_claims(self):
         for change in ("pdf", "document"):
@@ -106,6 +110,28 @@ class PaperEvidenceTests(unittest.TestCase):
         finding = self.report()["findings"][0]
         self.assertEqual(finding["status"], "UNRESOLVED")
         self.assertIn("QUOTE_NOT_LOCATED", finding["issues"])
+
+    def test_caption_quote_and_caption_region_must_match_picture(self):
+        self.manifest["claims"][1]["quote"] = "Figure 1"
+        self.save()
+        finding = self.report()["findings"][1]
+        self.assertIn("QUOTE_NOT_LOCATED", finding["issues"])
+        self.document["texts"][0]["text"] = "Figure 10 reports 112.5 mg/L"
+        self.manifest["claims"][1]["quote"] = "12.5 mg/L"
+        self.save()
+        finding = self.report()["findings"][1]
+        self.assertIn("QUOTE_NOT_LOCATED", finding["issues"])
+        self.document["texts"][0]["text"] = "Figure 1. Synthetic dose-response panel."
+        self.manifest["claims"][1]["quote"] = "Figure 1. Synthetic dose-response panel."
+        self.document["texts"][0]["prov"] = []
+        self.save()
+        finding = self.report()["findings"][1]
+        self.assertIn("CAPTION_REGION_MISSING", finding["issues"])
+        self.document["texts"][0]["prov"] = [{"page_no": 4, "bbox": {
+            "l": 3, "t": 1, "r": 70, "b": 0}}]
+        self.save()
+        finding = self.report()["findings"][1]
+        self.assertIn("CAPTION_PICTURE_PAGE_MISMATCH", finding["issues"])
 
     def test_missing_item_quote_and_wrong_reference_do_not_pass(self):
         self.manifest["claims"][0]["quote"] = "99 mg/L"
