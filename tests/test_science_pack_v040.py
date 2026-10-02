@@ -202,10 +202,36 @@ class RepoPinTests(unittest.TestCase):
         pin = self.k.szl_make_pin(declared_root, {"repos": [{"name": "child", "path": "child"}]})
         self.assertEqual((pin["status"], pin["repos"][0]["state"]), ("UNPINNED", "NOT_A_REPOSITORY"))
 
+    def test_git_output_removes_only_its_final_newline(self):
+        from unittest.mock import patch
+        for suffix in (" ", "\t", "\n"):
+            with self.subTest(suffix=repr(suffix)):
+                output = "repo" + suffix + "\n"
+                done = subprocess.CompletedProcess([], 0, output, "")
+                with patch.object(self.k.subprocess, "run", return_value=done):
+                    self.assertEqual(self.k._git(self.tmp, "rev-parse", "--show-toplevel"), (0, "repo" + suffix))
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX repository path ending in a space")
+    def test_posix_repo_root_with_trailing_space(self):
+        project = self.tmp / "trailing-path-project"
+        repo = project / "repo "
+        repo.mkdir(parents=True)
+        subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+        pin = self.k.szl_make_pin(project, {"repos": [{"name": "trailing", "path": repo.name}]})
+        self.assertEqual((pin["status"], pin["repos"][0]["state"]), ("PINNED", "CLEAN"))
+        self.assertEqual(self.k.szl_verify_pin(project, pin)["status"], "MATCH")
+
     def test_empty_or_malformed_pin_cannot_match(self):
         self.assertEqual(self.k.szl_verify_pin(self.tmp, {"schema": self.k.SCHEMA, "repos": []})["status"], "ERROR")
         self.assertEqual(self.k.szl_verify_pin(self.tmp, {"schema": self.k.SCHEMA, "repos": [None]})["status"], "ERROR")
         clean_pin = self.k.szl_make_pin(self.tmp, self.decl)
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, clean_pin)["status"], "MATCH")
+        for changes in (False, 0.0, -0.0):
+            with self.subTest(changes=repr(changes), change_type=type(changes).__name__):
+                wrong_count = json.loads(json.dumps(clean_pin))
+                wrong_count["repos"][0]["uncommitted_changes"] = changes
+                self.assertEqual(self.k.szl_verify_pin(self.tmp, wrong_count)["status"], "ERROR")
         dirty_record = json.loads(json.dumps(clean_pin))
         dirty_record["repos"][0]["state"] = "DIRTY"
         self.assertEqual(self.k.szl_verify_pin(self.tmp, dirty_record)["status"], "ERROR")
