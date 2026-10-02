@@ -51,7 +51,8 @@ def package_skills(destination, revision=None):
         archive = destination / (skill.name + ".zip")
         with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED) as z:
             for name, data in sorted(contents.items()):
-                member = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                # Manual claude.ai upload requires one enclosing skill directory.
+                member = zipfile.ZipInfo(skill.name + "/" + name, date_time=(1980, 1, 1, 0, 0, 0))
                 member.compress_type = zipfile.ZIP_DEFLATED
                 member.external_attr = 0o100644 << 16
                 z.writestr(member, data)

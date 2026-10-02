@@ -276,7 +276,7 @@ class PackagingTests(unittest.TestCase):
             for report in first:
                 with zipfile.ZipFile(pathlib.Path(temp) / "one" / report["archive"]) as archive:
                     expected = package["git_bytes"](revision, "skills/" + report["skill"] + "/SKILL.md")
-                    self.assertEqual(archive.read("SKILL.md"), expected)
+                    self.assertEqual(archive.read(report["skill"] + "/SKILL.md"), expected)
             with self.assertRaises(ValueError):
                 package["package_skills"](pathlib.Path(temp) / "bad", "main")
 
@@ -295,11 +295,15 @@ class PackagingTests(unittest.TestCase):
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
                 with self.subTest(skill=report["skill"]):
-                    unpacked = destination / ("imported-" + report["skill"])
+                    extraction = destination / ("imported-" + report["skill"])
+                    unpacked = extraction / report["skill"]
                     with zipfile.ZipFile(destination / report["archive"]) as z:
-                        self.assertTrue({"SKILL.md", "LICENSE", "NOTICE"} <= set(z.namelist()))
+                        names = set(z.namelist())
+                        self.assertTrue({report["skill"] + "/" + name for name in
+                                         ("SKILL.md", "LICENSE", "NOTICE")} <= names)
+                        self.assertTrue(all(name.startswith(report["skill"] + "/") for name in names))
                         self.assertLess(report["uncompressed_bytes"], 200000)
-                        z.extractall(unpacked)
+                        z.extractall(extraction)
                     if report["skill"] == "szl-science-workbench":
                         project = destination / "standalone-project"
                         init = subprocess.run([sys.executable, "-B", str(unpacked / "scripts" / "workbench.py"), "init", str(project)], capture_output=True, text=True)
