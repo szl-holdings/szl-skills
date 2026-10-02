@@ -1,11 +1,11 @@
 # Claude Science setup
 
-The source candidate contains fourteen skills: twelve science skills and two evidence
-skills. The SDK installer selects only the twelve science skills; it deliberately excludes
-szl-typesafe-ai and szl-governed-decision. Ten acceptance packages are six upgrades and four
-new audits; the existing workbench and kernel-comparison retain their separate checks.
-The historical v0.2.0-rc.1 tag contains eight science skills and does not include this
-expanded candidate. GitHub importing skills does not create a specialist.
+The current source inventory is generated in SKILL_INVENTORY.json. The SDK installer selects
+only its science skills; it deliberately excludes szl-typesafe-ai and szl-governed-decision.
+The marketplace lists the same inventory. The tagged v0.4.0 release predates the new source
+update-review skill. SCIENCE_ACCEPTANCE.md retains a separate, historical ten-package
+acceptance scope; the v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills
+does not create a specialist.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
 bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
@@ -23,12 +23,12 @@ receipt = setup["install"](host, resources, "claude-science-install-receipt.json
 print({"status": receipt["status"], "agent": receipt["agent"]})
 ```
 
-The SDK procedure stages twelve science skills, checks returned sidecar gates for edited
+The SDK procedure stages the current science inventory, checks returned sidecar gates for edited
 kernel.py resources, publishes through host.skills and reads every resource back. A new
-SZL_SCIENCE profile requests exactly the twelve selected skills and zero connectors on
+SZL_SCIENCE profile requests exactly the selected science skills and zero connectors on
 creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
-`update=True` updates only these twelve named SZL skills; protected bundled-name collisions
+`update=True` updates only these named SZL skills; protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles
 retain additional skills and their existing connectors/mode, which the receipt reports
 explicitly. Creation and updating a matching profile therefore have different inventories.

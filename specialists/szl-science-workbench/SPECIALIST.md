@@ -9,12 +9,17 @@ Description: Run reproducible scientific checks and maintain living project evid
 Skills (curated): szl-science-workbench, szl-research-anatomy, szl-math-claim-check,
 szl-dataset-readiness, szl-model-evaluation, szl-kernel-comparison,
 szl-reproducibility-capsule, szl-paired-science, szl-artifact-lineage,
-szl-unit-invariants, szl-negative-control-audit, szl-analysis-plan-audit.
+szl-unit-invariants, szl-negative-control-audit, szl-analysis-plan-audit,
+szl-evidence-gate, szl-cross-implementation-check, szl-analysis-mutation-test,
+szl-compute-energy-receipt, szl-session-receipt, szl-reviewer-pack,
+szl-refutation-ledger, szl-retrieval-eval, szl-quantization-check,
+szl-repo-pin, szl-result-fragility, szl-skill-update-review.
 
-This source candidate selects twelve science skills from fourteen total packages. The
-two evidence skills are intentionally excluded. Ten upgraded/new audit packages have
-bounded acceptance evidence; workbench and kernel-comparison keep their existing checks.
-The four standalone audit additions do not change the workbench's check-dispatch graph.
+The current source selection follows SKILL_INVENTORY.json; the v0.4.0 release predates
+szl-skill-update-review.
+The two evidence skills are intentionally excluded. SCIENCE_ACCEPTANCE.md retains the
+historical ten-package acceptance scope. The workbench dispatches dataset, binary/categorical
+model, math, kernel, calibration and paired checks; the other audits retain their own CLIs.
 The historical v0.2.0-rc.1 profile selected eight science skills.
 
 Connectors on creation: none. Attach a selected connector only when the scientific task needs it.

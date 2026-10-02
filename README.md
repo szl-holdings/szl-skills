@@ -1,13 +1,15 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. Twenty skills for
-Claude Science, Claude Code and claude.ai: twenty-three science checks and two evidence skills.
-Every check is Python standard library, runs without network or credentials, and reports what it
-did not verify alongside what it did.
+Executable, offline checks that make scientific claims carry their evidence. The current source
+skills for Claude Science, Claude Code and claude.ai are counted in SKILL_INVENTORY.json.
+The checks use the Python standard library, run without network or credentials, and report what
+they did not verify alongside what they did. Repository pins also use the local Git executable;
+optional session-receipt signing requires szl-receipt-dsse.
 
 ## Import
 
-Claude Science: Skills > Import from GitHub, paste:
+Claude Science: Skills > Import from GitHub, paste the tagged v0.4.0 release below. Newer source
+skills, including szl-skill-update-review, require a reviewed source commit until a later release.
 
     szl-holdings/szl-skills@v0.4.0
 
@@ -20,7 +22,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 
 | If you want to... | Use | It tells you |
 |---|---|---|
-| run every check on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
+| connect dataset, model, math, kernel and paired checks and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
 | know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
@@ -32,6 +34,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | know whether the 4-bit or ported model still answers like the one you validated | szl-quantization-check | WITHIN_TOLERANCE / DEGRADED with the worst inputs named |
 | name the exact commits of every repository an analysis used | szl-repo-pin | one composite digest, only when every tree is clean; MATCH / DRIFT later |
 | know how many outcome changes stand between a result and p = 0.05 | szl-result-fragility | fragility index against the number lost to follow-up |
+| review a local skill package update before relying on its new bytes | szl-skill-update-review | added and changed skills, declarations, and evidence or tests to rerun |
 
 ## Science checks
 
@@ -59,7 +62,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-quantization-check | Does the quantized or ported model agree with the reference on these inputs? | Not accuracy; nothing about inputs not included |
 | szl-repo-pin | Which exact commits, in which repositories, with nothing uncommitted? | Not publication or correctness of the code |
 | szl-result-fragility | How many outcome flips remove significance, compared with the dropouts? | Not effect size, design or adjusted analyses |
-| szl-science-workbench | All of the above on one project directory, with immutable runs and invalidation | Not an experiment runner |
+| szl-science-workbench | Dataset, binary/categorical model, math, kernel, calibration and paired checks, with immutable runs and invalidation | Other pack audits use their own CLIs; not an experiment runner |
 
 Every skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
 under `references/` where the input format is non-trivial, and tests in `tests/`. The workbench
