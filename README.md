@@ -1,16 +1,17 @@
 # SZL Skills
 
 Executable, offline checks that make scientific claims carry their evidence. The source candidate
-contains twenty-eight skills for Claude Science, Claude Code and claude.ai: twenty-six science
+contains twenty-nine skills for Claude Science, Claude Code and claude.ai: twenty-seven science
 tools and two evidence skills.
 The checks use the Python standard library and report what they did not verify alongside what
 they did. Normal checks are offline. Repository pins also use the local Git executable; optional
 session-receipt signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate
 optional service and credential requirements below.
 
-The science tools have three import families: twenty-four core checks, one bounded experiment
-replay check and one declared assay-run audit. Each SDK bundle retains the 1 MB limit, licenses
-and notices. All three families use the same installer and can attach to the same specialist.
+The science tools have four import families: twenty-four core checks, one bounded experiment
+replay check, one declared assay-run audit and one research change-impact check. Each SDK bundle
+retains the 1 MB limit, licenses and notices. All four families use the same installer and can
+attach to the same specialist.
 The published v0.4.0 tag retains
 its original twenty-three-tool science scope.
 
@@ -21,7 +22,7 @@ Claude Science: Skills > Import from GitHub, paste:
     szl-holdings/szl-skills@v0.4.0
 
 The published v0.4.0 tag contains twenty-three science tools and two evidence skills. The new
-clustered-replication and assay-measurement-audit skills below are unreleased source candidates;
+clustered-replication, assay-measurement-audit and research-change-impact skills below are unreleased source candidates;
 use the reviewed immutable source commit for testing until a separately verified release is published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
@@ -60,6 +61,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
+| szl-research-change-impact | Which old claims still need rechecking after a dependency is removed from a proposed graph? | Compares retained graphs and supplied digests; no experiment execution or truth judgment |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
 | szl-negative-control-audit | Do the negative controls actually rule out the mechanism they claim to, and were outcomes retained? | Does not design interventions |

@@ -97,6 +97,9 @@ def build(root):
     assay = set(installer_names(root, "ASSAY_NAMES", required=False))
     if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | replay):
         raise ValueError("installer/assay catalog mismatch")
+    change = set(installer_names(root, "CHANGE_NAMES", required=False))
+    if change != set(grouped.get("szl-science-change-impact-skills", [])) or change & (selected | replay | assay):
+        raise ValueError("installer/change catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",

@@ -2,12 +2,17 @@
 
 ## Unreleased 0.5.0-rc.1 candidate
 
+- Add szl-research-change-impact as a separate bounded import family. It compares retained
+  baseline and current dependency graphs, preserves removed edges and required claims in the
+  impact review, and produces an offline recheck order. The core twenty-four-skill SDK bundle
+  stays unchanged and below 1 MB; the new single-skill family includes its license and notice.
+  Graph impact and supplied digests do not establish scientific truth or host registration.
 - Added szl-assay-measurement-audit, a stdlib-only offline check for one researcher-declared
   increasing linear assay run. It gates calibration residuals, a separately identified blank,
   QC recovery, sample range, quantification minimum and final-result uncertainty declarations.
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
-- Source inventory becomes twenty-four core science tools, one replay tool, one assay tool and
+- Source inventory becomes twenty-four core science tools, one replay tool, one assay tool, one change-impact tool and
   two evidence skills. This source candidate is not proof of Claude Science host registration, method
   validation or clinical use.
 - Add szl-clustered-replication: distinguish observations from declared experimental units,
@@ -20,8 +25,8 @@
 - New numerical tests use an independent Cartesian sign-vector oracle and invariance to
   technical replication; test execution and app efficacy are reported separately.
 - Preserve the separately developed experiment replay contract in a second import family.
-  All three science families retain complete helpers, licenses and notices and the 1 MB SDK
-  bundle limit; the shared installer attaches all twenty-six science tools across three calls.
+  All four science families retain complete helpers, licenses and notices and the 1 MB SDK
+  bundle limit; the shared installer attaches all twenty-seven science tools across four calls.
 
 ## 0.4.0
 

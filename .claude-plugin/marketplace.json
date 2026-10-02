@@ -68,6 +68,15 @@
       "skills": [
         "./skills/szl-experiment-replay"
       ]
+    },
+    {
+      "name": "szl-science-change-impact-skills",
+      "description": "One offline research change-impact skill: compare retained dependency graphs and supplied artifact digests, preserve withdrawn dependencies and required claims, and plan reassessment. No experiment execution, services or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-research-change-impact"
+      ]
     }
   ]
 }
