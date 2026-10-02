@@ -1,7 +1,7 @@
 # SZL Skills
 
 Executable, offline checks that make scientific claims carry their evidence. Twenty skills for
-Claude Science, Claude Code and claude.ai: eighteen science checks and two evidence skills.
+Claude Science, Claude Code and claude.ai: twenty-three science checks and two evidence skills.
 Every check is Python standard library, runs without network or credentials, and reports what it
 did not verify alongside what it did.
 
@@ -9,7 +9,7 @@ did not verify alongside what it did.
 
 Claude Science: Skills > Import from GitHub, paste:
 
-    szl-holdings/szl-skills@v0.3.0
+    szl-holdings/szl-skills@v0.4.0
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -27,6 +27,11 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | write an honest energy or CO2e sentence for the methods section | szl-compute-energy-receipt | MEASURED / REPORTED / UNAVAILABLE with the sentence |
 | record what an analysis session read, ran and produced, verifiably | szl-session-receipt | hashed receipt, Methods paragraph, MATCH / MISMATCH later |
 | give a reviewer one page of what was checked and what is open | szl-reviewer-pack | REVIEW.md with every unresolved finding quoted |
+| record a failed replication with the same weight as the original, and see what rests on it | szl-refutation-ledger | per-claim REPLICATED / NOT_REPLICATED / CONTESTED and SOUND / SHAKEN foundation, hash-chained |
+| know whether the new embedding model found more of the relevant papers | szl-retrieval-eval | nDCG, MRR, MAP, recall with every judged query in the denominator |
+| know whether the 4-bit or ported model still answers like the one you validated | szl-quantization-check | WITHIN_TOLERANCE / DEGRADED with the worst inputs named |
+| name the exact commits of every repository an analysis used | szl-repo-pin | one composite digest, only when every tree is clean; MATCH / DRIFT later |
+| know how many outcome changes stand between a result and p = 0.05 | szl-result-fragility | fragility index against the number lost to follow-up |
 
 ## Science checks
 
@@ -49,6 +54,11 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-compute-energy-receipt | What did this run cost in energy, and was that measured or estimated? | Not a hardware monitor or carbon standard |
 | szl-session-receipt | What exactly did this session read, run and write, and is it still the same? | A MATCH is not correctness |
 | szl-reviewer-pack | What was checked, what is still open, in one page? | Does not re-run checks or approve publication |
+| szl-refutation-ledger | What has and has not replicated, and which conclusions rest on a shaken claim? | Not a verdict on truth; the chain proves order, not honesty |
+| szl-retrieval-eval | How well does the retriever agree with the relevance judgments, with no query skipped? | Does not judge whether the judgments are right |
+| szl-quantization-check | Does the quantized or ported model agree with the reference on these inputs? | Not accuracy; nothing about inputs not included |
+| szl-repo-pin | Which exact commits, in which repositories, with nothing uncommitted? | Not publication or correctness of the code |
+| szl-result-fragility | How many outcome flips remove significance, compared with the dropouts? | Not effect size, design or adjusted analyses |
 | szl-science-workbench | All of the above on one project directory, with immutable runs and invalidation | Not an experiment runner |
 
 Every skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract

@@ -317,6 +317,10 @@ class PackagingTests(unittest.TestCase):
                     elif report["skill"] == "szl-session-receipt":
                         command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), "record",
                                    str(unpacked / "assets" / "example.json"), "--root", str(unpacked / "assets" / "project")]
+                    elif report["skill"] == "szl-refutation-ledger":
+                        command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), "status", str(unpacked / "assets" / "example.json")]
+                    elif report["skill"] == "szl-repo-pin":
+                        command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), "show", str(unpacked / "assets" / "example.json")]
                     elif report["skill"] == "szl-reviewer-pack":
                         command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), str(unpacked / "assets" / "project"),
                                    "--json", str(destination / "pack.json"), "--output", str(destination / "REVIEW.md")]

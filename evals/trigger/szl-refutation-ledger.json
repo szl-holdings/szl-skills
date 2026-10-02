@@ -1,0 +1,87 @@
+{
+  "skill": "szl-refutation-ledger",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "My student could not reproduce the knockdown effect from the 2024 paper. Record it properly so it counts.",
+      "should_trigger": true
+    },
+    {
+      "query": "Three labs tried the same protocol; two got the effect and one did not. What is the honest state of that claim?",
+      "should_trigger": true
+    },
+    {
+      "query": "A reviewer asks what our organoid conclusion depends on. Trace the dependencies and their replication status.",
+      "should_trigger": true
+    },
+    {
+      "query": "Log this failed replication with the receipt from the session.",
+      "should_trigger": true
+    },
+    {
+      "query": "Start a shared ledger of replication outcomes for the consortium that nobody can quietly edit.",
+      "should_trigger": true
+    },
+    {
+      "query": "Which of our downstream claims rest on the result that failed to replicate last month?",
+      "should_trigger": true
+    },
+    {
+      "query": "Append the new replication attempt to the ledger and verify the chain is intact.",
+      "should_trigger": true
+    },
+    {
+      "query": "Write one paragraph for the methods section saying how many times this claim has been tested and with what result.",
+      "should_trigger": true
+    },
+    {
+      "query": "The original authors withdrew claim B. Record the withdrawal and show what it shakes.",
+      "should_trigger": true
+    },
+    {
+      "query": "Is the ledger file intact, or has someone edited an earlier entry?",
+      "should_trigger": true
+    },
+    {
+      "query": "Is this claim true? The effect size seems too large.",
+      "should_trigger": false
+    },
+    {
+      "query": "Design a replication study for this paper.",
+      "should_trigger": false
+    },
+    {
+      "query": "Compute the meta-analytic effect across these five replications.",
+      "should_trigger": false
+    },
+    {
+      "query": "Track supporting and contradicting observations inside my own project with expiry dates.",
+      "should_trigger": false
+    },
+    {
+      "query": "Summarize the literature on pathway P.",
+      "should_trigger": false
+    },
+    {
+      "query": "Hash this receipt file for me.",
+      "should_trigger": false
+    },
+    {
+      "query": "Which statistical test should the replication use?",
+      "should_trigger": false
+    },
+    {
+      "query": "Find papers that failed to replicate this result.",
+      "should_trigger": false
+    },
+    {
+      "query": "Record what this analysis session read, ran and produced.",
+      "should_trigger": false
+    },
+    {
+      "query": "Rate the quality of this replication attempt.",
+      "should_trigger": false
+    }
+  ]
+}

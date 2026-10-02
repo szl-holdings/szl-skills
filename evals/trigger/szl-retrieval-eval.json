@@ -1,0 +1,87 @@
+{
+  "skill": "szl-retrieval-eval",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Did the new embedding model actually find more of the relevant papers? Here are the judgments and both runs.",
+      "should_trigger": true
+    },
+    {
+      "query": "Score our literature RAG retriever: nDCG@10 and recall against the qrels, and don't skip the queries it failed on.",
+      "should_trigger": true
+    },
+    {
+      "query": "Compare two retrievers on the same judged query set and tell me which queries had no relevant document at all.",
+      "should_trigger": true
+    },
+    {
+      "query": "I have TREC run and qrels files from the benchmark; compute MRR and MAP without installing a framework.",
+      "should_trigger": true
+    },
+    {
+      "query": "How many of our evaluation queries did the search system return nothing for?",
+      "should_trigger": true
+    },
+    {
+      "query": "Evaluate the protocol-search pipeline against the curated relevance labels at k = 5.",
+      "should_trigger": true
+    },
+    {
+      "query": "The vendor reports nDCG 0.71; recompute it from their run file and our judgments.",
+      "should_trigger": true
+    },
+    {
+      "query": "Are there duplicate documents in these rankings, and how do they affect the scores?",
+      "should_trigger": true
+    },
+    {
+      "query": "Set a gate: at least 50 judged queries and recall@20 above 0.6. Does this run pass?",
+      "should_trigger": true
+    },
+    {
+      "query": "Report precision and recall per query for the paper-finding assistant.",
+      "should_trigger": true
+    },
+    {
+      "query": "Build a RAG pipeline over our PDFs.",
+      "should_trigger": false
+    },
+    {
+      "query": "Label which of these retrieved papers are relevant.",
+      "should_trigger": false
+    },
+    {
+      "query": "Why is nDCG better than precision for ranking evaluation?",
+      "should_trigger": false
+    },
+    {
+      "query": "Is the difference between the two retrievers statistically significant?",
+      "should_trigger": false
+    },
+    {
+      "query": "Summarize the top ten retrieved papers.",
+      "should_trigger": false
+    },
+    {
+      "query": "Evaluate the chatbot's answer quality.",
+      "should_trigger": false
+    },
+    {
+      "query": "Tune the embedding model to improve recall.",
+      "should_trigger": false
+    },
+    {
+      "query": "Compute the F1 of my binary classifier.",
+      "should_trigger": false
+    },
+    {
+      "query": "Deduplicate this bibliography.",
+      "should_trigger": false
+    },
+    {
+      "query": "Which vector database should we use?",
+      "should_trigger": false
+    }
+  ]
+}
