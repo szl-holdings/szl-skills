@@ -2,10 +2,10 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 25,
+    "total": 26,
     "by_plugin": {
       "szl-evidence-skills": 2,
-      "szl-science-skills": 23
+      "szl-science-skills": 24
     }
   },
   "plugins": {
@@ -23,6 +23,7 @@
       "szl-evidence-gate",
       "szl-kernel-comparison",
       "szl-math-claim-check",
+      "szl-measurement-harmonizer",
       "szl-model-evaluation",
       "szl-negative-control-audit",
       "szl-paired-science",
