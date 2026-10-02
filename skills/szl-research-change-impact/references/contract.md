@@ -7,6 +7,25 @@ directed dependencies. Every declared parent must exist in that snapshot. Model 
 run id; cycles are rejected. Evidence links target claim/proof/decision nodes and have relation
 supports/contradicts/qualifies. Existing workbench metadata and retained history are accepted as JSON.
 
+The artifact digest field is `sha256`: a 64-character lowercase hexadecimal SHA-256 digest, or
+omitted/null when no artifact is pinned. A minimal snapshot is self-contained:
+
+```json
+{
+  "schema": "szl.research-anatomy.v1",
+  "nodes": [
+    {"id": "data", "kind": "dataset", "title": "Selected data", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    {"id": "result", "kind": "claim", "title": "A claim to reassess", "depends_on": ["data"]}
+  ],
+  "evidence_links": [{"claim": "result", "evidence": "data", "relation": "supports"}]
+}
+```
+
+Kinds are question, claim, paper, dataset, code, model, kernel, run, proof and decision. Each id
+contains 1..128 characters; titles contain 1..2048. Dependencies are unique ids in the same snapshot.
+Optional evidence_status is active, corrected or retracted; needs_recheck is boolean. The digest
+above is an illustrative synthetic pin, not a readback. Use actual selected-byte digests in a real audit.
+
 `observed_digests` maps current pinned node ids to actual SHA-256 readbacks, or null when unavailable.
 Unknown and unpinned observation ids are rejected. A missing readback stays NOT_OBSERVED. Paper,
 dataset, code, model, kernel, run and proof nodes without a digest are UNPINNED. Matching bytes never
