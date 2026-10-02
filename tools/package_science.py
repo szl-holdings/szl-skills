@@ -20,7 +20,8 @@ def package_skills(destination, revision=None):
         raise ValueError("Release revision must be a full immutable 40-character commit")
     market = json.loads(git_bytes(revision, ".claude-plugin/marketplace.json") if revision else (ROOT / ".claude-plugin" / "marketplace.json").read_bytes())
     selected = [skill for plugin in market["plugins"]
-                if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills", "szl-science-assay-skills"}
+                if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills", "szl-science-assay-skills",
+                                     "szl-science-change-impact-skills"}
                 for skill in plugin["skills"]]
     if len(selected) != len(set(selected)):
         raise ValueError("Duplicate skill across science families")
