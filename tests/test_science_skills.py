@@ -309,6 +309,7 @@ class PackagingTests(unittest.TestCase):
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
                                str(unpacked / "assets" / "example.json")]
+                    review_output = None
                     if report["skill"] == "szl-reproducibility-capsule":
                         command.extend(["--root", str(unpacked)])
                     elif report["skill"] == "szl-analysis-mutation-test":
@@ -324,9 +325,23 @@ class PackagingTests(unittest.TestCase):
                     elif report["skill"] == "szl-reviewer-pack":
                         command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"), str(unpacked / "assets" / "project"),
                                    "--json", str(destination / "pack.json"), "--output", str(destination / "REVIEW.md")]
+                    elif report["skill"] == "szl-skill-update-review":
+                        example = unpacked / "assets" / "example"
+                        review_output = destination / "update-review"
+                        command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
+                                   str(example / "old-inventory.json"), str(example / "new-inventory.json"),
+                                   "--old-root", str(example / "old-package"),
+                                   "--new-root", str(example / "new-package"),
+                                   "--lock", str(example / "retained-lock.json"),
+                                   "--output-dir", str(review_output)]
                     p = subprocess.run(command, capture_output=True, text=True)
                     self.assertEqual(p.returncode, 0, p.stderr)
-                    json.loads(p.stdout)
+                    if review_output is not None:
+                        review = json.loads((review_output / "UPDATE_REVIEW.json").read_text(encoding="utf-8"))
+                        self.assertEqual(review["status"], "CHANGES_REVIEW_REQUIRED")
+                        self.assertTrue((review_output / "UPDATE_REVIEW.md").is_file())
+                    else:
+                        json.loads(p.stdout)
 
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
         for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
