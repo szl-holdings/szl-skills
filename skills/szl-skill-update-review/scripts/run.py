@@ -28,7 +28,7 @@ def _render(report):
         lines += ["", "## Package files", "", json.dumps(changes["package_files"], sort_keys=True),
                   "", "License or notice artifacts changed: " + json.dumps(changes["license_artifact_changes"]),
                   "", "## Declared and literal evidence", "",
-                  "Declared hosts, credentials, and licenses are metadata claims. Literal URL hosts and credential markers are string observations. Dynamic destinations are UNKNOWN.",
+                  "Declared hosts, credentials, and licenses are metadata claims. URL hosts and credential marker names are partial static observations; values are omitted. Dynamic destinations are UNKNOWN.",
                   "", json.dumps(report["observations"], sort_keys=True), "", "## Evidence and tests to revisit", ""]
         for action in report["rerun"]:
             lines.append(f"- {action['scope']} ({action['reason']}): " + "; ".join(action["evidence_and_tests"]))

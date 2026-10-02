@@ -11,7 +11,7 @@ import os
 import re
 import stat
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote_to_bytes, urlsplit
 
 INVENTORY_SCHEMA = "szl.skill-package-inventory.v1"
 LOCK_SCHEMA = "szl.skill-update-lock.v1"
@@ -29,8 +29,11 @@ PACKAGE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)
 HOST = re.compile(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\Z")
 CREDENTIAL = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 URL = re.compile(r"https?://[^\s\]\[()<>\"'`]+", re.I)
-ENV = re.compile(r"\b[A-Z][A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIALS)\b")
-LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+ENV = re.compile(r"\b(?:[A-Z][A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIALS)|API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIALS)\b")
+ENV_GENERIC = re.compile(r"\b(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIALS)\b")
+ASSIGNMENT = re.compile(r"(?m)^[ \t]*(?:(?:export|const|let|var)[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)[ \t]*=")
+BRACKET = re.compile(r"\[([^\[\]\n]+)\]")
+DEFINITION = re.compile(r"^[ ]{0,3}\[([^\[\]\n]+)\]:[ \t]*(.*)$", re.M)
 CODE = re.compile(r"`([^`\n]+)`")
 HELPER_SUFFIXES = {".py", ".sh", ".js", ".ts", ".ps1", ".bat", ".cmd", ".r", ".jl", ".ipynb"}
 
@@ -269,18 +272,138 @@ def _frontmatter(raw, path):
     return text, fields
 
 
-def _references(text):
-    refs = set()
-    candidates = [m.group(1).split("#", 1)[0] for m in LINK.finditer(text)]
-    candidates += [m.group(1) for m in CODE.finditer(text)
-                   if m.group(1).startswith(("assets/", "references/", "scripts/", "docs/"))]
-    for candidate in candidates:
-        candidate = candidate.strip().strip("<>")
-        if not candidate or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", candidate):
+def _markdown_target(value):
+    value = value.strip()
+    if not value:
+        raise Incomplete("empty Markdown destination")
+    if value.startswith("<"):
+        end = value.find(">")
+        if end < 0 or "<" in value[1:end]:
+            raise Incomplete("unsupported or ambiguous Markdown link destination")
+        destination, rest = value[1:end], value[end + 1:]
+    else:
+        match = re.match(r"(\S+)(.*)\Z", value, re.S)
+        destination, rest = match.groups()
+    if rest:
+        if not rest[0].isspace():
+            raise Incomplete("Markdown link title needs separating whitespace")
+        title = rest.strip()
+        if (len(title) < 2 or title[0] not in ('"', "'", "(") or
+                title[-1] != {'"': '"', "'": "'", "(": ")"}[title[0]]):
+            raise Incomplete("unsupported or ambiguous Markdown link title")
+        escaped = False
+        for char in title[1:-1]:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == title[-1] or (title[0] == "(" and char == "("):
+                raise Incomplete("ambiguous Markdown link title punctuation")
+        if escaped:
+            raise Incomplete("unterminated Markdown title escape")
+    return destination
+
+
+def _inline_end(text, opening):
+    depth, angle, quote, escaped = 1, False, None, False
+    for offset in range(opening + 1, len(text)):
+        char = text[offset]
+        if char == "\n":
+            break
+        if escaped:
+            escaped = False
             continue
+        if char == "\\":
+            escaped = True
+            continue
+        if quote:
+            if char == quote:
+                quote = None
+            continue
+        if char in ('"', "'") and offset > opening + 1 and text[offset - 1].isspace():
+            quote = char
+            continue
+        if char == "<":
+            angle = True
+        elif char == ">" and angle:
+            angle = False
+        elif not angle and char == "(":
+            depth += 1
+        elif not angle and char == ")":
+            depth -= 1
+            if depth == 0:
+                return offset
+    raise Incomplete("unterminated or unsupported Markdown inline link")
+
+
+def _reference_label(value):
+    label = " ".join(value.split()).casefold()
+    if not label or len(label) > 160:
+        raise Incomplete("empty or overlong Markdown reference label")
+    return label
+
+
+def _references(text):
+    refs, definitions = set(), {}
+
+    def add(destination):
+        candidate = destination.split("#", 1)[0]
+        scheme = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):", candidate)
+        if scheme and (scheme.group(1).lower() == "file" or len(scheme.group(1)) == 1):
+            raise Incomplete("local absolute URI is unsupported")
+        if not candidate or candidate.startswith("//") or scheme:
+            return
+        if re.search(r"%(?![0-9A-Fa-f]{2})", candidate):
+            raise Incomplete("malformed percent escape in local Markdown link")
+        try:
+            candidate = unquote_to_bytes(candidate).decode("utf-8")
+        except UnicodeError as error:
+            raise Incomplete("local Markdown link is not UTF-8") from error
+        if re.search(r"%[0-9A-Fa-f]{2}", candidate):
+            raise Incomplete("ambiguous double-encoded local Markdown link")
         if candidate.startswith("./"):
             candidate = candidate[2:]
         refs.add(_path(candidate))
+
+    matches = list(DEFINITION.finditer(text))
+    if len(matches) > MAX_FILES:
+        raise Incomplete("too many Markdown reference definitions")
+    body = list(text)
+    for match in matches:
+        label = _reference_label(match.group(1))
+        if label in definitions:
+            raise Incomplete(f"duplicate Markdown reference definition: {label}")
+        definitions[label] = _markdown_target(match.group(2))
+        add(definitions[label])
+        for offset in range(*match.span()):
+            body[offset] = " "
+    body = "".join(body)
+    bracket_ends = {match.end() for match in BRACKET.finditer(body)}
+    if any(match.start() + 1 not in bracket_ends
+           for match in re.finditer(r"\][ \t]*[\[(]", body)):
+        raise Incomplete("unsupported nested Markdown link label")
+    for match in BRACKET.finditer(body):
+        after = match.end()
+        if after < len(body) and body[after] == "(":
+            end = _inline_end(body, after)
+            add(_markdown_target(body[after + 1:end]))
+            continue
+        next_bracket = after
+        while next_bracket < len(body) and body[next_bracket] in " \t":
+            next_bracket += 1
+        if next_bracket < len(body) and body[next_bracket] == "[":
+            end = body.find("]", next_bracket + 1)
+            if end < 0 or "\n" in body[next_bracket:end]:
+                raise Incomplete("unterminated Markdown reference link")
+            label = _reference_label(body[next_bracket + 1:end] or match.group(1))
+            if label not in definitions:
+                raise Incomplete(f"undefined Markdown reference link: {label}")
+            add(definitions[label])
+        elif _reference_label(match.group(1)) in definitions:
+            add(definitions[_reference_label(match.group(1))])
+    for match in CODE.finditer(text):
+        if match.group(1).startswith(("assets/", "references/", "scripts/", "docs/")):
+            add(match.group(1))
     return sorted(refs)
 
 
@@ -295,8 +418,16 @@ def _observations(files):
             host = urlsplit(url.rstrip(".,;:")).hostname
             if host:
                 hosts.setdefault(host.lower(), set()).add(path)
-        for marker in ENV.findall(text):
-            credentials.setdefault(marker, set()).add(path)
+        for line in text.splitlines():
+            assigned = ASSIGNMENT.match(line)
+            if assigned:
+                marker = assigned.group(1)
+                if ENV.fullmatch(marker):
+                    credentials.setdefault(marker, set()).add(path)
+                continue
+            unquoted = re.sub(r'"[^"\n]*"|\'[^\'\n]*\'', "", line)
+            for marker in ENV_GENERIC.findall(unquoted):
+                credentials.setdefault(marker, set()).add(path)
     return {"literal_url_hosts": [{"host": host, "files": sorted(paths)} for host, paths in sorted(hosts.items())],
             "literal_credential_markers": [{"marker": marker, "files": sorted(paths)}
                                            for marker, paths in sorted(credentials.items())],
@@ -374,8 +505,11 @@ def _skill_changes(old_inv, new_inv):
             "old": before["declared_dynamic_destinations"], "new": after["declared_dynamic_destinations"]}
         if changed or file_delta["added"] or file_delta["removed"] or any(v["added"] or v["removed"] for v in declared.values()) or license_change or dynamic_change:
             changed_paths = changed + file_delta["added"] + file_delta["removed"]
+            referenced = set(before["referenced_files"]) | set(after["referenced_files"])
             helper_changed = any(p.startswith(("scripts/", "bin/")) or Path(p).name.startswith("kernel.") or
-                                 Path(p).suffix.lower() in HELPER_SUFFIXES for p in changed_paths)
+                                 Path(p).suffix.lower() in HELPER_SUFFIXES or
+                                 (p in referenced and Path(p).suffix.lower() not in {".md", ".txt"})
+                                 for p in changed_paths)
             docs_only = (bool(changed_paths) and all(Path(p).suffix.lower() in {".md", ".txt"} for p in changed_paths)
                          and not any(v["added"] or v["removed"] for v in declared.values())
                          and license_change is None and dynamic_change is None)
@@ -390,7 +524,7 @@ def _skill_changes(old_inv, new_inv):
                                        if old_files[p] != new_files[p])}
     license_paths = sorted(p for field in package_delta.values() for p in field
                            if Path(p).name.upper() in {"LICENSE", "NOTICE", "COPYING"} or
-                           Path(p).name.upper().startswith(("LICENSE.", "COPYING.")))
+                            Path(p).name.upper().startswith(("LICENSE.", "NOTICE.", "COPYING.")))
     return {"added_skills": [new_skills[p]["name"] for p in sorted(right)],
             "removed_skills": [old_skills[p]["name"] for p in sorted(left)],
             "added_skill_declarations": [{"name": new_skills[p]["name"], "path": p,
@@ -471,7 +605,7 @@ def szl_review_updates(old_root, old_inventory_path, new_root, new_inventory_pat
                 "rerun": _rerun(changes),
                 "observations": {"old": old["observations"], "new": new["observations"]},
                 "limits": ["Declared capabilities and licenses are claims in local metadata, not verified permissions or rights.",
-                           "Literal URL hosts and credential markers are string observations, not an exhaustive capability scan.",
+                           "URL hosts and credential marker names are partial static observations; values are omitted.",
                            "Dynamic destinations remain UNKNOWN; no package code was executed.",
                            "Byte matches do not establish code safety, scientific validity, approval, or installability.",
                            "The lock must be independently retained; its own SHA-256 is not a signature."]}

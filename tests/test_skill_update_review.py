@@ -159,6 +159,37 @@ class PackageFixture(unittest.TestCase):
         self.assertIn("LAB_TOKEN", json.dumps(report))
         self.assertEqual(report["observations"]["new"]["literal_credential_markers"], [])
 
+    def test_standalone_credential_markers_are_literal_names_only(self):
+        markers = ["API_KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIALS", "LAB_TOKEN"]
+        self.put(self.roots["new"], "skills/demo/scripts/helper.py",
+                 ("\n".join(f"{name}=synthetic_value" for name in markers) + "\n").encode())
+        self.refresh()
+        report = self.assess()
+        observed = report["observations"]["new"]["literal_credential_markers"]
+        self.assertEqual({item["marker"] for item in observed}, set(markers))
+        self.assertNotIn("synthetic_value", json.dumps(report))
+        self.assertEqual(report["changes"]["modified_skills"][0]["declarations"]["declared_credentials"],
+                         {"added": [], "removed": []})
+
+    def test_credential_observations_do_not_emit_assignment_values(self):
+        self.put(self.roots["new"], "skills/demo/scripts/helper.py",
+                 b'TOKEN = "SENSITIVE_TOKEN"\nexport API_KEY=OTHER_SECRET\n')
+        self.refresh()
+        report = self.assess()
+        self.assertEqual({item["marker"] for item in report["observations"]["new"]["literal_credential_markers"]},
+                         {"API_KEY", "TOKEN"})
+        self.assertNotIn("SENSITIVE_TOKEN", json.dumps(report))
+        self.assertNotIn("OTHER_SECRET", json.dumps(report))
+
+    def test_standalone_generic_markers_in_prose_are_observed(self):
+        for root in self.roots.values():
+            self.put(root, "skills/demo/SKILL.md", skill_text() + b"Requires API_KEY and TOKEN.\n")
+        self.refresh()
+        report = self.assess()
+        self.assertEqual(report["status"], "NO_RECORDED_CHANGE")
+        self.assertEqual({item["marker"] for item in report["observations"]["old"]["literal_credential_markers"]},
+                         {"API_KEY", "TOKEN"})
+
     def test_literal_host_is_observed_without_becoming_a_declaration(self):
         self.put(self.roots["new"], "skills/demo/scripts/helper.py",
                  b"URL = 'https://literal.example.org/v1'\n")
@@ -208,6 +239,18 @@ class PackageFixture(unittest.TestCase):
         report = self.assess()
         self.assertEqual(report["changes"]["license_artifact_changes"], ["LICENSE"])
         self.assertIn("review changed license text", json.dumps(report["rerun"]))
+
+    def test_notice_extension_bytes_trigger_attribution_review(self):
+        for name in ("NOTICE.txt", "NOTICE.md"):
+            with self.subTest(name=name):
+                self.put(self.roots["old"], name, b"Old attribution\n")
+                self.put(self.roots["new"], name, b"New attribution\n")
+                self.refresh()
+                report = self.assess()
+                self.assertEqual(report["changes"]["license_artifact_changes"], [name])
+                self.assertIn("package licenses", [item["scope"] for item in report["rerun"]])
+                for root in self.roots.values():
+                    (root / name).unlink()
 
     def test_frontmatter_and_manifest_license_disagreement_fails_closed(self):
         self.skills["new"][0]["declared_license"] = "MIT"
@@ -287,6 +330,114 @@ class PackageFixture(unittest.TestCase):
                          skill_text() + f"[missing]({link})\n".encode())
                 self.refresh()
                 self.assert_incomplete(self.assess())
+
+    def test_titled_inline_links_resolve_only_the_destination(self):
+        for suffix in ('"Notes"', "'Notes'", "(Notes)"):
+            with self.subTest(suffix=suffix):
+                for side in self.roots:
+                    self.put(self.roots[side], "skills/demo/SKILL.md",
+                             skill_text() + f'[notes](docs/notes.md {suffix})\n'.encode())
+                    self.skills[side][0]["referenced_files"] = ["docs/notes.md", "scripts/helper.py"]
+                self.refresh()
+                self.assertEqual(self.assess()["status"], "NO_RECORDED_CHANGE")
+
+    def test_escaped_title_punctuation_is_not_part_of_the_destination(self):
+        links = (r'[notes](docs/notes.md "Draft \"A\" title")',
+                 r'[notes](docs/notes.md "Draft (open")',
+                 r'[notes](docs/notes.md (Draft \) open))',
+                 r'[notes][source]' + "\n" + r'[source]: docs/notes.md "Draft \"A\" title"')
+        for link in links:
+            with self.subTest(link=link):
+                for side in self.roots:
+                    self.put(self.roots[side], "skills/demo/SKILL.md",
+                             skill_text() + (link + "\n").encode())
+                    self.skills[side][0]["referenced_files"] = ["docs/notes.md", "scripts/helper.py"]
+                self.refresh()
+                self.assertEqual(self.assess()["status"], "NO_RECORDED_CHANGE")
+
+    def test_angle_destination_with_spaces_and_title(self):
+        for side in self.roots:
+            self.put(self.roots[side], "skills/demo/docs/my notes.md", b"# Notes\n")
+            self.put(self.roots[side], "skills/demo/SKILL.md",
+                     skill_text() + b'[notes](<docs/my notes.md> "Notes")\n')
+            self.skills[side][0]["referenced_files"] = ["docs/my notes.md", "scripts/helper.py"]
+        self.refresh()
+        self.assertEqual(self.assess()["status"], "NO_RECORDED_CHANGE")
+
+    def test_reference_links_and_definitions_resolve_local_files(self):
+        for use in ("[notes][source]", "[source][]", "[source]"):
+            with self.subTest(use=use):
+                for side in self.roots:
+                    self.put(self.roots[side], "skills/demo/SKILL.md",
+                             skill_text() + f'{use}\n\n[source]: docs/notes.md "Notes"\n'.encode())
+                    self.skills[side][0]["referenced_files"] = ["docs/notes.md", "scripts/helper.py"]
+                self.refresh()
+                self.assertEqual(self.assess()["status"], "NO_RECORDED_CHANGE")
+
+    def test_missing_reference_style_destination_fails_closed(self):
+        for root in self.roots.values():
+            self.put(root, "skills/demo/SKILL.md",
+                     skill_text() + b"[missing][source]\n\n[source]: docs/missing.md\n")
+        self.refresh()
+        self.assert_incomplete(self.assess())
+
+    def test_ambiguous_or_undefined_reference_link_fails_closed(self):
+        for extra in (b"[notes][missing]\n", b"[notes][source]\n[source]:\n",
+                      b"[notes][source]\n[source]: docs/notes.md\n[SOURCE]: docs/notes.md\n",
+                      b'[notes](docs/notes.md "Notes" extra)\n'):
+            with self.subTest(extra=extra):
+                self.put(self.roots["new"], "skills/demo/SKILL.md", skill_text() + extra)
+                self.refresh()
+                self.assert_incomplete(self.assess())
+
+    def test_nested_link_label_cannot_hide_missing_destination(self):
+        for root in self.roots.values():
+            self.put(root, "skills/demo/assets/badge.png", b"badge")
+            self.put(root, "skills/demo/SKILL.md",
+                     skill_text() + b"[![badge](assets/badge.png)](docs/missing.md)\n")
+        for side in self.roots:
+            self.skills[side][0]["referenced_files"] = ["assets/badge.png", "scripts/helper.py"]
+        self.refresh()
+        self.assert_incomplete(self.assess())
+
+    def test_percent_encoded_local_reference_is_checked(self):
+        for link in (b"[notes](docs/my%20notes.md)\n",
+                     b"[notes][source]\n\n[source]: docs/my%20notes.md 'Notes'\n"):
+            with self.subTest(link=link):
+                for side in self.roots:
+                    self.put(self.roots[side], "skills/demo/docs/my notes.md", b"# Notes\n")
+                    self.put(self.roots[side], "skills/demo/SKILL.md", skill_text() + link)
+                    self.skills[side][0]["referenced_files"] = ["docs/my notes.md", "scripts/helper.py"]
+                self.refresh()
+                self.assertEqual(self.assess()["status"], "NO_RECORDED_CHANGE")
+
+    def test_encoded_traversal_and_malformed_escape_fail_closed(self):
+        for target in ("docs/%2e%2e/secret.md", "docs/bad%QQ.md", "docs/%252e%252e/secret.md"):
+            with self.subTest(target=target):
+                self.put(self.roots["new"], "skills/demo/SKILL.md",
+                         skill_text() + f"[bad]({target})\n".encode())
+                self.refresh()
+                self.assert_incomplete(self.assess())
+
+    def test_local_file_uri_is_not_ignored_as_external(self):
+        for target in ("file:docs/missing.md", "file:///outside/root", "C:/outside/root"):
+            with self.subTest(target=target):
+                for root in self.roots.values():
+                    self.put(root, "skills/demo/SKILL.md",
+                             skill_text() + f"[bad]({target})\n".encode())
+                self.refresh()
+                self.assert_incomplete(self.assess())
+
+    def test_linked_unknown_suffix_change_invalidates_file_bound_evidence(self):
+        for side in self.roots:
+            self.put(self.roots[side], "skills/demo/helper.go", side.encode())
+            self.put(self.roots[side], "skills/demo/SKILL.md",
+                     skill_text() + b"[helper](helper.go)\n")
+            self.skills[side][0]["referenced_files"] = ["helper.go", "scripts/helper.py"]
+        self.refresh()
+        report = self.assess()
+        self.assertTrue(report["changes"]["modified_skills"][0]["helper_bytes_changed"])
+        self.assertIn("invalidate prior helper-bound receipts", json.dumps(report["rerun"]))
 
     def test_extensionless_script_change_invalidates_receipts(self):
         for side in self.roots:

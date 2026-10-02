@@ -24,9 +24,9 @@ License or notice artifacts changed: []
 
 ## Declared and literal evidence
 
-Declared hosts, credentials, and licenses are metadata claims. Literal URL hosts and credential markers are string observations. Dynamic destinations are UNKNOWN.
+Declared hosts, credentials, and licenses are metadata claims. URL hosts and credential marker names are partial static observations; values are omitted. Dynamic destinations are UNKNOWN.
 
-{"new": {"dynamic_destinations": "UNKNOWN", "literal_credential_markers": [{"files": ["skills/demo/scripts/helper.py"], "marker": "LAB_TOKEN"}], "literal_url_hosts": [{"files": ["skills/demo/scripts/helper.py"], "host": "api.example.org"}]}, "old": {"dynamic_destinations": "UNKNOWN", "literal_credential_markers": [], "literal_url_hosts": []}}
+{"new": {"dynamic_destinations": "UNKNOWN", "literal_credential_markers": [], "literal_url_hosts": [{"files": ["skills/demo/scripts/helper.py"], "host": "api.example.org"}]}, "old": {"dynamic_destinations": "UNKNOWN", "literal_credential_markers": [], "literal_url_hosts": []}}
 
 ## Evidence and tests to revisit
 
@@ -36,7 +36,7 @@ Declared hosts, credentials, and licenses are metadata claims. Literal URL hosts
 ## Limits
 
 - Declared capabilities and licenses are claims in local metadata, not verified permissions or rights.
-- Literal URL hosts and credential markers are string observations, not an exhaustive capability scan.
+- URL hosts and credential marker names are partial static observations; values are omitted.
 - Dynamic destinations remain UNKNOWN; no package code was executed.
 - Byte matches do not establish code safety, scientific validity, approval, or installability.
 - The lock must be independently retained; its own SHA-256 is not a signature.

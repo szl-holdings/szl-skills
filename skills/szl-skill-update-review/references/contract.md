@@ -1,6 +1,6 @@
 # Contract: szl.skill-update-review.v1
 
-The caller supplies two **local immutable extracted package roots**, one JSON inventory per root, and a lock retained separately from both packages and inventories. The inventory and lock paths must be outside the package roots. Do not change a snapshot while the review is running. A revision is a full lowercase 40- or 64-hex pin supplied by the caller; this offline helper does not contact a host to establish where that revision came from.
+Supply two **immutable local package roots**, an inventory for each, and a separately retained lock. Keep inventories and lock outside the roots. Revision pins are caller-supplied full lowercase 40- or 64-hex values; the helper cannot verify their origin offline.
 
 ## Inventory
 
@@ -30,9 +30,9 @@ Each inventory is UTF-8 JSON with exactly these top-level keys:
 }
 ```
 
-The shown hashes and sizes are placeholders; calculate SHA-256 over exact file bytes. Include **every** file in the root, including tests, licenses, documentation and helpers. File entries must be sorted by canonical relative POSIX path; skill entries by skill path. The skill name and license must agree with `SKILL.md` frontmatter. The reviewer accepts a bounded frontmatter subset: one plain top-level scalar key and value per line; no nested or quoted keys. Other YAML forms are incomplete rather than guessed. A skill's `referenced_files` list consists of sorted, unique skill-relative paths that exist in the inventory. Include paths used by that skill even when they are not written in its entrypoint; all visible local Markdown links and code-quoted paths under `assets/`, `docs/`, `references/` or `scripts/` must also be declared. The three declaration fields are statements supplied with the package; the reviewer compares them, not their truth.
+Calculate SHA-256 over exact bytes of **every** package file. Sort file entries by canonical relative POSIX path and skills by path. Name and license must agree with `SKILL.md` frontmatter. The accepted frontmatter subset has one plain scalar key and value per line; nested forms and quoted keys are `INCOMPLETE`. List every skill-relative referenced file, including paths used outside the entrypoint. Declare visible local Markdown links and code-quoted paths under `assets/`, `docs/`, `references/` or `scripts/`. Supported links are single-line inline, full/collapsed reference, and defined shortcut forms. Destinations can use angle brackets and a separated single-quoted, double-quoted or parenthesized title. Local percent escapes are decoded once; malformed, double-encoded, unresolved or ambiguous references are `INCOMPLETE`. Host, credential and license declarations are caller claims.
 
-Path traversal, absolute or noncanonical paths, symlinks, Windows reparse points, duplicate/case-colliding paths or skill names, duplicate JSON keys, missing/extra package files, mismatched hashes, inconsistent frontmatter and unlisted visible references yield `INCOMPLETE`. Limits: 2 MiB inventory, 64 KiB lock, 4,096 package files, 256 skills, 8 MiB per file, 32 MiB total. A snapshot can be complete for this check while still omitting undeclared real-world capabilities.
+Unsafe or noncanonical paths, links/reparse points, collisions, duplicate JSON keys, missing/extra files, hash or frontmatter mismatches, and unlisted visible references yield `INCOMPLETE`. Limits: 2 MiB inventory, 64 KiB lock, 4,096 files, 256 skills, 8 MiB/file, 32 MiB total. Completeness here does not establish real-world capability coverage.
 
 ## Separately retained lock
 
@@ -48,10 +48,10 @@ The single lock is UTF-8 JSON with exactly these keys:
 }
 ```
 
-Retain the lock outside the update package and under independent change control. If an attacker can replace both inventory and lock, matching hashes do not establish authenticity. The report records the lock's own SHA-256 for reference; it is not a signature.
+Retain the lock independently. If both inventory and lock can be replaced, matching hashes do not establish authenticity. The reported lock hash is not a signature.
 
 ## Output and reruns
 
-`UPDATE_REVIEW.json` uses `szl.skill-update-review.v1`. Complete reports contain `status`, `package`, old/new revisions and inventory SHA-256 values, lock SHA-256, `changes`, `rerun`, `observations`, and `limits`. `changes` separates added and removed skills, exact-byte directory move candidates, modified skills, package file changes, and changed LICENSE/NOTICE/COPYING artifacts. Modified skills identify declared host/credential/reference/license changes, helper-byte changes, and documentation-only changes. `rerun` lists affected skill tests, package integration checks, license terms, and evidence/replay work to revisit. An invalid input returns `INCOMPLETE` with errors and no change conclusion. The Markdown output conveys the same review in readable form.
+`UPDATE_REVIEW.json` (`szl.skill-update-review.v1`) reports revisions, hashes, changes, reruns and observations. Changed LICENSE/NOTICE/COPYING artifacts include extensions. `helper_bytes_changed` includes referenced non-document files with unknown suffixes; revisit file-bound evidence. Invalid input returns `INCOMPLETE`. Markdown renders the review.
 
-`NO_RECORDED_CHANGE` applies when file bytes and declarations are the same, even if the two supplied revision labels differ; the labels are still reported. This outcome is only a byte/declaration comparison against the lock. The helper does not execute the old or new package, inspect runtime behavior, verify license rights, approve installation, or determine whether scientific results remain valid. URL and credential observations are literal strings and can miss constructed destinations; dynamic destinations are always `UNKNOWN`.
+`NO_RECORDED_CHANGE` applies when bytes and declarations agree, even if supplied revision labels differ. This only compares the locked inputs. The helper does not execute package code, verify rights, approve installation or establish scientific validity. URL hosts and credential marker names are partial static observations with file paths; values are omitted. Dynamic destinations are always `UNKNOWN`.
