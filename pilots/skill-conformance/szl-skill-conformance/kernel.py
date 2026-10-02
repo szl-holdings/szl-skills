@@ -111,19 +111,44 @@ def bundle(value):
     if hashlib.sha256(entry).hexdigest() != files["SKILL.md"]["sha256"]:
         raise ValueError("entrypoint changed during bundle scan")
     text = entry.decode("utf-8")
-    front = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", text, re.S)
+    # Interpret CRLF, CR and LF uniformly without changing retained file bytes.
+    # Every frontmatter check must consume this same structural line view.
+    parse_text = text.replace("\r\n", "\n").replace("\r", "\n")
+    front = re.match(r"\A---\n(.*?)\n---(?:\n|\Z)", parse_text, re.S)
     if front is None:
         raise ValueError("missing skill frontmatter")
-    for line in front.group(1).splitlines():
-        if line and not line[0].isspace() and not line.startswith("#") and not re.match(r"[A-Za-z][A-Za-z0-9_-]*:", line):
-            raise ValueError("unsupported top-level frontmatter key syntax")
-    name_fields = [] if front is None else re.findall(r"(?m)^(?:name|[\"']name[\"'])[ \t]*:.*$", front.group(1))
-    names = [] if len(name_fields) != 1 else re.findall(r"^name: *([a-z0-9-]+) *\r?$", name_fields[0])
-    if len(names) != 1 or not NAME.fullmatch(names[0]):
+    front_text = front.group(1)
+    if any(separator in front_text for separator in ("\x0b", "\x0c", "\x85", "\u2028", "\u2029")):
+        raise ValueError("unsupported frontmatter line separator")
+    if re.search(r"[\x00-\x08\x0e-\x1f\x7f]", front_text):
+        raise ValueError("unsupported frontmatter control character")
+    front_lines = front_text.split("\n")
+    fields = {}
+    for line in front_lines:
+        if not line.strip(" \t") or line.lstrip(" \t").startswith("#"):
+            continue
+        field = re.fullmatch(r"([A-Za-z][A-Za-z0-9_-]*):[ \t]+(.+)", line)
+        if field is None or field[1] in fields:
+            raise ValueError("unsupported or duplicate frontmatter field")
+        scalar = field[2].strip(" \t")
+        if not scalar:
+            raise ValueError("empty frontmatter scalar")
+        if scalar.startswith('"'):
+            if not isinstance(json.loads(scalar), str):
+                raise ValueError("unsupported double-quoted scalar")
+        elif scalar.startswith("'"):
+            if re.fullmatch(r"'(?:[^']|'')*'", scalar) is None:
+                raise ValueError("unsupported single-quoted scalar")
+        elif scalar[0] in "-?:,[]{}#&*!|>%@`" or re.search(r":[ \t]", scalar):
+            raise ValueError("unsupported frontmatter scalar syntax")
+        fields[field[1]] = scalar
+    name = fields.get("name", "")
+    if (not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", name)
+            or name in {"true", "false", "null", "yes", "no", "on", "off", "y", "n"}):
         raise ValueError("invalid skill identity")
     records = [{"path": key, **files[key]} for key in sorted(files)]
     canonical = json.dumps(records, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
-    return {"name": names[0], "bundle_sha256": hashlib.sha256(canonical).hexdigest(), "files": files, "total_bytes": total}
+    return {"name": name, "bundle_sha256": hashlib.sha256(canonical).hexdigest(), "files": files, "total_bytes": total}
 
 
 def keys(value, expected):
