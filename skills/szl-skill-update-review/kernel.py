@@ -378,16 +378,31 @@ def _references(text):
         for offset in range(*match.span()):
             body[offset] = " "
     body = "".join(body)
+    masked, skip, cursor, in_label = list(body), 0, 0, False
+    for match in BRACKET.finditer(body):
+        if match.start() < skip:
+            continue
+        for char in body[cursor:match.start()]:
+            if char == "[":
+                in_label = True
+            elif char in "]\n":
+                in_label = False
+        if in_label:
+            raise Incomplete("unsupported nested Markdown link label")
+        cursor = match.end()
+        after = match.end()
+        if after < len(body) and body[after] == "(":
+            skip = _inline_end(body, after) + 1
+            add(_markdown_target(body[after + 1:skip - 1]))
+            masked[match.start():skip] = [" "] * (skip - match.start())
+            cursor = skip
+    body = "".join(masked)
     bracket_ends = {match.end() for match in BRACKET.finditer(body)}
     if any(match.start() + 1 not in bracket_ends
            for match in re.finditer(r"\][ \t]*[\[(]", body)):
         raise Incomplete("unsupported nested Markdown link label")
     for match in BRACKET.finditer(body):
         after = match.end()
-        if after < len(body) and body[after] == "(":
-            end = _inline_end(body, after)
-            add(_markdown_target(body[after + 1:end]))
-            continue
         next_bracket = after
         while next_bracket < len(body) and body[next_bracket] in " \t":
             next_bracket += 1

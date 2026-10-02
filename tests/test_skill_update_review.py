@@ -355,6 +355,18 @@ class PackageFixture(unittest.TestCase):
                 self.refresh()
                 self.assertEqual(self.assess()["status"], "NO_RECORDED_CHANGE")
 
+    def test_link_shaped_title_text_creates_no_phantom_reference(self):
+        for title in ('"[internal][only]"', '"[draft](docs/missing.md)"',
+                      '"text ]( punctuation"'):
+            with self.subTest(title=title):
+                for side in self.roots:
+                    self.put(self.roots[side], "skills/demo/SKILL.md",
+                             skill_text() + f"[notes](docs/notes.md {title})\n".encode())
+                    self.skills[side][0]["referenced_files"] = ["docs/notes.md", "scripts/helper.py"]
+                self.refresh()
+                report = self.assess()
+                self.assertEqual(report["status"], "NO_RECORDED_CHANGE")
+
     def test_angle_destination_with_spaces_and_title(self):
         for side in self.roots:
             self.put(self.roots[side], "skills/demo/docs/my notes.md", b"# Notes\n")

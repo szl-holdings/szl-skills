@@ -4,7 +4,7 @@ Supply two **immutable local package roots**, an inventory for each, and a separ
 
 ## Inventory
 
-Each inventory is UTF-8 JSON with exactly these top-level keys:
+UTF-8 inventory shape:
 
 ```json
 {
@@ -13,14 +13,13 @@ Each inventory is UTF-8 JSON with exactly these top-level keys:
   "revision": "1111111111111111111111111111111111111111",
   "complete": true,
   "files": [
-    {"path": "skills/demo/SKILL.md", "sha256": "<64 lowercase hex digits>", "size": 72},
-    {"path": "skills/demo/scripts/run.py", "sha256": "<64 lowercase hex digits>", "size": 56}
+    {"path": "skills/demo/SKILL.md", "sha256": "<64 lowercase hex digits>", "size": 72}
   ],
   "skills": [
     {
       "path": "skills/demo",
       "name": "demo",
-      "referenced_files": ["scripts/run.py"],
+      "referenced_files": [],
       "declared_external_hosts": [],
       "declared_credentials": [],
       "declared_license": "Apache-2.0",
@@ -36,7 +35,7 @@ Unsafe or noncanonical paths, links/reparse points, collisions, duplicate JSON k
 
 ## Separately retained lock
 
-The single lock is UTF-8 JSON with exactly these keys:
+UTF-8 lock shape:
 
 ```json
 {
@@ -54,4 +53,4 @@ Retain the lock independently. If both inventory and lock can be replaced, match
 
 `UPDATE_REVIEW.json` (`szl.skill-update-review.v1`) reports revisions, hashes, changes, reruns and observations. Changed LICENSE/NOTICE/COPYING artifacts include extensions. `helper_bytes_changed` includes referenced non-document files with unknown suffixes; revisit file-bound evidence. Invalid input returns `INCOMPLETE`. Markdown renders the review.
 
-`NO_RECORDED_CHANGE` applies when bytes and declarations agree, even if supplied revision labels differ. This only compares the locked inputs. The helper does not execute package code, verify rights, approve installation or establish scientific validity. URL hosts and credential marker names are partial static observations with file paths; values are omitted. Dynamic destinations are always `UNKNOWN`.
+`NO_RECORDED_CHANGE` means bytes and declarations agree, even if revision labels differ. This only compares locked inputs. The helper does not execute package code, verify rights, approve installation or establish scientific validity. URL hosts and credential marker names are partial static observations with file paths; values are omitted. Dynamic destinations remain `UNKNOWN`.
