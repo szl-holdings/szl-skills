@@ -314,7 +314,8 @@ class PackagingTests(unittest.TestCase):
                         claims = destination / "paper-evidence-claims.json"
                         pdf.write_bytes(b"%PDF-1.7\nsynthetic package contract\n")
                         doc = {"tables": [{"prov": [{"page_no": 1, "bbox":
-                               {"l": 0, "t": 10, "r": 20, "b": 0}}],
+                               {"l": 0, "t": 10, "r": 20, "b": 0,
+                                "coord_origin": "BOTTOMLEFT"}}],
                                "data": {"table_cells": [{"text": "7 mg/L"}]}}]}
                         extracted.write_text(json.dumps(doc), encoding="utf-8")
                         claim = {"schema": "szl.paper-evidence-claims.v1",

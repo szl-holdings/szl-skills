@@ -29,11 +29,12 @@ class PaperEvidenceTests(unittest.TestCase):
                     {"text": "Dose (mg/L)", "start_row_offset_idx": 0, "start_col_offset_idx": 0},
                     {"text": "12.5 mg/L", "start_row_offset_idx": 1, "start_col_offset_idx": 1}]}}],
             "pictures": [{"prov": [{"page_no": 3, "bbox": {
-                "l": 3, "t": 50, "r": 70, "b": 2}}],
+                "l": 3, "t": 50, "r": 70, "b": 2, "coord_origin": "BOTTOMLEFT"}}],
                 "captions": [{"$ref": "#/texts/0"}]}],
             "texts": [{"text": "Figure 1. Synthetic dose-response panel.",
                        "prov": [{"page_no": 3, "bbox": {
-                           "l": 3, "t": 1, "r": 70, "b": 0}}]}]
+                           "l": 3, "t": 1, "r": 70, "b": 0,
+                           "coord_origin": "BOTTOMLEFT"}}]}]
         }
         self.manifest = {
             "schema": "szl.paper-evidence-claims.v1",
@@ -128,10 +129,33 @@ class PaperEvidenceTests(unittest.TestCase):
         finding = self.report()["findings"][1]
         self.assertIn("CAPTION_REGION_MISSING", finding["issues"])
         self.document["texts"][0]["prov"] = [{"page_no": 4, "bbox": {
-            "l": 3, "t": 1, "r": 70, "b": 0}}]
+            "l": 3, "t": 1, "r": 70, "b": 0,
+            "coord_origin": "BOTTOMLEFT"}}]
         self.save()
         finding = self.report()["findings"][1]
         self.assertIn("CAPTION_PICTURE_PAGE_MISMATCH", finding["issues"])
+
+    def test_inverted_or_unknown_coordinate_regions_fail_closed(self):
+        cases = [
+            {"l": 100, "t": 95, "r": 10, "b": 20, "coord_origin": "BOTTOMLEFT"},
+            {"l": 10, "t": 20, "r": 80, "b": 95, "coord_origin": "BOTTOMLEFT"},
+            {"l": 10, "t": 95, "r": 80, "b": 20, "coord_origin": "TOPLEFT"},
+            {"l": 10, "t": 20, "r": 80, "b": 95, "coord_origin": "UNKNOWN"},
+        ]
+        for bbox in cases:
+            with self.subTest(bbox=bbox):
+                self.document["tables"][0]["prov"][0]["bbox"] = bbox
+                self.save()
+                finding = self.report()["findings"][0]
+                self.assertEqual(finding["status"], "UNRESOLVED")
+                self.assertIn("PAGE_REGION_MISSING", finding["issues"])
+        self.document["tables"][0]["prov"][0]["bbox"] = {
+            "l": 10, "t": 20, "r": 80, "b": 95
+        }
+        self.save()
+        finding = self.report()["findings"][0]
+        self.assertEqual(finding["status"], "TABLE_TEXT_LOCATED_REVIEW_REQUIRED")
+        self.assertEqual(finding["locators"][0]["coord_origin"], "TOPLEFT")
 
     def test_missing_item_quote_and_wrong_reference_do_not_pass(self):
         self.manifest["claims"][0]["quote"] = "99 mg/L"

@@ -75,10 +75,15 @@ def _locator(item):
         coords = [bbox.get(k) for k in ("l", "t", "r", "b")]
         if any(isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) for x in coords):
             return None
-        if coords[0] == coords[2] or coords[1] == coords[3]:
+        origin = bbox.get("coord_origin", "TOPLEFT")
+        if origin not in ("TOPLEFT", "BOTTOMLEFT"):
+            return None
+        if coords[0] >= coords[2] or (origin == "TOPLEFT" and coords[1] >= coords[3]) or (
+            origin == "BOTTOMLEFT" and coords[1] <= coords[3]
+        ):
             return None
         locators.append({"page": page, "bbox": {k: bbox[k] for k in ("l", "t", "r", "b")},
-                         "coord_origin": bbox.get("coord_origin", "UNDECLARED")})
+                         "coord_origin": origin})
     return locators
 
 
