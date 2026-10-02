@@ -44,6 +44,14 @@ def szl_cluster_number(value, label, lower=0, upper=1e12):
     return Fraction(value)
 
 
+def szl_cluster_report_number(value):
+    """Do not turn a nonzero exact aggregate into a contradictory zero summary."""
+    reported = float(value)
+    if not math.isfinite(reported) or (reported == 0 and value != 0):
+        raise ValueError("Aggregate overflows or underflows the supported float report representation")
+    return reported
+
+
 def szl_cluster_integer(value, label, lower, upper):
     if type(value) is not int or not lower <= value <= upper:
         raise ValueError(label + " must be a bounded integer")
@@ -208,7 +216,7 @@ def szl_cluster_audit(document, expected_plan_sha256):
         total = sum(means.values(), Fraction())
         for name, value in means.items():
             omitted_mean = (total - value) / (k - 1)
-            leave_one.append({"omitted_cluster": name, "mean_improvement": float(omitted_mean),
+            leave_one.append({"omitted_cluster": name, "mean_improvement": szl_cluster_report_number(omitted_mean),
                               "positive_effect_retained": omitted_mean > 0,
                               "minimum_improvement_retained": omitted_mean >= minimum})
         if equal_mean > 0 and any(not item["positive_effect_retained"] for item in leave_one):
@@ -228,9 +236,9 @@ def szl_cluster_audit(document, expected_plan_sha256):
             "observations": len(rows), "declared_experimental_units": k,
             "experimental_unit": plan["experimental_unit"], "observational_unit": plan["observational_unit"],
             "reported_n": plan["reported_n"], "unit": plan["unit"],
-            "equal_cluster_mean_improvement": float(equal_mean),
-            "observation_weighted_mean_improvement": float(row_mean),
-            "clusters": [{"id": name, "observations": len(grouped[name]), "mean_improvement": float(value)}
+            "equal_cluster_mean_improvement": szl_cluster_report_number(equal_mean),
+            "observation_weighted_mean_improvement": szl_cluster_report_number(row_mean),
+            "clusters": [{"id": name, "observations": len(grouped[name]), "mean_improvement": szl_cluster_report_number(value)}
                          for name, value in means.items()],
             "leave_one_cluster_out": leave_one, "conditional_exact_test": test,
             "findings": findings, "inference_blockers": blockers,

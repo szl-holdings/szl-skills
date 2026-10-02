@@ -28,6 +28,9 @@ The CLI also records the raw input and loaded helper file digests. Its decoder r
 numbers, duplicate keys, invalid Unicode, excessive depth and overflow/underflow to float
 infinity/zero. Supported fractional JSON tokens use Python binary floats; rational arithmetic
 is exact over those parsed values, not over an arbitrary-precision decimal interpretation.
+Reports use finite binary floats. If a nonzero exact cluster, overall, row-weighted or
+leave-one-out mean would be displayed as zero, the result is INPUT_ERROR without inference.
+This avoids a zero effect summary contradicting a positive exact-effect decision.
 
 The cluster effect is the arithmetic mean of the paired improvements in that cluster. The
 reported main effect is the unweighted mean of those cluster means, so a large cluster does

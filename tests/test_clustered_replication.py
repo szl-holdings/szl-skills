@@ -182,11 +182,28 @@ class ExactClusterTests(unittest.TestCase):
         installer = runpy.run_path(str(ROOT / "tools/install_claude_science.py"))
         self.assertEqual(set(installer["NAMES"]), set(expected))
         self.assertEqual(len(installer["NAMES"]), len(set(installer["NAMES"])))
+        profile = (ROOT / "specialists/szl-science-workbench/SPECIALIST.md").read_text()
+        curated = profile.split("Skills (curated):", 1)[1].split("\n\n", 1)[0].strip().removesuffix(".")
+        self.assertEqual({name.strip() for name in curated.split(",")}, set(installer["NAMES"]))
         self.assertNotIn("szl-typesafe-ai", installer["NAMES"])
         self.assertNotIn("szl-governed-decision", installer["NAMES"])
         manifest = [name for plugin in market["plugins"] for name in plugin["skills"]]
         self.assertEqual({pathlib.PurePosixPath(name).name for name in manifest},
                          {path.name for path in (ROOT / "skills").iterdir() if path.is_dir()})
+
+    def test_subnormal_aggregate_cannot_report_zero_with_positive_inference(self):
+        document = experiment([0, 0], repeats=2)
+        document["plan"]["minimum_improvement"] = 0
+        for row in document["rows"]:
+            row["baseline_loss"], row["candidate_loss"] = 5e-324, 0
+        representable = audit(document)
+        self.assertEqual(representable["equal_cluster_mean_improvement"], 5e-324)
+        self.assertTrue(representable["conditional_exact_test"]["positive_minimum_effect_met"])
+        document["rows"][1]["baseline_loss"] = 0
+        underflow = audit(document)
+        self.assertEqual(underflow["status"], "INPUT_ERROR")
+        self.assertIsNone(underflow["conditional_exact_test"])
+        self.assertIn("Aggregate", underflow["reason"])
 
     def test_fixture_commitment_and_declared_findings(self):
         doc = K.read_json((SKILL / "assets/example.json").read_bytes())

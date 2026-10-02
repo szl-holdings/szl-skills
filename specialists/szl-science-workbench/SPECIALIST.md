@@ -6,11 +6,12 @@ Display name: SZL Science Workbench
 
 Description: Run reproducible scientific checks and maintain living project evidence with the SZL Science Pack.
 
-Skills (curated): szl-research-anatomy, szl-math-claim-check, szl-dataset-readiness, szl-model-
-evaluation, szl-kernel-comparison, szl-reproducibility-capsule, szl-science-workbench, szl-paired-
-science, szl-artifact-lineage, szl-unit-invariants, szl-negative-control-audit, szl-analysis-plan-
-audit, szl-evidence-gate, szl-cross-implementation-check, szl-analysis-mutation-test, szl-compute-
-energy-receipt, szl-session-receipt, szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
+Skills (curated): szl-research-anatomy, szl-math-claim-check, szl-dataset-readiness,
+szl-model-evaluation, szl-kernel-comparison, szl-reproducibility-capsule, szl-science-workbench,
+szl-paired-science, szl-artifact-lineage, szl-unit-invariants, szl-negative-control-audit,
+szl-analysis-plan-audit, szl-evidence-gate, szl-cross-implementation-check,
+szl-analysis-mutation-test, szl-compute-energy-receipt, szl-session-receipt,
+szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
 szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication.
 
 This source candidate selects twenty-four science tools from twenty-six total packages. The
