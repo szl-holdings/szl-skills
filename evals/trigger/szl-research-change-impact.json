@@ -1,0 +1,17 @@
+{
+  "skill": "szl-research-change-impact",
+  "schema": "szl.trigger-eval.v1",
+  "note": "Held trigger and near-miss examples; model routing rates NOT_MEASURED until executed in the real application.",
+  "queries": [
+    {"query": "Compare our retained graph with the proposed graph. Which old claims are affected if this data edge is removed?", "should_trigger": true},
+    {"query": "The model card no longer names the old benchmark. Keep the baseline dependency visible and plan the rechecks.", "should_trigger": true},
+    {"query": "Here are two workbench graph snapshots and fresh file digests. Produce the reassessment order before we accept the new dataset.", "should_trigger": true},
+    {"query": "A required claim disappeared from the edited graph. Make sure it stays in the audit denominator.", "should_trigger": true},
+    {"query": "The candidate graph reverses a dependency and the old and new graphs are individually acyclic. Compare their impact without running anything.", "should_trigger": true},
+    {"query": "Find every paper on this molecule published today.", "should_trigger": false},
+    {"query": "Run training and deploy the new model to our Space.", "should_trigger": false},
+    {"query": "Is this scientific claim true?", "should_trigger": false},
+    {"query": "Record this replication attempt in the hash-chained ledger.", "should_trigger": false},
+    {"query": "Prove that the experiment demonstrated causality.", "should_trigger": false}
+  ]
+}
