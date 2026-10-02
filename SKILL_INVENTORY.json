@@ -2,9 +2,10 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 28,
+    "total": 29,
     "by_plugin": {
       "szl-evidence-skills": 2,
+      "szl-paper-evidence-skills": 1,
       "szl-science-assay-skills": 1,
       "szl-science-replay-skills": 1,
       "szl-science-skills": 24
@@ -14,6 +15,9 @@
     "szl-evidence-skills": [
       "szl-governed-decision",
       "szl-typesafe-ai"
+    ],
+    "szl-paper-evidence-skills": [
+      "szl-paper-evidence-audit"
     ],
     "szl-science-assay-skills": [
       "szl-assay-measurement-audit"
