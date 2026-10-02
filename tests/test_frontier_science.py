@@ -123,6 +123,13 @@ class ContinuityTests(unittest.TestCase):
         doc['surfaces'][0]['observed']['artifact_sha256'] = 'c' * 64
         self.assertIn('MISMATCH_ARTIFACT_SHA256', self.k.szl_release_continuity(doc)['surfaces'][0]['findings'])
 
+    def test_native_kernel_is_an_explicit_pinned_repository_type(self):
+        doc = self.passing(); surface = doc['surfaces'][1]
+        surface['kind'] = 'hf-kernel'
+        self.assertEqual(self.k.szl_release_continuity(doc)['surfaces'][1]['kind'], 'hf-kernel')
+        surface['expected']['revision'] = 'main'
+        with self.assertRaises(ValueError): self.k.szl_release_continuity(doc)
+
 class CLITests(unittest.TestCase):
     def test_cli_findings_and_malformed_json_are_nonzero(self):
         with tempfile.TemporaryDirectory() as folder:
