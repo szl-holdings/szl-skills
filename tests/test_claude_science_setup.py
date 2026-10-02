@@ -91,12 +91,12 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(len(self.host.skills.files), 1)
         self.assertEqual(self.host.skills.published, [])
 
-    def test_four_bounded_families_attach_all_tools_without_replacing_profile(self):
+    def test_five_bounded_families_attach_all_tools_without_replacing_profile(self):
         replay = SETUP["bundle"](ROOT, family="replay")
         paper = SETUP["bundle"](ROOT, family="paper")
         assay = SETUP["bundle"](ROOT, family="assay")
         multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
-        self.assertEqual(set(replay), {"szl-experiment-replay"})
+        self.assertEqual(set(replay), {"szl-experiment-replay", "szl-measurement-harmonizer"})
         self.assertEqual(set(paper), {"szl-paper-evidence-audit"})
         self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
         self.assertEqual(set(multiplicity), {"szl-multiplicity-audit"})
@@ -125,7 +125,8 @@ class SetupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-assay-measurement-audit": {"huge": "x" * 1000001}}, self.path, family="assay")
         with self.assertRaises(ValueError):
-            SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001}}, self.path, family="replay")
+            SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001},
+                                             "szl-measurement-harmonizer": {}}, self.path, family="replay")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="paper")
         with self.assertRaises(ValueError):

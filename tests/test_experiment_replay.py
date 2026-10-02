@@ -140,7 +140,7 @@ class ExperimentReplayTests(unittest.TestCase):
     def test_installer_selected_replay_resources_are_cli_only(self):
         installer = runpy.run_path(str(ROOT / "tools" / "install_claude_science.py"))
         resources = installer["bundle"](ROOT, family="replay")
-        self.assertEqual(set(resources), {"szl-experiment-replay"})
+        self.assertEqual(set(resources), {"szl-experiment-replay", "szl-measurement-harmonizer"})
         files = resources["szl-experiment-replay"]
         self.assertEqual(set(files), {"SKILL.md", "LICENSE", "NOTICE", "scripts/run.py",
                                       "scripts/engine.py", "assets/declaration.json",
@@ -149,7 +149,16 @@ class ExperimentReplayTests(unittest.TestCase):
         for relative in ("scripts/run.py", "scripts/engine.py"):
             with self.subTest(resource=relative):
                 ast.parse(files[relative], filename=relative)
-        self.assertLessEqual(sum(len(content.encode()) for content in files.values()), 1000000)
+        harmonizer = resources["szl-measurement-harmonizer"]
+        self.assertEqual(set(harmonizer), {"SKILL.md", "LICENSE", "NOTICE", "scripts/run.py",
+                                           "scripts/harmonizer.py", "assets/example.json",
+                                           "assets/lab-a.csv", "assets/lab-b.csv", "references/contract.md"})
+        self.assertNotIn("kernel.py", harmonizer)
+        for relative in ("scripts/run.py", "scripts/harmonizer.py"):
+            with self.subTest(resource=relative):
+                ast.parse(harmonizer[relative], filename=relative)
+        self.assertLessEqual(sum(len(content.encode()) for files in resources.values()
+                                 for content in files.values()), 1000000)
 
     def test_existing_receipt_is_not_overwritten(self):
         original = (self.root / "assets" / "expected.json").read_bytes()

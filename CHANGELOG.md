@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased source candidate
+
+- Add szl-measurement-harmonizer to the bounded replay/data import family. It aligns two to
+  four byte-pinned CSV exports using explicitly declared specimen IDs and affine unit
+  conversions; ambiguous, incomplete, changed or malformed inputs yield no usable rows.
+  Mappings and conversions are declarations, not authenticated identities, calibration,
+  uncertainty analysis or scientific agreement. The source candidate has twenty-nine
+  science tools and two evidence skills; no new tag or Claude Science registration is claimed.
+
 ## 0.5.0-rc.1
 
 - Add szl-paper-evidence-audit as a separate, bounded paper import family. It matches complete

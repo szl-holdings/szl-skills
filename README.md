@@ -1,15 +1,15 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty skills for Claude Science, Claude Code and claude.ai: twenty-eight science
+contains thirty-one skills for Claude Science, Claude Code and claude.ai: twenty-nine science
 tools and two evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have five import families: twenty-four core checks, one bounded experiment
-replay check, one paper evidence audit, one declared assay-run audit, and one multiplicity audit. Each SDK bundle retains
-the 1 MB limit, licenses and notices. All four families use the same installer and can attach to
+The science tools have five import families: twenty-four core checks, two bounded replay/data
+checks, one paper evidence audit, one declared assay-run audit, and one multiplicity audit. Each SDK bundle retains
+the 1 MB limit, licenses and notices. All five families use the same installer and can attach to
 the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
 
 ## Import
@@ -23,8 +23,9 @@ measurement. The stable v0.4.0 tag still contains twenty-three science tools and
 skills. A GitHub tag does not prove Claude Science host registration or measured skill
 effectiveness; verify those separately.
 
-That published v0.4.0 tag contains twenty-three science skills. The new multiplicity skill is
-source-candidate work until a separately reviewed tag and byte readback are published.
+That published v0.4.0 tag contains twenty-three science skills. The multiplicity and
+measurement-harmonizer skills are source-candidate work until separately reviewed tags and
+byte readbacks establish their publication.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -63,6 +64,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
+| szl-measurement-harmonizer | Can declared specimen IDs and affine unit conversions align byte-pinned CSV exports? | Does not authenticate identities or conversions, propagate uncertainty, or establish agreement |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |

@@ -15,7 +15,7 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility",
          "szl-clustered-replication"]
 AGENT = "SZL_SCIENCE"
-REPLAY_NAMES = ["szl-experiment-replay"]
+REPLAY_NAMES = ["szl-experiment-replay", "szl-measurement-harmonizer"]
 PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]
 MULTIPLICITY_NAMES = ["szl-multiplicity-audit"]
