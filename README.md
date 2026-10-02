@@ -1,7 +1,7 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. Twenty-five skills for
-Claude Science, Claude Code and claude.ai: twenty-three science checks and two evidence skills.
+Executable, offline checks that make scientific claims carry their evidence. Twenty-seven skills in
+this checkout for Claude Science, Claude Code and claude.ai: twenty-five science checks and two evidence skills.
 The checks use the Python standard library, run without network or credentials, and report what
 they did not verify alongside what they did. Repository pins also use the local Git executable;
 optional session-receipt signing requires szl-receipt-dsse.
@@ -16,6 +16,10 @@ Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder
 into `.claude/skills/` or `~/.claude/skills/`.
 
 Community index with pinned commits and automated checks: https://github.com/ai4science-skills/skills
+
+The import above is the published v0.4.0 release with 23 science skills. This checkout
+prepares v0.5.0 with outcome preservation and release continuity; that release is not
+published by this change. Review its exact source commit before importing preview resources.
 
 ## Start here
 
@@ -33,6 +37,8 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | know whether the 4-bit or ported model still answers like the one you validated | szl-quantization-check | WITHIN_TOLERANCE / DEGRADED with the worst inputs named |
 | name the exact commits of every repository an analysis used | szl-repo-pin | one composite digest, only when every tree is clean; MATCH / DRIFT later |
 | know how many outcome changes stand between a result and p = 0.05 | szl-result-fragility | fragility index against the number lost to follow-up |
+| catch a scientific decision flip after a numerically close optimization | szl-outcome-preservation | complete-cohort regressions, inactive modes and withheld performance ratios |
+| trace source identity through a wheel, Hub artifact and runtime | szl-release-continuity | missing bindings, conflicts and refused readiness |
 
 ## Science checks
 
@@ -60,7 +66,9 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-quantization-check | Does the quantized or ported model agree with the reference on these inputs? | Not accuracy; nothing about inputs not included |
 | szl-repo-pin | Which exact commits, in which repositories, with nothing uncommitted? | Not publication or correctness of the code |
 | szl-result-fragility | How many outcome flips remove significance, compared with the dropouts? | Not effect size, design or adjusted analyses |
-| szl-science-workbench | Dataset, binary/categorical model, math, kernel, calibration and paired checks, with immutable runs and invalidation | Other pack audits use their own CLIs; not an experiment runner |
+| szl-outcome-preservation | Did optimization preserve scientific decisions on every declared case? | Supplied measurements only; not GPU or scientific qualification |
+| szl-release-continuity | Do registry artifacts and runtime bind to the intended source? | Supplied identity comparison; not attestation verification or release authority |
+| szl-science-workbench | Dataset, binary/categorical model, math, kernel, calibration, paired, outcome and release checks, with immutable runs and invalidation | Other pack audits use their own CLIs; not an experiment runner |
 
 Every skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
 under `references/` where the input format is non-trivial, and tests in `tests/`. The workbench
