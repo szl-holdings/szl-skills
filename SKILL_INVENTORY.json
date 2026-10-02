@@ -2,10 +2,10 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 25,
+    "total": 26,
     "by_plugin": {
       "szl-evidence-skills": 2,
-      "szl-science-skills": 23
+      "szl-science-skills": 24
     }
   },
   "plugins": {
@@ -17,6 +17,7 @@
       "szl-analysis-mutation-test",
       "szl-analysis-plan-audit",
       "szl-artifact-lineage",
+      "szl-assay-measurement-audit",
       "szl-compute-energy-receipt",
       "szl-cross-implementation-check",
       "szl-dataset-readiness",

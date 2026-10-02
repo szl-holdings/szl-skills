@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 (source candidate; not tagged)
+
+- Added szl-assay-measurement-audit, a stdlib-only offline check for one researcher-declared
+  increasing linear assay run. It gates calibration residuals, a separately identified blank,
+  QC recovery, sample range, quantification minimum and final-result uncertainty declarations.
+  Measured-control failure withholds all sample concentrations. Synthetic fixtures and
+  adversarial regression tests cover dilution-basis and numeric-precision edges.
+- Source inventory becomes twenty-four science skills plus two evidence skills. This source
+  candidate is not proof of Claude Science host registration, method validation or clinical use.
+
 ## 0.4.0
 
 - Five new science skills, all stdlib and offline: szl-refutation-ledger (append-only, hash-chained
