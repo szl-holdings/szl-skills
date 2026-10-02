@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-four core science skills for evidence-grounded research, including clustered replication. Offline by default; optional explicit pinned public study fetch. No credentials required. Replay, paper evidence, assay, multiplicity and change-impact audits are separate import families.",
+      "description": "Twenty-four core science skills for evidence-grounded research, including clustered replication. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay, paper evidence, assay, multiplicity and change-impact audits are separate import families.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -49,6 +49,15 @@
         "./skills/szl-repo-pin",
         "./skills/szl-result-fragility",
         "./skills/szl-clustered-replication"
+      ]
+    },
+    {
+      "name": "szl-science-design-skills",
+      "description": "One bounded offline prospective experiment-contract draft: expose missing controls, units, falsifier, harm limit and cheapest decisive measurement. No preregistration, execution, inference or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-experiment-contract"
       ]
     },
     {
