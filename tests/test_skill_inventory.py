@@ -57,6 +57,31 @@ class InventoryTests(unittest.TestCase):
         skill_inventory.check(self.root)
         self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
 
+    def test_replay_family_requires_an_exact_separate_installer_selection(self):
+        directory = self.root / "skills" / "szl-replay"; directory.mkdir()
+        (directory / "SKILL.md").write_text("---\nname: szl-replay\ndescription: fixture\n---\n")
+        self.market["plugins"].append({"name": "szl-science-replay-skills", "skills": ["./skills/szl-replay"]})
+        self.save_market()
+        with self.assertRaisesRegex(ValueError, "installer/replay catalog mismatch"):
+            skill_inventory.build(self.root)
+        installer = self.root / "tools" / "install_claude_science.py"
+        installer.write_text(installer.read_text() + "REPLAY_NAMES = ['szl-replay']\n")
+        self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
+
+    def test_paper_family_requires_an_exact_separate_installer_selection(self):
+        directory = self.root / "skills" / "szl-paper"; directory.mkdir()
+        (directory / "SKILL.md").write_text("---\nname: szl-paper\ndescription: fixture\n---\n")
+        self.market["plugins"].append({"name": "szl-paper-evidence-skills", "skills": ["./skills/szl-paper"]})
+        self.save_market()
+        with self.assertRaisesRegex(ValueError, "installer/paper catalog mismatch"):
+            skill_inventory.build(self.root)
+        installer = self.root / "tools" / "install_claude_science.py"
+        installer.write_text(installer.read_text() + "PAPER_NAMES = ['szl-paper']\n")
+        self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
+        installer.write_text(installer.read_text().replace("['szl-paper']", "['szl-one']"))
+        with self.assertRaisesRegex(ValueError, "installer/paper catalog mismatch"):
+            skill_inventory.build(self.root)
+
     def test_catalog_orphan_and_duplicate_membership_fail(self):
         self.market["plugins"][0]["skills"].append("./skills/szl-missing")
         self.save_market()

@@ -6,20 +6,21 @@ Display name: SZL Science Workbench
 
 Description: Run reproducible scientific checks and maintain living project evidence with the SZL Science Pack.
 
-Skills (curated): szl-science-workbench, szl-research-anatomy, szl-math-claim-check,
-szl-dataset-readiness, szl-model-evaluation, szl-kernel-comparison,
-szl-reproducibility-capsule, szl-paired-science, szl-artifact-lineage,
-szl-unit-invariants, szl-negative-control-audit, szl-analysis-plan-audit,
-szl-evidence-gate, szl-cross-implementation-check, szl-analysis-mutation-test,
-szl-compute-energy-receipt, szl-session-receipt, szl-reviewer-pack,
-szl-refutation-ledger, szl-retrieval-eval, szl-quantization-check,
-szl-repo-pin, szl-result-fragility, szl-paper-evidence-audit.
+Skills (curated): szl-research-anatomy, szl-math-claim-check, szl-dataset-readiness,
+szl-model-evaluation, szl-kernel-comparison, szl-reproducibility-capsule, szl-science-workbench,
+szl-paired-science, szl-artifact-lineage, szl-unit-invariants, szl-negative-control-audit,
+szl-analysis-plan-audit, szl-evidence-gate, szl-cross-implementation-check,
+szl-analysis-mutation-test, szl-compute-energy-receipt, szl-session-receipt,
+szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
+szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication.
 
-This post-v0.4.0 source selects twenty-four science skills from twenty-six total packages.
-The two evidence skills are intentionally excluded. SCIENCE_ACCEPTANCE.md retains the
-historical ten-package acceptance scope. The workbench dispatches dataset, binary/categorical
-model, math, kernel, calibration and paired checks; the other audits retain their own CLIs.
-The historical v0.2.0-rc.1 profile selected eight science skills.
+This source candidate selects twenty-four core science tools from twenty-eight total packages;
+the two evidence skills are excluded. Separate replay- and paper-family installs can attach
+szl-experiment-replay and szl-paper-evidence-audit to the same profile, giving twenty-six
+science tools across all three families. The published v0.4.0 tag has twenty-three science
+tools; the newer skills remain unreleased candidates. The workbench integrates seven core
+checks; all other tools run separately. SCIENCE_ACCEPTANCE.md retains the historical
+ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 
 Connectors on creation: none. Attach a selected connector only when the scientific task needs it.
 

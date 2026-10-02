@@ -91,6 +91,37 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(len(self.host.skills.files), 1)
         self.assertEqual(self.host.skills.published, [])
 
+    def test_three_bounded_families_attach_all_tools_without_replacing_profile(self):
+        replay = SETUP["bundle"](ROOT, family="replay")
+        paper = SETUP["bundle"](ROOT, family="paper")
+        self.assertEqual(set(replay), {"szl-experiment-replay"})
+        self.assertEqual(set(paper), {"szl-paper-evidence-audit"})
+        for resources in (self.resources, replay, paper):
+            self.assertLessEqual(sum(len(v.encode()) for files in resources.values() for v in files.values()), 1000000)
+        SETUP["install"](self.host, self.resources, self.path)
+        replay_result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay")
+        self.assertEqual(replay_result["family"], "replay")
+        result = SETUP["install"](self.host, paper, self.path.with_name("paper.json"), family="paper")
+        self.assertEqual(set(result["agent"]["skillNames"]),
+                         set(SETUP["NAMES"] + SETUP["REPLAY_NAMES"] + SETUP["PAPER_NAMES"]))
+        self.assertEqual(result["family"], "paper")
+        self.assertFalse(result["agent"]["unrestricted"])
+        self.assertEqual(result["agent"]["connectors"], [])
+
+    def test_unknown_partial_or_oversized_family_never_writes(self):
+        with self.assertRaises(ValueError):
+            SETUP["bundle"](ROOT, family="unreviewed")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {}, self.path, family="replay")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001}}, self.path, family="replay")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {}, self.path, family="paper")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-paper-evidence-audit": {"huge": "x" * 1000001}}, self.path, family="paper")
+        self.assertEqual(self.host.skills.files, {})
+        self.assertEqual(self.host.agents.profiles, {})
+
     def test_gate_rejection_is_not_a_publication_success(self):
         self.host.skills.reject_gate = True
         with self.assertRaises(ValueError):
