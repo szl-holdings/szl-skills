@@ -3,21 +3,39 @@
 import argparse
 import hashlib
 import json
+import os
 import pathlib
 import re
 import subprocess
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+GIT_ENV = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
 
 
 def git_bytes(revision, relative):
-    return subprocess.run(["git", "show", revision + ":" + relative], cwd=ROOT, check=True, capture_output=True).stdout
+    return subprocess.run(["git", "show", revision + ":" + relative], cwd=ROOT,
+                          env=GIT_ENV, check=True, capture_output=True).stdout
 
 
-def package_skills(destination, revision=None):
+def package_skills(destination, revision=None, manifest=False):
     if revision is not None and not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise ValueError("Release revision must be a full immutable 40-character commit")
+    if revision is not None:
+        try:
+            object_type = subprocess.run(
+                ["git", "cat-file", "-t", revision], cwd=ROOT, check=True,
+                capture_output=True, text=True, env=GIT_ENV,
+            ).stdout.strip()
+        except subprocess.CalledProcessError as error:
+            raise ValueError("Release revision must resolve to a commit object") from error
+        if object_type != "commit":
+            raise ValueError("Release revision must be a commit object")
+    if manifest and revision is None:
+        raise ValueError("A manifest requires --revision at a full immutable commit")
+    manifest_path = destination / "science-package-manifest.json" if manifest else None
+    if manifest_path is not None and manifest_path.exists():
+        raise FileExistsError(manifest_path)
     market = json.loads(git_bytes(revision, ".claude-plugin/marketplace.json") if revision else (ROOT / ".claude-plugin" / "marketplace.json").read_bytes())
     selected = [skill for plugin in market["plugins"]
                 if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills",
@@ -33,7 +51,8 @@ def package_skills(destination, revision=None):
         contents = {}
         if revision:
             prefix = skill.relative_to(ROOT).as_posix() + "/"
-            tree = subprocess.run(["git", "ls-tree", "-r", revision, "--", prefix], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+            tree = subprocess.run(["git", "ls-tree", "-r", revision, "--", prefix], cwd=ROOT,
+                                  env=GIT_ENV, check=True, capture_output=True, text=True).stdout
             for line in tree.splitlines():
                 attributes, path = line.split("\t", 1)
                 if attributes.split()[0] not in {"100644", "100755"} or not path.startswith(prefix):
@@ -61,6 +80,12 @@ def package_skills(destination, revision=None):
                             "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
                             "compressed_bytes": archive.stat().st_size,
                             "uncompressed_bytes": sum(i.file_size for i in z.infolist())})
+    if manifest_path is not None:
+        record = {"schema": "szl.science-package-manifest.v1",
+                  "source_commit": revision, "archives": reports}
+        with manifest_path.open("x", encoding="utf-8", newline="\n") as output:
+            json.dump(record, output, sort_keys=True, indent=2)
+            output.write("\n")
     return reports
 
 
@@ -68,5 +93,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=pathlib.Path, required=True)
     parser.add_argument("--revision", help="Full immutable commit; package Git blobs, excluding working-copy changes")
+    parser.add_argument("--manifest", action="store_true", help="Write a source-bound ZIP hash manifest; requires --revision")
     args = parser.parse_args()
-    print(json.dumps(package_skills(args.output_dir, args.revision), indent=2))
+    print(json.dumps(package_skills(args.output_dir, args.revision, args.manifest), indent=2))
