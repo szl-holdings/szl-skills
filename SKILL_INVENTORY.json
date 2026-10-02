@@ -1,0 +1,42 @@
+{
+  "schema": "szl.source-skill-inventory.v1",
+  "scope": "source-tree",
+  "counts": {
+    "total": 25,
+    "by_plugin": {
+      "szl-evidence-skills": 2,
+      "szl-science-skills": 23
+    }
+  },
+  "plugins": {
+    "szl-evidence-skills": [
+      "szl-governed-decision",
+      "szl-typesafe-ai"
+    ],
+    "szl-science-skills": [
+      "szl-analysis-mutation-test",
+      "szl-analysis-plan-audit",
+      "szl-artifact-lineage",
+      "szl-compute-energy-receipt",
+      "szl-cross-implementation-check",
+      "szl-dataset-readiness",
+      "szl-evidence-gate",
+      "szl-kernel-comparison",
+      "szl-math-claim-check",
+      "szl-model-evaluation",
+      "szl-negative-control-audit",
+      "szl-paired-science",
+      "szl-quantization-check",
+      "szl-refutation-ledger",
+      "szl-repo-pin",
+      "szl-reproducibility-capsule",
+      "szl-research-anatomy",
+      "szl-result-fragility",
+      "szl-retrieval-eval",
+      "szl-reviewer-pack",
+      "szl-science-workbench",
+      "szl-session-receipt",
+      "szl-unit-invariants"
+    ]
+  }
+}
