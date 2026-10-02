@@ -1,5 +1,6 @@
 """Documented SDK contract tests only. This test double is NOT the real application."""
 import pathlib
+import json
 import runpy
 import tempfile
 import types
@@ -64,6 +65,13 @@ class SetupTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_supported_calls_publish_readback_and_curated_profile(self):
+        market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        science = next(p for p in market["plugins"] if p["name"] == "szl-science-skills")
+        evidence = next(p for p in market["plugins"] if p["name"] == "szl-evidence-skills")
+        expected = {pathlib.PurePosixPath(p).name for p in science["skills"]}
+        self.assertEqual(set(self.resources), expected)
+        self.assertEqual(len(SETUP["NAMES"]), len(expected))
+        self.assertTrue(expected.isdisjoint(pathlib.PurePosixPath(p).name for p in evidence["skills"]))
         result = SETUP["install"](self.host, self.resources, self.path)
         self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
         self.assertEqual(len(result["skills"]), len(SETUP["NAMES"]))
