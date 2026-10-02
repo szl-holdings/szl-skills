@@ -37,8 +37,9 @@ explicitly. Creation and updating a matching profile therefore have different in
 The receipt says PUBLISHED_AND_READ_BACK only after those application readbacks succeed.
 A kernel gate rejection, unavailable SDK, publish refusal or mismatch is a visible failure.
 An absent sidecar probe is recorded as PROBE_UNAVAILABLE, even when publication/readback
-succeeds. Unchanged kernels do not receive a fresh probe; CLI-only paired-science and
-workbench resources do not enter the kernel gate path. Confirm all intended resources in
+succeeds. Unchanged kernels do not receive a fresh probe; CLI-only paired-science,
+measurement-harmonizer, and workbench resources do not enter the kernel gate path. Confirm
+all intended resources in
 the actual application's supported import/runtime and retain unresolved checks separately.
 Publication/readback is distinct from real sidecar validation and agent task evaluation;
 the receipt retains NOT_EXECUTED for task evaluation until a pilot is run.
