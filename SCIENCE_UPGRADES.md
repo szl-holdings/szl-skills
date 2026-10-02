@@ -1,5 +1,8 @@
 # Six scientific evidence upgrades
 
+Historical snapshot: this document records the earlier six-upgrade candidate at the source
+revision below. Its draft and release statements do not describe the later v0.5.0-rc.1 prerelease.
+
 Base: `szl-holdings/szl-skills@9668f1571315e93ca2059b9a44f12beef483532d`.
 Existing licensed implementations are extended in place; names and historical APIs
 remain supported. New strict contracts distinguish declarations, supplied observations,
