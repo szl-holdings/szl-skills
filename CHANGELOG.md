@@ -8,7 +8,21 @@
   Supplied digests and synthetic examples do not establish scientific truth or host registration.
 - Current source inventory is thirty-one skills: twenty-four core science tools, five separate
   science tools, and two evidence skills. The new change-impact family retains the 1 MB bundle
-  limit and does not change the published v0.5.0-rc.1 tag.
+  limit and does not change the published v0.5.0-rc.2 tag.
+
+## 0.5.0-rc.2
+
+- Add szl-multiplicity-audit as a separate import family: Holm FWER or declared-assumption
+  BH FDR over a complete predeclared family; HOLD if any planned result is missing. Plan hash
+  is not preregistration. It stays outside the 1 MB core bundle.
+- Wrap each deterministic science ZIP in one skill-named directory for manual claude.ai upload.
+  The 28 published ZIPs correspond to 24 core tools plus replay, paper, assay and multiplicity;
+  the two evidence skills remain in source, not in these science ZIP assets. The v0.5.0-rc.1
+  assets were not changed.
+- The signed tag resolves to protected-main commit `d36e803dc7dfa56c23aee8c0d4baff647f52fac7`.
+  The tagged marketplace manifest still declares `0.5.0-rc.1`, so host import/version display
+  needs an actual application readback. A tag and ZIP checks do not establish Claude Science
+  registration, scientific validity, method validation or clinical use.
 
 ## 0.5.0-rc.1
 
@@ -21,11 +35,9 @@
   QC recovery, sample range, quantification minimum and final-result uncertainty declarations.
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
-- Add szl-multiplicity-audit as a separate import family: Holm FWER or declared-assumption
-  BH FDR over a complete predeclared family; HOLD if any planned result is missing. Plan hash
-  is not preregistration. It stays outside the 1 MB core bundle.
-- Source inventory becomes twenty-four core science tools, one replay tool, one paper audit,
-  one assay audit, one multiplicity audit and two evidence skills. This source release is not
+- Source inventory was twenty-four core science tools, one replay tool, one paper audit,
+  one assay audit and two evidence skills: twenty-nine total, with twenty-seven science tools.
+  Multiplicity and the skill-named ZIP root were not in this tag. This source release is not
   proof of Claude Science host registration, method validation or clinical use.
 - Add szl-clustered-replication: distinguish observations from declared experimental units,
   equal-cluster paired effects, an exact conditional cluster sign-flip calculation and
@@ -38,7 +50,7 @@
   technical replication; test execution and app efficacy are reported separately.
 - Preserve the separately developed experiment replay contract and keep paper and assay audits
   outside the core bundle. All four science families retain complete helpers, licenses and
-  notices and the 1 MB SDK bundle limit; the shared installer can attach all twenty-eight tools
+  notices and the 1 MB SDK bundle limit; the shared installer can attach all twenty-seven tools
   across four separately verified calls.
 
 ## 0.4.0

@@ -15,16 +15,24 @@ the same specialist. The stable v0.4.0 tag retains its original twenty-three-too
 
 ## Import
 
-Claude Science: Skills > Import from GitHub, paste:
+The GitHub `v0.5.0-rc.2` prerelease is tagged at
+`d36e803dc7dfa56c23aee8c0d4baff647f52fac7`. It has twenty-eight individual
+science-skill ZIPs and adds `szl-multiplicity-audit` to the twenty-seven science
+tools in `v0.5.0-rc.1`; the two evidence skills remain available in source. To
+try the pinned GitHub import in Claude Science, use Skills > Import from GitHub
+and paste:
 
-    szl-holdings/szl-skills@v0.5.0-rc.1
+    szl-holdings/szl-skills@v0.5.0-rc.2
 
-This prerelease includes paper evidence audit, clustered replication, experiment replay, and assay
-measurement. The stable v0.4.0 tag still contains twenty-three science tools and two evidence
-skills. A GitHub tag does not prove Claude Science host registration or measured skill
-effectiveness; verify those separately.
+The `v0.5.0-rc.2` tag's marketplace manifest still declares version
+`0.5.0-rc.1`; check the actual host's imported inventory and displayed version
+before calling the new pin installed. The current untagged source also contains
+`szl-research-change-impact`, which is **not** in the RC2 tag or its ZIPs. The
+stable `v0.4.0` tag still contains twenty-three science tools and two evidence
+skills. A GitHub release does not prove Claude Science host registration,
+sidecar acceptance, scientific validity, or measured skill effectiveness.
 
-Multiplicity and research change impact remain source-candidate work until a separately
+Research change impact remains source-candidate work until a separately
 reviewed tag and byte readback are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`

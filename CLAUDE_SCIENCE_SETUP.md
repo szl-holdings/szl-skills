@@ -6,9 +6,12 @@ assay, multiplicity and change-impact families select szl-experiment-replay,
 szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
 szl-research-change-impact. Each complete family must fit the existing 1 MB resource limit.
 All six families exclude szl-typesafe-ai and szl-governed-decision. The stable v0.4.0 tag contains
-twenty-three science tools and two evidence skills; clustered replication, replay, paper evidence
-and the assay audit were added in v0.5.0-rc.1. Multiplicity and change impact remain source
-candidates. The historical v0.2.0-rc.1 tag contains eight
+twenty-three science tools and two evidence skills. Clustered replication, replay, paper evidence
+and the assay audit were added in v0.5.0-rc.1; multiplicity was published in v0.5.0-rc.2,
+whose signed tag resolves to `d36e803dc7dfa56c23aee8c0d4baff647f52fac7` and has
+twenty-eight science ZIP assets. Change impact is present only in the newer source candidate,
+not that tag. The RC2 tag's marketplace metadata still says `0.5.0-rc.1`; actual host import
+and displayed version require verification. The historical v0.2.0-rc.1 tag contains eight
 science skills. GitHub importing skills does not create a specialist. The workbench integrates
 seven core checks; other tools run separately.
 SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does not cover
