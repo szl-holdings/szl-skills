@@ -52,6 +52,15 @@
       ]
     },
     {
+      "name": "szl-science-assay-skills",
+      "description": "One bounded offline assay-run audit for a researcher-declared increasing linear calibration, blank, QC and sample uncertainty disclosures. Synthetic fixtures only; not method validation or clinical qualification.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-assay-measurement-audit"
+      ]
+    },
+    {
       "name": "szl-science-replay-skills",
       "description": "One bounded offline experiment replay skill: pin a local CSV, reference and helper, rerun its built-in mean, and retain match, divergence or incomplete evidence. No supplied code, network or credentials.",
       "source": "./",

@@ -15,6 +15,7 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility", "szl-clustered-replication"]
 AGENT = "SZL_SCIENCE"
 REPLAY_NAMES = ["szl-experiment-replay"]
+ASSAY_NAMES = ["szl-assay-measurement-audit"]
 PROMPT = """You are SZL Science Workbench, a scientific workflow assistant. Connect the scientist's
 question to inspectable artifacts, selected calculations, actual outputs and retained
 project memory. Prefer the integrated workbench for a project that should survive a session;
@@ -31,6 +32,8 @@ def family_names(family):
         return NAMES
     if family == "replay":
         return REPLAY_NAMES
+    if family == "assay":
+        return ASSAY_NAMES
     raise ValueError("Unknown reviewed science family")
 
 

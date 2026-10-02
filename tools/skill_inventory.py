@@ -94,6 +94,9 @@ def build(root):
     replay = set(installer_names(root, "REPLAY_NAMES", required=False))
     if replay != set(grouped.get("szl-science-replay-skills", [])) or replay & selected:
         raise ValueError("installer/replay catalog mismatch")
+    assay = set(installer_names(root, "ASSAY_NAMES", required=False))
+    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | replay):
+        raise ValueError("installer/assay catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",

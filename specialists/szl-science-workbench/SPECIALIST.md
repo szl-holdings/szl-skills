@@ -14,10 +14,11 @@ szl-analysis-mutation-test, szl-compute-energy-receipt, szl-session-receipt,
 szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
 szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication.
 
-This source candidate selects twenty-four core science tools from twenty-seven total packages. The
-two evidence skills are excluded. A separate replay-family install attaches
-szl-experiment-replay to the same profile, giving twenty-five science tools across both families. The published v0.4.0 tag has twenty-three science tools;
-the clustered-replication addition is an unreleased candidate. The workbench integrates seven
+This source candidate selects twenty-four core science tools from twenty-eight total packages. The
+two evidence skills are excluded. Separate replay- and assay-family installs attach
+szl-experiment-replay and szl-assay-measurement-audit to the same profile, giving twenty-six science
+tools across three families. The published v0.4.0 tag has twenty-three science tools; the
+clustered-replication and assay additions are unreleased candidates. The workbench integrates seven
 core checks; all other tools run separately. SCIENCE_ACCEPTANCE.md retains the historical
 ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 

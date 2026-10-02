@@ -91,15 +91,20 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(len(self.host.skills.files), 1)
         self.assertEqual(self.host.skills.published, [])
 
-    def test_two_bounded_families_attach_all_tools_without_replacing_profile(self):
+    def test_three_bounded_families_attach_all_tools_without_replacing_profile(self):
         replay = SETUP["bundle"](ROOT, family="replay")
+        assay = SETUP["bundle"](ROOT, family="assay")
         self.assertEqual(set(replay), {"szl-experiment-replay"})
-        for resources in (self.resources, replay):
+        self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
+        for resources in (self.resources, replay, assay):
             self.assertLessEqual(sum(len(v.encode()) for files in resources.values() for v in files.values()), 1000000)
         SETUP["install"](self.host, self.resources, self.path)
-        result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay")
-        self.assertEqual(set(result["agent"]["skillNames"]), set(SETUP["NAMES"] + SETUP["REPLAY_NAMES"]))
-        self.assertEqual(result["family"], "replay")
+        replay_result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay")
+        self.assertEqual(replay_result["family"], "replay")
+        result = SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay")
+        self.assertEqual(set(result["agent"]["skillNames"]),
+                         set(SETUP["NAMES"] + SETUP["REPLAY_NAMES"] + SETUP["ASSAY_NAMES"]))
+        self.assertEqual(result["family"], "assay")
         self.assertFalse(result["agent"]["unrestricted"])
         self.assertEqual(result["agent"]["connectors"], [])
 
@@ -108,6 +113,8 @@ class SetupTests(unittest.TestCase):
             SETUP["bundle"](ROOT, family="unreviewed")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="replay")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {}, self.path, family="assay")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001}}, self.path, family="replay")
         self.assertEqual(self.host.skills.files, {})
