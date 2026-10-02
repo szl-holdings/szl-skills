@@ -1,9 +1,9 @@
 # Claude Science setup
 
-The v0.5.0-rc.1 prerelease contains twenty-nine skills: twenty-seven science tools and two evidence
-skills. The default core family selects twenty-four science tools; separate replay, paper and
-assay families select szl-experiment-replay, szl-paper-evidence-audit and
-szl-assay-measurement-audit. Each complete family must fit the existing 1 MB resource limit.
+This source candidate contains thirty skills: twenty-eight science tools and two evidence
+skills. The default core family selects twenty-four science tools; separate replay, paper,
+assay and multiplicity families select szl-experiment-replay, szl-paper-evidence-audit,
+szl-assay-measurement-audit and szl-multiplicity-audit. Each complete family must fit the existing 1 MB resource limit.
 All four exclude szl-typesafe-ai and szl-governed-decision. The stable v0.4.0 tag contains
 twenty-three science tools and two evidence skills; clustered replication, replay, paper evidence
 and the assay audit were added in v0.5.0-rc.1. The historical v0.2.0-rc.1 tag contains eight
@@ -34,8 +34,12 @@ paper_receipt = setup["install"](host, paper, "claude-science-paper-receipt.json
 assay = setup["bundle"](".", family="assay")
 assay_receipt = setup["install"](host, assay, "claude-science-assay-receipt.json",
                                  update=True, family="assay")
+multiplicity = setup["bundle"](".", family="multiplicity")
+multiplicity_receipt = setup["install"](host, multiplicity, "claude-science-multiplicity-receipt.json",
+                                 update=True, family="multiplicity")
 print({"core": receipt["status"], "replay": replay_receipt["status"],
-       "paper": paper_receipt["status"], "assay": assay_receipt["status"]})
+       "paper": paper_receipt["status"], "assay": assay_receipt["status"],
+       "multiplicity": multiplicity_receipt["status"]})
 ```
 
 The SDK procedure stages twenty-four core science tools, checks returned sidecar gates for edited
