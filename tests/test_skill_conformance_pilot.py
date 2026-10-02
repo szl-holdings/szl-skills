@@ -8,8 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import unittest
-from unittest import mock
+from unittest import TestCase, main, mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PILOT = ROOT / "pilots/skill-conformance/szl-skill-conformance"
@@ -18,7 +17,7 @@ kernel = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kernel)
 
 
-class SkillConformanceTests(unittest.TestCase):
+class SkillConformanceTests(TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self.temp.name)
@@ -96,6 +95,38 @@ class SkillConformanceTests(unittest.TestCase):
     def test_empty_explicit_alias_is_not_silently_defaulted(self):
         self.assertEqual(self.run_check(imported_name="")["offline_conformance"], "REJECTED")
 
+    def test_duplicate_identity_with_bare_cr_is_rejected(self):
+        path = self.source / "SKILL.md"
+        path.write_bytes(b"---\nname: szl-example\nlicense: Apache-2.0\rname: other-skill\n---\nBody\n")
+        self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED")
+
+    def test_all_ascii_line_endings_share_identity_checks_but_not_hashes(self):
+        original = b"---\nname: szl-example\ndescription: Fixture skill\n---\nBody\n"
+        hashes = []
+        for ending in (b"\n", b"\r\n", b"\r"):
+            with self.subTest(ending=ending):
+                data = original.replace(b"\n", ending)
+                (self.source / "SKILL.md").write_bytes(data)
+                result = kernel.bundle(self.source)
+                self.assertEqual(result["name"], "szl-example")
+                self.assertEqual(result["files"]["SKILL.md"]["sha256"], hashlib.sha256(data).hexdigest())
+                hashes.append(result["bundle_sha256"])
+                bad = data.replace(b"description: Fixture skill", b"description: Fixture skill" + ending + b"name: other-skill")
+                (self.source / "SKILL.md").write_bytes(bad)
+                self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED")
+        self.assertEqual(len(set(hashes)), 3, "structural normalization must not normalize resource bytes")
+
+    def test_unsupported_splitlines_separators_reject_only_in_frontmatter(self):
+        path = self.source / "SKILL.md"
+        original = "---\nname: szl-example\ndescription: Fixture skill\n---\nBody\n"
+        for separator in ("\x0b", "\x0c", "\x85", "\u2028", "\u2029"):
+            with self.subTest(separator=repr(separator)):
+                bad = original.replace("description: Fixture skill", "description: Fixture skill" + separator + "name: other-skill")
+                path.write_bytes(bad.encode("utf-8"))
+                self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED")
+                path.write_bytes((original + "Body separator: " + separator).encode("utf-8"))
+                self.assertEqual(kernel.bundle(self.source)["name"], "szl-example")
+
     def test_duplicate_or_unsupported_frontmatter_identity_rejects(self):
         path = self.source / "SKILL.md"
         original = path.read_text(encoding="utf-8")
@@ -104,6 +135,39 @@ class SkillConformanceTests(unittest.TestCase):
             self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED", extra)
         path.write_text(original.replace("name: szl-example", 'name: "szl-example"'), encoding="utf-8")
         self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED")
+
+    def test_scalar_contents_cannot_supply_a_phantom_identity(self):
+        for field in (
+            'description: "Lead\nname: szl-phantom\n end"',
+            "description: 'Lead\nname: szl-phantom\n end'",
+            'description: &anchor "Lead\nname: szl-phantom\n end"',
+            'description: !!str "Lead\nname: szl-phantom\n end"',
+            'description: {"text": "Lead\nname: szl-phantom\n end"}',
+            'description: ["Lead\nname: szl-phantom\n end"]',
+        ):
+            with self.subTest(field=field):
+                (self.source / "SKILL.md").write_bytes(("---\n" + field + "\n---\nBody\n").encode("utf-8"))
+                self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED")
+
+    def test_flat_scalar_subset_accepts_single_line_quoted_descriptions(self):
+        for description in ('"Fixture skill"', "'Researcher''s fixture'", '"Use \\"quoted\\" text"', "Fixture skill # note"):
+            with self.subTest(description=description):
+                (self.source / "SKILL.md").write_bytes(("---\n# comment\nname: szl-example\ndescription: " + description + "\n---\nBody\n").encode("utf-8"))
+                self.assertEqual(kernel.bundle(self.source)["name"], "szl-example")
+
+    def test_structured_scalar_and_implicitly_typed_identity_are_rejected(self):
+        for field in ('description: |', 'description: >', 'description: {text: fixture}',
+                      'description: [fixture]', 'description: &anchor fixture',
+                      'description: !!str fixture', 'description: *anchor',
+                      'metadata:\n  name: other-skill', 'description: "unterminated',
+                      "description: 'unterminated", 'description: Fixture\ndescription: Duplicate'):
+            with self.subTest(field=field):
+                (self.source / "SKILL.md").write_bytes(("---\nname: szl-example\n" + field + "\n---\nBody\n").encode("utf-8"))
+                self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED")
+        for name in ("true", "false", "null", "yes", "no", "on", "off", "y", "n", "123", "0xabc", "1-skill"):
+            with self.subTest(name=name):
+                (self.source / "SKILL.md").write_bytes(("---\nname: " + name + "\ndescription: Fixture\n---\nBody\n").encode("utf-8"))
+                self.assertEqual(kernel.check(self.source)["offline_conformance"], "REJECTED")
 
     def test_forged_verified_field_and_unknown_case_field_reject(self):
         bad = copy.deepcopy(self.doc); bad["verified"] = True
@@ -189,4 +253,4 @@ class SkillConformanceTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
