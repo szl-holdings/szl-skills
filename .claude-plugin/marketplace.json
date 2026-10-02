@@ -47,7 +47,8 @@
         "./skills/szl-retrieval-eval",
         "./skills/szl-quantization-check",
         "./skills/szl-repo-pin",
-        "./skills/szl-result-fragility"
+        "./skills/szl-result-fragility",
+        "./skills/szl-paper-evidence-audit"
       ]
     }
   ]
