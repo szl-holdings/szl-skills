@@ -176,7 +176,10 @@ class RangeTests(unittest.TestCase):
                                      str(original)], capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 2)
             report = json.loads(result.stdout)
-            self.assertEqual(report["error_code"], "MALFORMED_JSON")
+            self.assertEqual(report["status"], "INVALID_INPUT")
+            # Parser recursion limits vary by Python version. Either the JSON
+            # decoder or the kernel must reject this non-object input safely.
+            self.assertIn(report["error_code"], {"MALFORMED_JSON", "INVALID_FIELDS"})
             self.assertNotIn("Traceback", result.stderr)
 
 
