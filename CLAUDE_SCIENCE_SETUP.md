@@ -9,7 +9,7 @@ counts do not cover all twenty-six candidate science skills. The historical v0.2
 contains eight science skills. GitHub importing skills does not create a specialist.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
-bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
+bundle_batches() reads the working tree; it does not resolve an immutable revision itself. Actual
 application registration requires separate human review and authorization.
 
 For supported SDK registration and specialist setup, select this repository as the Claude
@@ -19,12 +19,18 @@ Python tool or a terminal), execute:
 ```python
 import runpy
 setup = runpy.run_path("tools/install_claude_science.py")
-resources = setup["bundle"](".")
+resources = setup["bundle_batches"](".")
 receipt = setup["install"](host, resources, "claude-science-install-receipt.json", update=True)
 print({"status": receipt["status"], "agent": receipt["agent"]})
 ```
 
-The SDK procedure stages twenty-six science skills, checks returned sidecar gates for edited
+The SDK procedure stages all twenty-six science skills in at most eight batches, each
+limited to 1,000,000 UTF-8 resource bytes. Each skill remains limited to 200,000 bytes.
+Root LICENSE and NOTICE resources count toward these bounds for every staged skill.
+The installer validates the complete inventory and all name collisions before any write,
+then sends individual file edits. The receipt records batch membership and byte totals;
+these are local staging limits, not measured application import limits. The original
+bundle() entry point still rejects a single bundle above 1 MB. The SDK procedure checks returned sidecar gates for edited
 kernel.py resources, publishes through host.skills and reads every resource back. A new
 SZL_SCIENCE profile requests exactly the twenty-six selected skills and zero connectors on
 creation. It does not switch the

@@ -15,6 +15,9 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility",
          "szl-outcome-preservation", "szl-release-continuity"]
 AGENT = "SZL_SCIENCE"
+MAX_BATCH_BYTES = 1000000
+MAX_SKILL_BYTES = 200000
+MAX_BATCHES = 8
 PROMPT = """You are SZL Science Workbench, a scientific workflow assistant. Connect the scientist's
 question to inspectable artifacts, selected calculations, actual outputs and retained
 project memory. Prefer the integrated workbench for a project that should survive a session;
@@ -26,35 +29,116 @@ Lambda is Conjecture 1 (OPEN). Propose the next useful experiment with its assum
 source ids, and leave scientific judgments with the researcher."""
 
 
-def bundle(root):
+def _skill_bytes(files):
+    if not isinstance(files, dict) or not files or "SKILL.md" not in files:
+        raise ValueError("Expected skill resources with SKILL.md")
+    size = 0
+    for path, content in files.items():
+        if (not isinstance(path, str) or not path or "\\" in path or ":" in path
+                or any(part in ("", ".", "..") for part in path.split("/"))
+                or pathlib.PurePosixPath(path).is_absolute()):
+            raise ValueError("Expected a canonical relative resource path")
+        if not isinstance(content, str):
+            raise ValueError("Expected UTF-8 text resources")
+        size += len(content.encode("utf-8"))
+    if size > MAX_SKILL_BYTES:
+        raise ValueError("Skill exceeds 200 KB")
+    return size
+
+
+def _read_skill(root, name):
+    directory = root / "skills" / name
+    if directory.is_symlink() or not directory.is_dir() or (root / "skills").is_symlink():
+        raise ValueError("Expected a regular skill directory")
+    files = {}
+    for path in sorted(directory.rglob("*")):
+        if path.is_symlink():
+            raise ValueError("Symlink in bundle")
+        if path.is_file() and "__pycache__" not in path.parts:
+            with path.open("rb") as handle:
+                data = handle.read(MAX_SKILL_BYTES + 1)
+            if len(data) > MAX_SKILL_BYTES:
+                raise ValueError("Resource exceeds 200 KB")
+            files[path.relative_to(directory).as_posix()] = data.decode("utf-8")
+            if sum(len(content.encode("utf-8")) for content in files.values()) > MAX_SKILL_BYTES:
+                raise ValueError("Skill exceeds 200 KB")
+    for license_name in ("LICENSE", "NOTICE"):
+        path = root / license_name
+        if path.is_symlink():
+            raise ValueError("Symlink in bundle")
+        with path.open("rb") as handle:
+            data = handle.read(MAX_SKILL_BYTES + 1)
+        if len(data) > MAX_SKILL_BYTES:
+            raise ValueError("License resource exceeds 200 KB")
+        files[license_name] = data.decode("utf-8")
+    _skill_bytes(files)
+    if not re.search(r"(?m)^name: " + re.escape(name) + r"$", files["SKILL.md"]):
+        raise ValueError("Skill name mismatch")
+    return files
+
+
+def bundle(root, names=None):
+    """One bounded batch. The default retains the original complete-bundle limit."""
     root = pathlib.Path(root).resolve(strict=True)
+    names = NAMES if names is None else names
+    if (not isinstance(names, list) or not names or any(name not in NAMES for name in names)
+            or len(names) != len(set(names))):
+        raise ValueError("Expected unique reviewed skill names")
     result = {}
-    for name in NAMES:
-        directory = root / "skills" / name
-        entry = (directory / "SKILL.md").read_text(encoding="utf-8")
-        if not re.search(r"(?m)^name: " + re.escape(name) + r"$", entry):
-            raise ValueError("Skill name mismatch")
-        files = {}
-        for path in sorted(directory.rglob("*")):
-            if path.is_symlink():
-                raise ValueError("Symlink in bundle")
-            if path.is_file() and "__pycache__" not in path.parts:
-                files[path.relative_to(directory).as_posix()] = path.read_text(encoding="utf-8")
-        for license_name in ("LICENSE", "NOTICE"):
-            files[license_name] = (root / license_name).read_text(encoding="utf-8")
-        result[name] = files
-    if sum(len(v.encode()) for files in result.values() for v in files.values()) > 1000000:
+    for name in names:
+        result[name] = _read_skill(root, name)
+    if sum(_skill_bytes(files) for files in result.values()) > MAX_BATCH_BYTES:
         raise ValueError("Bundle exceeds 1 MB")
     return result
 
 
+def bundle_batches(root):
+    """Stage every reviewed skill once in at most eight batches of at most 1 MB."""
+    root = pathlib.Path(root).resolve(strict=True)
+    batches, current, size = [], {}, 0
+    for name in NAMES:
+        files = _read_skill(root, name)
+        added = _skill_bytes(files)
+        if current and size + added > MAX_BATCH_BYTES:
+            batches.append(current)
+            current, size = {}, 0
+        current[name], size = files, size + added
+    if current:
+        batches.append(current)
+    _review_batches(batches)
+    return batches
+
+
+def _review_batches(resources):
+    batches = [resources] if isinstance(resources, dict) else resources
+    if not isinstance(batches, list) or not 1 <= len(batches) <= MAX_BATCHES:
+        raise ValueError("Expected one to eight bounded staging batches")
+    flattened, receipts = {}, []
+    for batch in batches:
+        if not isinstance(batch, dict) or not batch:
+            raise ValueError("Expected a nonempty staging batch")
+        size = 0
+        for name, files in batch.items():
+            if name not in NAMES or name in flattened:
+                raise ValueError("Unknown or duplicate staged skill")
+            size += _skill_bytes(files)
+            if not re.search(r"(?m)^name: " + re.escape(name) + r"$", files["SKILL.md"]):
+                raise ValueError("Skill name mismatch")
+            flattened[name] = files
+        if size > MAX_BATCH_BYTES:
+            raise ValueError("Staging batch exceeds 1 MB")
+        receipts.append({"skill_names": list(batch), "resource_bytes": size})
+    if set(flattened) != set(NAMES):
+        raise ValueError("Expected the complete reviewed science skill inventory")
+    return flattened, receipts
+
+
 def install(host, resources, receipt_path, update=False):
-    """Preflight the complete bundle; publish and read back through the actual SDK."""
+    """Preflight every batch and collision before SDK edits; publish and read back."""
     receipt_path = pathlib.Path(receipt_path)
     if receipt_path.exists():
         raise FileExistsError("Retain the previous receipt; choose a new receipt path")
-    if set(resources) != set(NAMES):
-        raise ValueError("Expected the complete reviewed science skill inventory")
+    resources, batches = _review_batches(resources)
     inventory = {s["name"]: s for s in host.skills.list()}
     profiles = {a["name"]: a for a in host.agents.list()}
     if AGENT in profiles and profiles[AGENT].get("systemPrompt") != PROMPT:
@@ -82,7 +166,10 @@ def install(host, resources, receipt_path, update=False):
             edits.append((name, path, content, previous))
     # All collisions are assessed before any write.
     receipt = {"schema": "szl.claude-science-install.v1", "status": "IN_PROGRESS", "skills": {},
-               "agent": None, "runtime_task_evaluation": "NOT_EXECUTED", "signed": False}
+               "agent": None, "runtime_task_evaluation": "NOT_EXECUTED", "signed": False,
+               "staging": {"batches": batches, "max_batch_bytes": MAX_BATCH_BYTES,
+                           "max_skill_bytes": MAX_SKILL_BYTES, "max_batches": MAX_BATCHES,
+                           "total_resource_bytes": sum(batch["resource_bytes"] for batch in batches)}}
     try:
         for name, path, content, previous in edits:
             edited = host.skills.edit(name, path, content, old_string=previous)
