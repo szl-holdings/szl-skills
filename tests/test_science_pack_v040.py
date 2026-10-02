@@ -154,6 +154,7 @@ class RepoPinTests(unittest.TestCase):
         pin = self.k.szl_make_pin(self.tmp, self.decl)
         self.assertEqual((pin["status"], pin["composite_sha256"], pin["not_pinnable"]), ("UNPINNED", None, ["data-prep"]))
         (self.tmp / "code/prep/new.txt").unlink()
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, pin)["status"], "ERROR")
         pin = self.k.szl_make_pin(self.tmp, self.decl)
         subprocess.run(["git", "-C", str(self.tmp / "code/analysis"), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "more"], check=True)
         v = self.k.szl_verify_pin(self.tmp, pin)
@@ -167,6 +168,56 @@ class RepoPinTests(unittest.TestCase):
         self.assertEqual((pin["status"], pin["repos"][0]["state"]), ("UNPINNED", "MISSING"))
         example_pin = example("szl-repo-pin")
         self.assertEqual(self.k.szl_verify_pin(self.tmp, example_pin)["status"], "DRIFT")
+
+    def test_drive_qualified_and_windows_traversal_paths_are_rejected(self):
+        clean_pin = self.k.szl_make_pin(self.tmp, self.decl)
+        for path in ("C:/outside", "C:outside", "C:\\outside", "\\\\server\\share\\repo", "..\\outside"):
+            with self.subTest(path=path):
+                self.assertEqual(self.k.szl_make_pin(self.tmp, {"repos": [{"name": "outside", "path": path}]})["status"], "ERROR")
+                recorded = json.loads(json.dumps(clean_pin))
+                recorded["repos"][0]["path"] = path
+                self.assertEqual(self.k.szl_verify_pin(self.tmp, recorded)["status"], "ERROR")
+
+    def test_symlink_outside_root_is_rejected(self):
+        clean_pin = self.k.szl_make_pin(self.tmp, self.decl)
+        with tempfile.TemporaryDirectory() as outside:
+            link = self.tmp / "linked-outside"
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except (NotImplementedError, OSError) as error:
+                self.skipTest(f"directory symlink unavailable: {error}")
+            try:
+                self.assertEqual(self.k.szl_make_pin(self.tmp, {"repos": [{"name": "outside", "path": link.name}]})["status"], "ERROR")
+                recorded = json.loads(json.dumps(clean_pin))
+                recorded["repos"][0]["path"] = link.name
+                self.assertEqual(self.k.szl_verify_pin(self.tmp, recorded)["status"], "ERROR")
+            finally:
+                link.unlink()
+
+    def test_child_directory_cannot_pin_ancestor_repository(self):
+        declared_root = self.tmp / "code/analysis/declared-root"
+        (declared_root / "child").mkdir(parents=True)
+        inspected = self.k.szl_inspect_repo(declared_root, "child")
+        self.assertEqual(inspected["state"], "NOT_A_REPOSITORY")
+        pin = self.k.szl_make_pin(declared_root, {"repos": [{"name": "child", "path": "child"}]})
+        self.assertEqual((pin["status"], pin["repos"][0]["state"]), ("UNPINNED", "NOT_A_REPOSITORY"))
+
+    def test_empty_or_malformed_pin_cannot_match(self):
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, {"schema": self.k.SCHEMA, "repos": []})["status"], "ERROR")
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, {"schema": self.k.SCHEMA, "repos": [None]})["status"], "ERROR")
+        clean_pin = self.k.szl_make_pin(self.tmp, self.decl)
+        dirty_record = json.loads(json.dumps(clean_pin))
+        dirty_record["repos"][0]["state"] = "DIRTY"
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, dirty_record)["status"], "ERROR")
+        wrong_digest = json.loads(json.dumps(clean_pin))
+        wrong_digest["composite_sha256"] = "0" * 64
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, wrong_digest)["status"], "ERROR")
+        duplicate_name = json.loads(json.dumps(clean_pin))
+        duplicate_name["repos"][1]["name"] = duplicate_name["repos"][0]["name"]
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, duplicate_name)["status"], "ERROR")
+        non_object = json.loads(json.dumps(clean_pin))
+        non_object["repos"][0] = None
+        self.assertEqual(self.k.szl_verify_pin(self.tmp, non_object)["status"], "ERROR")
 
 
 class ResultFragilityTests(unittest.TestCase):
