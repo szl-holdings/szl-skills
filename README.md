@@ -1,7 +1,8 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. Twenty-five skills for
-Claude Science, Claude Code and claude.ai: twenty-three science checks and two evidence skills.
+Executable, offline checks that make scientific claims carry their evidence. This source candidate
+has twenty-six skills for Claude Science, Claude Code and claude.ai: twenty-four science checks
+and two evidence skills.
 The checks use the Python standard library, run without network or credentials, and report what
 they did not verify alongside what they did. Repository pins also use the local Git executable;
 optional session-receipt signing requires szl-receipt-dsse.
@@ -11,6 +12,9 @@ optional session-receipt signing requires szl-receipt-dsse.
 Claude Science: Skills > Import from GitHub, paste:
 
     szl-holdings/szl-skills@v0.4.0
+
+That published v0.4.0 tag contains twenty-three science skills. The new multiplicity skill is
+source-candidate work until a separately reviewed tag and byte readback are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -33,6 +37,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | know whether the 4-bit or ported model still answers like the one you validated | szl-quantization-check | WITHIN_TOLERANCE / DEGRADED with the worst inputs named |
 | name the exact commits of every repository an analysis used | szl-repo-pin | one composite digest, only when every tree is clean; MATCH / DRIFT later |
 | know how many outcome changes stand between a result and p = 0.05 | szl-result-fragility | fragility index against the number lost to follow-up |
+| adjust a complete predeclared family without hiding missing tests | szl-multiplicity-audit | Holm FWER or declared-assumption BH FDR; HOLD if any planned result is missing |
 
 ## Science checks
 
@@ -60,6 +65,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-quantization-check | Does the quantized or ported model agree with the reference on these inputs? | Not accuracy; nothing about inputs not included |
 | szl-repo-pin | Which exact commits, in which repositories, with nothing uncommitted? | Not publication or correctness of the code |
 | szl-result-fragility | How many outcome flips remove significance, compared with the dropouts? | Not effect size, design or adjusted analyses |
+| szl-multiplicity-audit | Were all planned tests reported, and what are their Holm/BH adjusted p-values? | Supplied plan hash is not preregistration; raw p-values and BH dependence are unverified |
 | szl-science-workbench | Dataset, binary/categorical model, math, kernel, calibration and paired checks, with immutable runs and invalidation | Other pack audits use their own CLIs; not an experiment runner |
 
 Every skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract

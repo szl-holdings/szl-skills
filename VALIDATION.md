@@ -2,9 +2,12 @@
 
 The observations below describe the earlier eight-science-skill prerelease. They are
 historical evidence, not measurements of the expanded source candidate or a new run.
-For the current six upgrades and four new packages, including the notice follow-up,
-see [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). Current routing is fourteen total
+For the historical six upgrades and four new packages, including the notice follow-up,
+see [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That candidate had fourteen total
 packages, twelve science skills selected by the installer and two excluded evidence skills.
+The published v0.4.0 tag has twenty-three science skills; this later source candidate adds
+szl-multiplicity-audit as a twenty-fourth. Its synthetic tests and review findings are in
+`tests/test_science_multiplicity.py`; no Claude Science host run is claimed.
 Neither evidence set establishes application import or measured agent efficacy.
 
 ## Checks
