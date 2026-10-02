@@ -90,7 +90,7 @@ def _table_matches(item, quote):
     for number, cell in enumerate(data["table_cells"]):
         if not isinstance(cell, dict) or not isinstance(cell.get("text"), str):
             return None
-        if quote in cell["text"]:
+        if quote == cell["text"]:
             matches.append({"cell_index": number,
                             "row": cell.get("start_row_offset_idx"),
                             "column": cell.get("start_col_offset_idx")})

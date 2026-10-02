@@ -83,7 +83,7 @@ class PaperEvidenceTests(unittest.TestCase):
 
     def test_ambiguous_quote_missing_region_and_missing_caption_fail_closed(self):
         original = copy.deepcopy(self.document)
-        self.document["tables"][0]["data"]["table_cells"].append({"text": "also 12.5 mg/L"})
+        self.document["tables"][0]["data"]["table_cells"].append({"text": "12.5 mg/L"})
         self.save()
         self.assertIn("AMBIGUOUS_QUOTE", self.report()["findings"][0]["issues"])
         self.document = copy.deepcopy(original)
@@ -94,6 +94,18 @@ class PaperEvidenceTests(unittest.TestCase):
         self.document["pictures"][0]["captions"] = []
         self.save()
         self.assertIn("QUOTE_NOT_LOCATED", self.report()["findings"][1]["issues"])
+
+    def test_table_quote_must_equal_entire_cell_not_a_numeric_substring(self):
+        self.document["tables"][0]["data"]["table_cells"][1]["text"] = "112.5 mg/L"
+        self.save()
+        finding = self.report()["findings"][0]
+        self.assertEqual(finding["status"], "UNRESOLVED")
+        self.assertIn("QUOTE_NOT_LOCATED", finding["issues"])
+        self.document["tables"][0]["data"]["table_cells"][1]["text"] = "also 12.5 mg/L"
+        self.save()
+        finding = self.report()["findings"][0]
+        self.assertEqual(finding["status"], "UNRESOLVED")
+        self.assertIn("QUOTE_NOT_LOCATED", finding["issues"])
 
     def test_missing_item_quote_and_wrong_reference_do_not_pass(self):
         self.manifest["claims"][0]["quote"] = "99 mg/L"
