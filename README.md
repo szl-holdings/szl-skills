@@ -1,14 +1,16 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. Twenty-five skills for
-Claude Science, Claude Code and claude.ai: twenty-three science checks and two evidence skills.
+Executable, offline checks that make scientific claims carry their evidence. The current source has
+twenty-six skills for Claude Science, Claude Code and claude.ai: twenty-four science checks and two
+evidence skills. The measurement harmonizer is an unreleased candidate.
 The checks use the Python standard library, run without network or credentials, and report what
 they did not verify alongside what they did. Repository pins also use the local Git executable;
 optional session-receipt signing requires szl-receipt-dsse.
 
 ## Import
 
-Claude Science: Skills > Import from GitHub, paste:
+Claude Science: Skills > Import from GitHub. The last released v0.4.0 pack has twenty-three science
+skills; paste:
 
     szl-holdings/szl-skills@v0.4.0
 
@@ -46,6 +48,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
+| szl-measurement-harmonizer | Do two to four CSV exports align under declared specimen IDs and unit conversions? | Does not infer identity or validate conversion authority |
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
 | szl-negative-control-audit | Do the negative controls actually rule out the mechanism they claim to, and were outcomes retained? | Does not design interventions |
 | szl-analysis-plan-audit | Did the analysis that ran match the frozen plan, or is the result exploratory now? | No p value, power or efficacy |
