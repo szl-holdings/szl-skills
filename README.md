@@ -1,8 +1,9 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. Main now contains
-twenty-six skills: twenty-four science checks and two evidence skills. The immutable v0.4.0
-release below contains twenty-three science checks; the paper evidence audit is not in that tag.
+Executable, offline checks that make scientific claims carry their evidence. This unreleased
+source candidate has twenty-seven skills for Claude Science, Claude Code and claude.ai:
+twenty-five science checks and two evidence skills. The v0.4.0 tag retains twenty-three
+science checks and two evidence skills; paper evidence audit and experiment replay are not in that tag.
 The checks use the Python standard library, run without network or credentials, and report what
 they did not verify alongside what they did. Repository pins also use the local Git executable;
 optional session-receipt signing requires szl-receipt-dsse.
@@ -46,6 +47,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-kernel-comparison | Does the fast implementation give the same numbers, and was the timing fair? | Does not measure energy |
 | szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
+| szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
