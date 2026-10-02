@@ -6,8 +6,15 @@
   four byte-pinned CSV exports using explicitly declared specimen IDs and affine unit
   conversions; ambiguous, incomplete, changed or malformed inputs yield no usable rows.
   Mappings and conversions are declarations, not authenticated identities, calibration,
-  uncertainty analysis or scientific agreement. The source candidate has twenty-nine
-  science tools and two evidence skills; no new tag or Claude Science registration is claimed.
+  uncertainty analysis or scientific agreement. No new tag or Claude Science registration
+  is claimed.
+- Add szl-research-change-impact as a separate bounded import family. It compares retained
+  baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
+  keeps missing required claims visible, and gives a deterministic reassessment order.
+  Supplied digests and synthetic examples do not establish scientific truth or host registration.
+- Current source inventory is thirty-two skills: twenty-four core science tools, two replay/data
+  tools, one each in the paper, assay, multiplicity and change-impact families, and two evidence
+  skills. Each family retains the 1 MB bundle limit; the published v0.5.0-rc.1 tag is unchanged.
 
 ## 0.5.0-rc.1
 

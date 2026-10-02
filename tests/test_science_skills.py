@@ -290,7 +290,7 @@ class PackagingTests(unittest.TestCase):
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
                         if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills",
                                               "szl-paper-evidence-skills", "szl-science-assay-skills",
-                                              "szl-science-multiplicity-skills"}
+                                              "szl-science-multiplicity-skills", "szl-science-change-impact-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
