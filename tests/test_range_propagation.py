@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -156,6 +157,28 @@ class RangeTests(unittest.TestCase):
             second = subprocess.run(command, capture_output=True, text=True, timeout=10)
             self.assertEqual(second.returncode, 2)
             self.assertEqual(output.read_bytes(), snapshot)
+            self.assertEqual({path.name for path in Path(directory).iterdir()},
+                             {"input.json", "report.json"})
+
+    def test_cli_failed_staging_never_publishes_partial_report(self):
+        cli = module_from(SKILL / "scripts" / "run.py", "range_cli")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "report.json"
+            with patch.object(cli.os, "fsync", side_effect=OSError("simulated failure")):
+                with self.assertRaises(OSError):
+                    cli._write_exclusive(output, '{"status":"PASS_DECLARED_BOUNDS"}\n')
+            self.assertFalse(output.exists())
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_cli_unavailable_hard_link_fails_without_report(self):
+        cli = module_from(SKILL / "scripts" / "run.py", "range_cli")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "report.json"
+            with patch.object(cli.os, "link", side_effect=OSError("unsupported")):
+                with self.assertRaises(OSError):
+                    cli._write_exclusive(output, '{"status":"PASS_DECLARED_BOUNDS"}\n')
+            self.assertFalse(output.exists())
+            self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_cli_duplicate_key_invalid_receipt_with_no_echo(self):
         with tempfile.TemporaryDirectory() as directory:

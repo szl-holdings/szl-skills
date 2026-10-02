@@ -5,8 +5,10 @@ import argparse
 from decimal import Decimal
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from kernel import REPORT_SCHEMA, audit  # noqa: E402
@@ -55,6 +57,24 @@ def _load(raw):
         raise ValueError("MALFORMED_JSON") from exc
 
 
+def _write_exclusive(output, rendered):
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                                         prefix=f".{output.name}.", suffix=".tmp",
+                                         dir=output.parent, delete=False) as destination:
+            temporary = Path(destination.name)
+            destination.write(rendered)
+            destination.flush()
+            os.fsync(destination.fileno())
+        # The same-directory hard link publishes complete bytes without ever
+        # replacing an existing target, including across competing writers.
+        os.link(temporary, output)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
@@ -79,8 +99,7 @@ def main(argv=None):
         sys.stdout.write(rendered)
     else:
         try:
-            with args.output.open("x", encoding="utf-8", newline="\n") as destination:
-                destination.write(rendered)
+            _write_exclusive(args.output, rendered)
         except FileExistsError:
             print("OUTPUT_EXISTS", file=sys.stderr)
             return 2
