@@ -2,11 +2,15 @@
 
 The observations below describe the earlier eight-science-skill prerelease. They are
 historical evidence, not measurements of the expanded source candidate or a new run.
-For the earlier six upgrades and four new packages, including the notice follow-up,
-see [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That acceptance document is historical.
-Current source routing is twenty-six total packages: twenty-four science tools selected by the
-installer and two excluded evidence skills. This count is not a new behavioral acceptance result.
-Neither evidence set establishes application import or measured agent efficacy.
+For the later six-upgrade, four-audit candidate and its notice follow-up, see
+[SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That candidate routed fourteen packages:
+twelve science skills selected by its installer and two separate evidence skills.
+Current source routing is twenty-six total packages: twenty-four science tools selected by
+the installer and two excluded evidence skills. This count is not a new behavioral
+acceptance result.
+The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL.md files
+and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These
+historical evidence sets establish neither application import nor measured agent efficacy.
 
 ## Checks
 
@@ -60,7 +64,7 @@ binding was performed, and this is not an external-data benchmark or production 
 In that earlier prerelease, eight individual ZIPs included SKILL.md, explicit resources,
 LICENSE and NOTICE. The largest
 workbench ZIP was approximately 34 KB compressed and 93 KB uncompressed; all eight total
-about 104 KB compressed. These sizes have not been measured for the current twelve-skill
+about 104 KB compressed. These sizes were not measured for the later twelve-skill
 candidate. No weights, private second-brain records or downloaded study data
 are included. Selected artifact downloads are explicit and their byte receipts are unsigned.
 

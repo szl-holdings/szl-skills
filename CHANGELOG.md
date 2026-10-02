@@ -53,7 +53,7 @@
   cover the new CLIs. 229 tests; selfcheck PASS; skills/ under 1 MB.
 - Scientific and agent performance remain NOT_MEASURED until a pilot runs in Claude Science.
 
-## Unreleased science acceptance candidate
+## Historical science acceptance candidate (before 0.3.0)
 
 - Substantially upgrade six existing science packages and add four original offline audits.
   Source inventory is fourteen packages: twelve science and two separate evidence skills.

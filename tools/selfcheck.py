@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Self-check for szl-skills. Stdlib only. Exit 1 on any failure."""
 import json, pathlib, re, sys, unittest
+import skill_inventory
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
@@ -16,6 +17,10 @@ try:
     json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
 except Exception as e:
     fails.append("marketplace.json invalid: %s" % e)
+try:
+    skill_inventory.check(ROOT)
+except (OSError, ValueError, KeyError, TypeError) as e:
+    fails.append("source skill inventory: %s" % e)
 
 if not SKILLS.is_dir():
     fails.append("skills/ folder missing")
