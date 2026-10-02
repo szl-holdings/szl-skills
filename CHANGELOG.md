@@ -11,9 +11,12 @@
   QC recovery, sample range, quantification minimum and final-result uncertainty declarations.
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
+- Add szl-multiplicity-audit as a separate import family: Holm FWER or declared-assumption
+  BH FDR over a complete predeclared family; HOLD if any planned result is missing. Plan hash
+  is not preregistration. It stays outside the 1 MB core bundle.
 - Source inventory becomes twenty-four core science tools, one replay tool, one paper audit,
-  one assay audit and two evidence skills. This source release is not proof of Claude Science
-  host registration, method validation or clinical use.
+  one assay audit, one multiplicity audit and two evidence skills. This source release is not
+  proof of Claude Science host registration, method validation or clinical use.
 - Add szl-clustered-replication: distinguish observations from declared experimental units,
   equal-cluster paired effects, an exact conditional cluster sign-flip calculation and
   leave-one-cluster sensitivity. Missing commitments or undeclared assumptions stay
@@ -25,7 +28,7 @@
   technical replication; test execution and app efficacy are reported separately.
 - Preserve the separately developed experiment replay contract and keep paper and assay audits
   outside the core bundle. All four science families retain complete helpers, licenses and
-  notices and the 1 MB SDK bundle limit; the shared installer can attach all twenty-seven tools
+  notices and the 1 MB SDK bundle limit; the shared installer can attach all twenty-eight tools
   across four separately verified calls.
 
 ## 0.4.0

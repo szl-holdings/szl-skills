@@ -93,6 +93,17 @@ class InventoryTests(unittest.TestCase):
         installer.write_text(installer.read_text() + "ASSAY_NAMES = ['szl-assay']\n")
         self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
 
+    def test_multiplicity_family_requires_an_exact_separate_installer_selection(self):
+        directory = self.root / "skills" / "szl-multiplicity"; directory.mkdir()
+        (directory / "SKILL.md").write_text("---\nname: szl-multiplicity\ndescription: fixture\n---\n")
+        self.market["plugins"].append({"name": "szl-science-multiplicity-skills", "skills": ["./skills/szl-multiplicity"]})
+        self.save_market()
+        with self.assertRaisesRegex(ValueError, "installer/multiplicity catalog mismatch"):
+            skill_inventory.build(self.root)
+        installer = self.root / "tools" / "install_claude_science.py"
+        installer.write_text(installer.read_text() + "MULTIPLICITY_NAMES = ['szl-multiplicity']\n")
+        self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
+
     def test_catalog_orphan_and_duplicate_membership_fail(self):
         self.market["plugins"][0]["skills"].append("./skills/szl-missing")
         self.save_market()

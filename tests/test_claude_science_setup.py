@@ -95,20 +95,23 @@ class SetupTests(unittest.TestCase):
         replay = SETUP["bundle"](ROOT, family="replay")
         paper = SETUP["bundle"](ROOT, family="paper")
         assay = SETUP["bundle"](ROOT, family="assay")
+        multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
         self.assertEqual(set(replay), {"szl-experiment-replay"})
         self.assertEqual(set(paper), {"szl-paper-evidence-audit"})
         self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
-        for resources in (self.resources, replay, paper, assay):
+        self.assertEqual(set(multiplicity), {"szl-multiplicity-audit"})
+        for resources in (self.resources, replay, paper, assay, multiplicity):
             self.assertLessEqual(sum(len(v.encode()) for files in resources.values() for v in files.values()), 1000000)
         SETUP["install"](self.host, self.resources, self.path)
         replay_result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay")
         self.assertEqual(replay_result["family"], "replay")
         paper_result = SETUP["install"](self.host, paper, self.path.with_name("paper.json"), family="paper")
         self.assertEqual(paper_result["family"], "paper")
-        result = SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay")
+        SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay")
+        result = SETUP["install"](self.host, multiplicity, self.path.with_name("multiplicity.json"), family="multiplicity")
         self.assertEqual(set(result["agent"]["skillNames"]),
-                         set(SETUP["NAMES"] + SETUP["REPLAY_NAMES"] + SETUP["PAPER_NAMES"] + SETUP["ASSAY_NAMES"]))
-        self.assertEqual(result["family"], "assay")
+                         set(SETUP["NAMES"] + SETUP["REPLAY_NAMES"] + SETUP["PAPER_NAMES"] + SETUP["ASSAY_NAMES"] + SETUP["MULTIPLICITY_NAMES"]))
+        self.assertEqual(result["family"], "multiplicity")
         self.assertFalse(result["agent"]["unrestricted"])
         self.assertEqual(result["agent"]["connectors"], [])
 
@@ -127,6 +130,10 @@ class SetupTests(unittest.TestCase):
             SETUP["install"](self.host, {}, self.path, family="paper")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-paper-evidence-audit": {"huge": "x" * 1000001}}, self.path, family="paper")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {}, self.path, family="multiplicity")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-multiplicity-audit": {"huge": "x" * 1000001}}, self.path, family="multiplicity")
         self.assertEqual(self.host.skills.files, {})
         self.assertEqual(self.host.agents.profiles, {})
 
