@@ -1,0 +1,73 @@
+{
+  "schema": "szl.package-result-pilot.v1",
+  "evidence_kind": "synthetic_fixture",
+  "expected": {
+    "project": "synthetic-math",
+    "version": "0.1.0",
+    "wheel_filename": "synthetic_math-0.1.0-py3-none-any.whl",
+    "wheel_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_repository": "example-lab/synthetic-math",
+    "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "source_ref": "refs/tags/v0.1.0",
+    "import_name": "synthetic_math",
+    "session_id": "synthetic-run-001"
+  },
+  "observed": {
+    "pypi": {
+      "project": "synthetic-math",
+      "version": "0.1.0",
+      "filename": "synthetic_math-0.1.0-py3-none-any.whl",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "provenance": {
+      "publisher_repository": "example-lab/synthetic-math",
+      "source_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_ref": "refs/tags/v0.1.0",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "github": {
+      "repository": "example-lab/synthetic-math",
+      "tag_ref": "refs/tags/v0.1.0",
+      "resolved_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "install_invocation": {
+      "tool": "pip",
+      "dry_run": false,
+      "exit_code": 0,
+      "interpreter_id": "synthetic-interpreter-001"
+    },
+    "install_report": {
+      "version": "1",
+      "install": [
+        {
+          "metadata": {"name": "synthetic-math", "version": "0.1.0"},
+          "download_info": {
+            "url": "https://example.invalid/synthetic_math-0.1.0-py3-none-any.whl",
+            "archive_info": {
+              "hashes": {"sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+            }
+          },
+          "is_yanked": false
+        }
+      ]
+    },
+    "inspect_report": {
+      "version": "1",
+      "installed": [
+        {
+          "metadata": {"name": "synthetic_math", "version": "0.1.0"},
+          "installer": "pip"
+        }
+      ]
+    },
+    "session": {
+      "session_id": "synthetic-run-001",
+      "import_name": "synthetic_math",
+      "interpreter_id": "synthetic-interpreter-001",
+      "install_report_sha256": "fb2cb2f77687a30f91dc80df259a878d505f715ab1482a84be06927d37a23777",
+      "environment_report_sha256": "c23f429e6528f6025291591029e7682a4968767d30a41eec37ef99b21ec542a3",
+      "input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "output_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  }
+}

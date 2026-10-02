@@ -7,10 +7,23 @@ This is observational checking, not a sandbox against a hostile concurrent files
 No extra export files are permitted. A host display-name alias is recorded explicitly;
 the exported SKILL.md payload must retain its original source identity and bytes.
 The identity field must use one literal unquoted `name: lowercase-hyphenated-name`
-line. Duplicate, quoted or otherwise unsupported identity syntax is rejected; this
-pilot deliberately does not implement general YAML interpretation or importer security.
-Top-level keys must be literal unquoted identifiers; quoted keys, merge keys and
-tagged key syntax are outside this subset and fail closed. Quoted descriptions are allowed.
+line. Names start with a lowercase letter and are at most 64 characters; ambiguous
+implicit-type tokens (`true`, `false`, `null`, `yes`, `no`, `on`, `off`, `y`, `n`)
+are rejected. Numeric/date-like names are outside this subset.
+Frontmatter is a flat mapping of unique literal unquoted identifier keys to nonempty
+single-line scalar values. Blank lines and comments are allowed. Indented non-comment
+content, empty values, duplicate fields, quoted/merge keys, block or flow structures,
+anchors, aliases, tags and multiline quoted values fail closed. Single-quoted values
+must close on the same line (doubled quotes are allowed); double-quoted values must
+be valid JSON strings on one line. Plain values cannot start with YAML structural
+indicators or contain a colon followed by ASCII space/tab. Quoted names are rejected.
+Structural trimming uses ASCII space/tab only. The checker does not implement
+general YAML interpretation or importer security.
+CRLF, CR and LF are normalized only for structural frontmatter checks, which all
+use the same line view. Retained bytes and bundle hashes are never normalized.
+Other Python `splitlines` separators (VT, FF, NEL, LS and PS) are rejected inside
+frontmatter; they may occur in the opaque Markdown body. This is a conservative
+subset, not a general YAML parser.
 
 Trials JSON has exactly these fields:
 

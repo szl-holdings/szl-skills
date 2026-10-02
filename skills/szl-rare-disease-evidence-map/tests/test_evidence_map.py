@@ -2,6 +2,7 @@
 
 import copy
 import hashlib
+import importlib.util
 import json
 import pathlib
 import subprocess
@@ -10,10 +11,20 @@ import tempfile
 import unittest
 
 SKILL = pathlib.Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(SKILL))
-from kernel import EvidenceMapError, map_evidence, read_input
-
 ASSETS = SKILL / "assets"
+
+
+def module_from(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+kernel = module_from(SKILL / "kernel.py", "rare_disease_evidence_map_kernel")
+EvidenceMapError = kernel.EvidenceMapError
+map_evidence = kernel.map_evidence
+read_input = kernel.read_input
 
 
 def fixture():
