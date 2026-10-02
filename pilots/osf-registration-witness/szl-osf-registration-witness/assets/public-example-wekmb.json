@@ -1,0 +1,8 @@
+{
+  "schema": "szl.osf-registration-witness.v1",
+  "registration_id": "wekmb",
+  "file_id": "650233e76d1e8962ef15164c",
+  "expected_path": "/Archive of OSF Storage/Study design subdocument.pdf",
+  "expected_sha256": "19bc273f9c96c3e795b9e44c1967762ae1f975aaae2d02f24e673256f786eeba",
+  "artifact_kind": "opaque_file"
+}
