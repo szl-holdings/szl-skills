@@ -86,8 +86,8 @@ def szl_change_graph(graph):
     if not isinstance(graph, dict) or graph.get("schema") != "szl.research-anatomy.v1":
         raise ValueError("Expected a research-anatomy.v1 snapshot")
     nodes = graph.get("nodes")
-    if not isinstance(nodes, list) or not 1 <= len(nodes) <= 1000:
-        raise ValueError("Each snapshot must contain 1..1000 nodes")
+    if not isinstance(nodes, list) or len(nodes) > 1000:
+        raise ValueError("Each snapshot must contain 0..1000 nodes")
     index, deps, edge_count = {}, {}, 0
     kinds = {"question", "claim", "paper", "dataset", "code", "model", "kernel", "run", "proof", "decision"}
     for node in nodes:
