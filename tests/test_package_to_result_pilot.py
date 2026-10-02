@@ -181,7 +181,7 @@ class PackageToResultPilotTests(unittest.TestCase):
         for _ in range(1200):
             current["nested"] = {}
             current = current["nested"]
-        self.assert_finding(record, "REFUSED", "NON_JSON_VALUE")
+        self.assert_finding(record, "REFUSED", "RECORD_TOO_DEEP")
 
 
 if __name__ == "__main__":

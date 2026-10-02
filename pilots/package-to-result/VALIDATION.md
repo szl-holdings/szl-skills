@@ -21,6 +21,8 @@ distribution identity, and session links to the exact supplied pip reports. `GAP
 `INCOMPLETE`, and `REFUSED` retain disagreement, absent evidence, and malformed or ambiguous
 inputs separately. `kernel.loads_strict` rejects duplicate JSON keys, non-finite numbers and
 oversized input. A record is capped at 128 KiB; pip report lists are capped at 1,000 entries.
+Nested records are capped at 64 levels and 10,000 visited values, independent of platform-specific
+JSON recursion behavior.
 
 The receipt always says `attestation_cryptographically_verified: false`,
 `actual_installation_observed: false`, `analysis_execution_observed: false`, and

@@ -11,6 +11,8 @@ from urllib.parse import unquote, urlsplit
 SCHEMA = "szl.package-result-pilot.v1"
 RECEIPT_SCHEMA = "szl.package-result-pilot.receipt.v1"
 MAX_BYTES = 128 * 1024
+MAX_DEPTH = 64
+MAX_NODES = 10_000
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 _NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?\Z")
@@ -26,6 +28,22 @@ class _Missing(ValueError):
 
 class _Invalid(ValueError):
     pass
+
+
+def _enforce_structure_bounds(value: object) -> None:
+    pending = [(value, 0)]
+    visited = 0
+    while pending:
+        node, depth = pending.pop()
+        visited += 1
+        if visited > MAX_NODES:
+            raise _Invalid("RECORD_TOO_COMPLEX")
+        if depth > MAX_DEPTH:
+            raise _Invalid("RECORD_TOO_DEEP")
+        if isinstance(node, dict):
+            pending.extend((child, depth + 1) for child in node.values())
+        elif isinstance(node, list):
+            pending.extend((child, depth + 1) for child in node)
 
 
 def _canonical(value: object) -> bytes:
@@ -66,6 +84,7 @@ def loads_strict(data: bytes | str) -> dict:
         raise ValueError("JSON_TOO_DEEP") from exc
     if not isinstance(value, dict):
         raise ValueError("JSON_ROOT_NOT_OBJECT")
+    _enforce_structure_bounds(value)
     return value
 
 
@@ -148,6 +167,7 @@ def check(record: dict) -> dict:
     try:
         if not isinstance(record, dict):
             raise _Invalid("RECORD_NOT_OBJECT")
+        _enforce_structure_bounds(record)
         raw = _canonical(record)
         if len(raw) > MAX_BYTES:
             raise _Invalid("RECORD_TOO_LARGE")
