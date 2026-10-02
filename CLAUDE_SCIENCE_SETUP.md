@@ -1,15 +1,16 @@
 # Claude Science setup
 
-The source candidate contains thirty skills: twenty-eight science tools and two evidence
-skills. The default core family selects twenty-four science tools; separate replay, paper, assay
-and change families select szl-experiment-replay, szl-paper-evidence-audit,
-szl-assay-measurement-audit and szl-research-change-impact. Each complete family must fit the
-existing 1 MB resource limit. All five exclude szl-typesafe-ai and szl-governed-decision.
-The published v0.4.0 tag contains twenty-three science tools and two evidence skills; clustered
-replication, replay, paper evidence, the assay audit and change-impact remain source candidates
-until separately verified release. The historical
-v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills does not create a
-specialist. The workbench integrates seven core checks; other tools run separately.
+This source candidate contains thirty-one skills: twenty-nine science tools and two evidence
+skills. The default core family selects twenty-four science tools; separate replay, paper,
+assay, multiplicity and change-impact families select szl-experiment-replay,
+szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
+szl-research-change-impact. Each complete family must fit the existing 1 MB resource limit.
+All six families exclude szl-typesafe-ai and szl-governed-decision. The stable v0.4.0 tag contains
+twenty-three science tools and two evidence skills; clustered replication, replay, paper evidence
+and the assay audit were added in v0.5.0-rc.1. Multiplicity and change impact remain source
+candidates. The historical v0.2.0-rc.1 tag contains eight
+science skills. GitHub importing skills does not create a specialist. The workbench integrates
+seven core checks; other tools run separately.
 SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does not cover
 all current science tools.
 
@@ -35,12 +36,15 @@ paper_receipt = setup["install"](host, paper, "claude-science-paper-receipt.json
 assay = setup["bundle"](".", family="assay")
 assay_receipt = setup["install"](host, assay, "claude-science-assay-receipt.json",
                                  update=True, family="assay")
+multiplicity = setup["bundle"](".", family="multiplicity")
+multiplicity_receipt = setup["install"](host, multiplicity, "claude-science-multiplicity-receipt.json",
+                                 update=True, family="multiplicity")
 change = setup["bundle"](".", family="change")
 change_receipt = setup["install"](host, change, "claude-science-change-receipt.json",
                                   update=True, family="change")
 print({"core": receipt["status"], "replay": replay_receipt["status"],
        "paper": paper_receipt["status"], "assay": assay_receipt["status"],
-       "change": change_receipt["status"]})
+       "multiplicity": multiplicity_receipt["status"], "change": change_receipt["status"]})
 ```
 
 The SDK procedure stages twenty-four core science tools, checks returned sidecar gates for edited
@@ -76,4 +80,3 @@ This host SDK is documented by the installed Claude Science customize skill. It 
 available as a tool in the Codex session that authored this pack; actual application
 registration and this agent pilot have not been claimed as completed here. SDK contract
 tests use a test double and are not application-import evidence.
-The GitHub source branch and draft PR are not a Claude Science import or update receipt.

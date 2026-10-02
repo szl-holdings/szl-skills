@@ -1,0 +1,27 @@
+{
+  "skill": "szl-range-propagation",
+  "schema": "szl.trigger-eval.v1",
+  "note": "Twenty proposed trigger probes: ten intended matches and ten near misses. They have not been run against an agent; trigger rates are NOT_MEASURED.",
+  "queries": [
+    {"query": "Our instrument length is 1.9 to 2.1 m and width is 0.9 to 1.1 m. Does the claimed area range contain every possible product?", "should_trigger": true},
+    {"query": "Check whether the reported bounds on this sum of bounded measurements are conservative.", "should_trigger": true},
+    {"query": "My interval calculation uses centimeters and meters. Verify the SI conversions and the final range.", "should_trigger": true},
+    {"query": "Audit this chain of bounded differences and ratios and tell me if the published range is too narrow.", "should_trigger": true},
+    {"query": "Could the denominator cross zero anywhere in the declared measurement range?", "should_trigger": true},
+    {"query": "Do these inclusive output bounds enclose the result for all declared input intervals?", "should_trigger": true},
+    {"query": "A reviewer says our worst-case pressure range is understated. Recompute it from bounded force and area.", "should_trigger": true},
+    {"query": "Propagate exact decimal input ranges through this two-step arithmetic graph, including units.", "should_trigger": true},
+    {"query": "Check the conservative range of x minus x without assuming the two appearances are independent measurements.", "should_trigger": true},
+    {"query": "Does the claimed energy interval cover every result of these bounded power and time inputs?", "should_trigger": true},
+    {"query": "Compute a 95 percent confidence interval for the mean of these observations.", "should_trigger": false},
+    {"query": "Estimate measurement uncertainty following the GUM and report coverage probability.", "should_trigger": false},
+    {"query": "Fit a Bayesian posterior credible interval for this parameter.", "should_trigger": false},
+    {"query": "Use Monte Carlo simulation to model the correlation between two uncertain sensors.", "should_trigger": false},
+    {"query": "Are these data licensed for reuse in a commercial model?", "should_trigger": false},
+    {"query": "Prove symbolically that x minus x equals zero for all real x.", "should_trigger": false},
+    {"query": "Convert Celsius to Kelvin and audit the calibration curve.", "should_trigger": false},
+    {"query": "Does the dataset contain train-test leakage?", "should_trigger": false},
+    {"query": "Evaluate whether this numerical kernel is faster than the reference implementation.", "should_trigger": false},
+    {"query": "Check whether the clinical assay is qualified for patient care.", "should_trigger": false}
+  ]
+}

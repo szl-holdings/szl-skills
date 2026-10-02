@@ -20,8 +20,9 @@ def package_skills(destination, revision=None):
         raise ValueError("Release revision must be a full immutable 40-character commit")
     market = json.loads(git_bytes(revision, ".claude-plugin/marketplace.json") if revision else (ROOT / ".claude-plugin" / "marketplace.json").read_bytes())
     selected = [skill for plugin in market["plugins"]
-                if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills", "szl-science-assay-skills",
-                                     "szl-science-change-impact-skills", "szl-paper-evidence-skills"}
+                if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills",
+                                       "szl-paper-evidence-skills", "szl-science-assay-skills",
+                                       "szl-science-multiplicity-skills", "szl-science-change-impact-skills"}
                 for skill in plugin["skills"]]
     if len(selected) != len(set(selected)):
         raise ValueError("Duplicate skill across science families")
@@ -50,7 +51,8 @@ def package_skills(destination, revision=None):
         archive = destination / (skill.name + ".zip")
         with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED) as z:
             for name, data in sorted(contents.items()):
-                member = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                # Manual claude.ai upload requires one enclosing skill directory.
+                member = zipfile.ZipInfo(skill.name + "/" + name, date_time=(1980, 1, 1, 0, 0, 0))
                 member.compress_type = zipfile.ZIP_DEFLATED
                 member.external_attr = 0o100644 << 16
                 z.writestr(member, data)

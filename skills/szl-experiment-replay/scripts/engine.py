@@ -20,6 +20,7 @@ OPERATION = "csv_column_mean_v1"
 MAX_CSV = 256 * 1024
 MAX_REFERENCE = 4096
 MAX_JSON = 8192
+MAX_ENGINE = 128 * 1024
 MAX_ROWS = 10000
 MAX_COLUMNS = 64
 DECIMAL = re.compile(r"-?(?:0|[1-9][0-9]{0,17})(?:\.[0-9]{1,18})?\Z")
@@ -186,11 +187,23 @@ def _file_pin(root, relative, limit):
 
 def _engine_hash():
     source = pathlib.Path(__file__)
-    if _is_reparse(source.lstat()):
-        raise ValueError("engine is a symlink or reparse point")
-    raw = source.read_bytes()
-    if len(raw) > 128 * 1024:
+    before = source.lstat()
+    if _is_reparse(before) or not stat.S_ISREG(before.st_mode):
+        raise ValueError("engine is not a regular file")
+    if before.st_size > MAX_ENGINE:
         raise ValueError("engine exceeds byte limit")
+    with source.open("rb") as stream:
+        opened = os.fstat(stream.fileno())
+        if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise ValueError("engine changed during opening")
+        raw = stream.read(MAX_ENGINE + 1)
+        finished = os.fstat(stream.fileno())
+    after = source.lstat()
+    identity = lambda info: (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+    if (_is_reparse(after) or not stat.S_ISREG(after.st_mode) or len(raw) > MAX_ENGINE
+            or identity(before) != identity(opened) or identity(opened) != identity(finished)
+            or identity(finished) != identity(after)):
+        raise ValueError("engine changed or exceeds byte limit")
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -259,7 +272,7 @@ def replay(root, pin):
     try:
         _validate_pin(pin)
     except (ValueError, TypeError, OverflowError, RecursionError):
-        return _receipt(pin, "REFUSED", "INVALID_PIN")
+        return _receipt(None, "REFUSED", "INVALID_PIN")
     try:
         engine_hash = _engine_hash()
     except (OSError, ValueError):

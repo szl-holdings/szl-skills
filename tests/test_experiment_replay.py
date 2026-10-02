@@ -1,6 +1,7 @@
 """Synthetic, offline acceptance tests for the fixed experiment replay engine."""
 # SPDX-License-Identifier: Apache-2.0
 
+import ast
 import contextlib
 import hashlib
 import io
@@ -11,10 +12,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "szl-experiment-replay"
-ENGINE = runpy.run_path(str(SKILL / "kernel.py"))
+ENGINE = runpy.run_path(str(SKILL / "scripts" / "engine.py"))
 CLI = runpy.run_path(str(SKILL / "scripts" / "run.py"))
 
 
@@ -41,7 +43,7 @@ class ExperimentReplayTests(unittest.TestCase):
         self.assertEqual(result["absolute_error"], "0.0")
         self.assertEqual(pin["input"]["sha256"], hashlib.sha256((self.root / "assets" / "synthetic.csv").read_bytes()).hexdigest())
         self.assertEqual(pin["reference"]["sha256"], hashlib.sha256((self.root / "assets" / "expected.json").read_bytes()).hexdigest())
-        self.assertEqual(pin["engine_sha256"], hashlib.sha256((SKILL / "kernel.py").read_bytes()).hexdigest())
+        self.assertEqual(pin["engine_sha256"], hashlib.sha256((SKILL / "scripts" / "engine.py").read_bytes()).hexdigest())
         self.assertEqual(result, ENGINE["replay"](self.root, pin))
         self.assertEqual((result["evidence_scope"], result["signed"], result["independent_witness"], result["scientific_claims_verified"]),
                          ("SAME_HOST_LOCAL", False, False, False))
@@ -111,6 +113,43 @@ class ExperimentReplayTests(unittest.TestCase):
         result = ENGINE["replay"](self.root, pin)
         self.assertEqual((result["status"], result["reason"]), ("REFUSED", "INVALID_PIN"))
         self.assertEqual(result["execution"], "NOT_RUN")
+        self.assertIsNone(result["pin_sha256"])
+
+    def test_missing_and_malformed_on_disk_pins_retain_refusal_receipts(self):
+        (self.root / "malformed.json").write_text('{"pin_sha256":"' + "a" * 64 + '",', encoding="utf-8")
+        for pin_name, receipt_name, reason in (("missing.json", "missing-receipt.json", "PIN_MISSING"),
+                                               ("malformed.json", "malformed-receipt.json", "INVALID_PIN")):
+            with self.subTest(pin=pin_name), contextlib.redirect_stdout(io.StringIO()):
+                code = CLI["main"](["replay", pin_name, "--root", str(self.root), "--receipt", receipt_name])
+                self.assertEqual(code, 2)
+                receipt = json.loads((self.root / receipt_name).read_text(encoding="utf-8"))
+                self.assertEqual((receipt["status"], receipt["reason"], receipt["execution"]),
+                                 ("REFUSED", reason, "NOT_RUN"))
+                self.assertIsNone(receipt["pin_sha256"])
+                self.assertRegex(receipt["receipt_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_oversized_engine_is_refused_before_opening(self):
+        source = self.root / "oversized_engine.py"
+        source.write_bytes(b"x" * (ENGINE["MAX_ENGINE"] + 1))
+        engine_hash = ENGINE["_engine_hash"]
+        with mock.patch.dict(engine_hash.__globals__, {"__file__": str(source)}), \
+             mock.patch.object(pathlib.Path, "open", side_effect=AssertionError("oversized engine opened")):
+            with self.assertRaisesRegex(ValueError, "engine exceeds byte limit"):
+                engine_hash()
+
+    def test_installer_selected_replay_resources_are_cli_only(self):
+        installer = runpy.run_path(str(ROOT / "tools" / "install_claude_science.py"))
+        resources = installer["bundle"](ROOT, family="replay")
+        self.assertEqual(set(resources), {"szl-experiment-replay"})
+        files = resources["szl-experiment-replay"]
+        self.assertEqual(set(files), {"SKILL.md", "LICENSE", "NOTICE", "scripts/run.py",
+                                      "scripts/engine.py", "assets/declaration.json",
+                                      "assets/synthetic.csv", "assets/expected.json"})
+        self.assertNotIn("kernel.py", files)
+        for relative in ("scripts/run.py", "scripts/engine.py"):
+            with self.subTest(resource=relative):
+                ast.parse(files[relative], filename=relative)
+        self.assertLessEqual(sum(len(content.encode()) for content in files.values()), 1000000)
 
     def test_existing_receipt_is_not_overwritten(self):
         original = (self.root / "assets" / "expected.json").read_bytes()

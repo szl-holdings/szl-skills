@@ -91,16 +91,18 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(len(self.host.skills.files), 1)
         self.assertEqual(self.host.skills.published, [])
 
-    def test_five_bounded_families_attach_all_tools_without_replacing_profile(self):
+    def test_six_bounded_families_attach_all_tools_without_replacing_profile(self):
         replay = SETUP["bundle"](ROOT, family="replay")
         paper = SETUP["bundle"](ROOT, family="paper")
         assay = SETUP["bundle"](ROOT, family="assay")
         change = SETUP["bundle"](ROOT, family="change")
+        multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
         self.assertEqual(set(replay), {"szl-experiment-replay"})
         self.assertEqual(set(paper), {"szl-paper-evidence-audit"})
         self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
         self.assertEqual(set(change), {"szl-research-change-impact"})
-        for resources in (self.resources, replay, paper, assay, change):
+        self.assertEqual(set(multiplicity), {"szl-multiplicity-audit"})
+        for resources in (self.resources, replay, paper, assay, change, multiplicity):
             self.assertLessEqual(sum(len(v.encode()) for files in resources.values() for v in files.values()), 1000000)
         SETUP["install"](self.host, self.resources, self.path)
         replay_result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay")
@@ -108,9 +110,11 @@ class SetupTests(unittest.TestCase):
         paper_result = SETUP["install"](self.host, paper, self.path.with_name("paper.json"), family="paper")
         self.assertEqual(paper_result["family"], "paper")
         SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay")
+        multiplicity_result = SETUP["install"](self.host, multiplicity, self.path.with_name("multiplicity.json"), family="multiplicity")
+        self.assertEqual(multiplicity_result["family"], "multiplicity")
         result = SETUP["install"](self.host, change, self.path.with_name("change.json"), family="change")
         self.assertEqual(set(result["agent"]["skillNames"]),
-                         set(SETUP["NAMES"] + SETUP["REPLAY_NAMES"] + SETUP["PAPER_NAMES"] + SETUP["ASSAY_NAMES"] + SETUP["CHANGE_NAMES"]))
+                         set(SETUP["NAMES"] + SETUP["REPLAY_NAMES"] + SETUP["PAPER_NAMES"] + SETUP["ASSAY_NAMES"] + SETUP["MULTIPLICITY_NAMES"] + SETUP["CHANGE_NAMES"]))
         self.assertEqual(result["family"], "change")
         self.assertEqual(result["skills"]["szl-research-change-impact"]["sidecar_gate"]["ok"], True)
         self.assertFalse(result["agent"]["unrestricted"])
@@ -126,6 +130,8 @@ class SetupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="change")
         with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-research-change-impact": {"huge": "x" * 1000001}}, self.path, family="change")
+        with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-assay-measurement-audit": {"huge": "x" * 1000001}}, self.path, family="assay")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001}}, self.path, family="replay")
@@ -133,6 +139,10 @@ class SetupTests(unittest.TestCase):
             SETUP["install"](self.host, {}, self.path, family="paper")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-paper-evidence-audit": {"huge": "x" * 1000001}}, self.path, family="paper")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {}, self.path, family="multiplicity")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-multiplicity-audit": {"huge": "x" * 1000001}}, self.path, family="multiplicity")
         self.assertEqual(self.host.skills.files, {})
         self.assertEqual(self.host.agents.profiles, {})
 

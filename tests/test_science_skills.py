@@ -276,7 +276,7 @@ class PackagingTests(unittest.TestCase):
             for report in first:
                 with zipfile.ZipFile(pathlib.Path(temp) / "one" / report["archive"]) as archive:
                     expected = package["git_bytes"](revision, "skills/" + report["skill"] + "/SKILL.md")
-                    self.assertEqual(archive.read("SKILL.md"), expected)
+                    self.assertEqual(archive.read(report["skill"] + "/SKILL.md"), expected)
             with self.assertRaises(ValueError):
                 package["package_skills"](pathlib.Path(temp) / "bad", "main")
 
@@ -288,17 +288,22 @@ class PackagingTests(unittest.TestCase):
             reports = package["package_skills"](destination)
             market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
-                        if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills", "szl-science-assay-skills",
-                                              "szl-science-change-impact-skills", "szl-paper-evidence-skills"}
+                        if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills",
+                                              "szl-paper-evidence-skills", "szl-science-assay-skills",
+                                              "szl-science-multiplicity-skills", "szl-science-change-impact-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
                 with self.subTest(skill=report["skill"]):
-                    unpacked = destination / ("imported-" + report["skill"])
+                    extraction = destination / ("imported-" + report["skill"])
+                    unpacked = extraction / report["skill"]
                     with zipfile.ZipFile(destination / report["archive"]) as z:
-                        self.assertTrue({"SKILL.md", "LICENSE", "NOTICE"} <= set(z.namelist()))
+                        names = set(z.namelist())
+                        self.assertTrue({report["skill"] + "/" + name for name in
+                                         ("SKILL.md", "LICENSE", "NOTICE")} <= names)
+                        self.assertTrue(all(name.startswith(report["skill"] + "/") for name in names))
                         self.assertLess(report["uncompressed_bytes"], 200000)
-                        z.extractall(unpacked)
+                        z.extractall(extraction)
                     if report["skill"] == "szl-science-workbench":
                         project = destination / "standalone-project"
                         init = subprocess.run([sys.executable, "-B", str(unpacked / "scripts" / "workbench.py"), "init", str(project)], capture_output=True, text=True)
@@ -377,6 +382,9 @@ class PackagingTests(unittest.TestCase):
                     elif report["skill"] == "szl-clustered-replication":
                         lock = json.loads((unpacked / "assets" / "fixture-lock.json").read_bytes())
                         command.extend(["--expected-plan-sha256", lock["plan_sha256"]])
+                    elif report["skill"] == "szl-multiplicity-audit":
+                        command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
+                                   str(unpacked / "assets" / "plan.json"), str(unpacked / "assets" / "results.json")]
                     p = subprocess.run(command, capture_output=True, text=True)
                     self.assertEqual(p.returncode, 0, p.stderr)
                     json.loads(p.stdout)
@@ -384,7 +392,7 @@ class PackagingTests(unittest.TestCase):
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
         for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
                              "szl-negative-control-audit", "szl-analysis-plan-audit", "szl-clustered-replication",
-                             "szl-assay-measurement-audit"]:
+                             "szl-multiplicity-audit", "szl-assay-measurement-audit"]:
             with self.subTest(skill=name):
                 path = ROOT / "skills" / name / "kernel.py"
                 tree = ast.parse(path.read_text())

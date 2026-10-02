@@ -103,6 +103,9 @@ def build(root):
     change = set(installer_names(root, "CHANGE_NAMES", required=False))
     if change != set(grouped.get("szl-science-change-impact-skills", [])) or change & (selected | replay | paper | assay):
         raise ValueError("installer/change catalog mismatch")
+    multiplicity = set(installer_names(root, "MULTIPLICITY_NAMES", required=False))
+    if multiplicity != set(grouped.get("szl-science-multiplicity-skills", [])) or multiplicity & (selected | replay | paper | assay | change):
+        raise ValueError("installer/multiplicity catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",
