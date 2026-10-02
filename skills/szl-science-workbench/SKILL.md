@@ -1,6 +1,6 @@
 ---
 name: szl-science-workbench
-description: "Runs a resumable local research project that connects the SZL science checks (claim ledger, numerical math checks, dataset leakage audit, binary or categorical model scoring, kernel comparison, paired qualification, file capsule) over the project's actual bytes, records immutable runs, and invalidates downstream conclusions when any input changes. Use when the user wants all checks on one project directory, wants to resume or re-check a project, or asks 'what changed since last run'. Start here if unsure which single check to use. Not an experiment runner or a model trainer."
+description: "Runs a resumable local project with selected dataset, binary/categorical model, numerical math, kernel, calibration-benchmark and paired checks; retains an anatomy graph, byte hashes and immutable capsules. Use to run these supported checks together, resume a project or determine which dependent conclusions changed. Other science-pack tools run separately through their own CLIs. Not an experiment runner, model trainer or dispatcher for every science skill."
 license: Apache-2.0
 ---
 

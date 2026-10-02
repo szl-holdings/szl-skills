@@ -1,13 +1,15 @@
 # Claude Science setup
 
-This unreleased source candidate contains twenty-seven skills: twenty-five science skills and
-two evidence skills. The published v0.4.0 tag retains twenty-three science skills and two
-evidence skills. The SDK installer selects only the twenty-five current science skills; it
-deliberately excludes szl-typesafe-ai and szl-governed-decision. The marketplace lists the
-same inventory. SCIENCE_ACCEPTANCE.md retains the separate, historical ten-package acceptance
-scope; its counts do not cover all twenty-five candidate science skills. The historical
-v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills does not create a
-specialist.
+The unreleased source candidate contains twenty-eight skills: twenty-six science tools and two
+evidence skills. The default core family selects twenty-four science tools; the separate replay
+and multiplicity families select szl-experiment-replay and szl-multiplicity-audit. Each complete
+family must fit the existing 1 MB resource limit. All three exclude szl-typesafe-ai and
+szl-governed-decision. The published v0.4.0 tag contains
+twenty-three science tools; experiment replay, clustered replication and multiplicity audit remain
+source candidates until their releases are separately verified. The historical v0.2.0-rc.1 tag
+contains eight science skills. GitHub importing skills does not create a specialist. The workbench
+integrates seven core checks; the other tools run separately. SCIENCE_ACCEPTANCE.md retains the
+historical ten-package acceptance scope, which does not cover all current science tools.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
 bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
@@ -22,15 +24,24 @@ import runpy
 setup = runpy.run_path("tools/install_claude_science.py")
 resources = setup["bundle"](".")
 receipt = setup["install"](host, resources, "claude-science-install-receipt.json", update=True)
-print({"status": receipt["status"], "agent": receipt["agent"]})
+replay = setup["bundle"](".", family="replay")
+replay_receipt = setup["install"](host, replay, "claude-science-replay-receipt.json",
+                                  update=True, family="replay")
+multiplicity = setup["bundle"](".", family="multiplicity")
+multiplicity_receipt = setup["install"](host, multiplicity,
+                                        "claude-science-multiplicity-receipt.json",
+                                        update=True, family="multiplicity")
+print({"core": receipt["status"], "replay": replay_receipt["status"],
+       "multiplicity": multiplicity_receipt["status"]})
 ```
 
-The SDK procedure stages twenty-five science skills, checks returned sidecar gates for edited
+The core SDK procedure stages twenty-four science tools, checks returned sidecar gates for edited
 kernel.py resources, publishes through host.skills and reads every resource back. A new
-SZL_SCIENCE profile requests exactly the twenty-five selected skills and zero connectors on
+SZL_SCIENCE profile requests exactly those twenty-four tools and zero connectors on
 creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
-`update=True` updates only these twenty-five named SZL skills; protected bundled-name collisions
+`update=True` updates only the names in the selected family; the separate replay and multiplicity
+calls add or update their one named tool each. Protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles
 retain additional skills and their existing connectors/mode, which the receipt reports
 explicitly. Creation and updating a matching profile therefore have different inventories.

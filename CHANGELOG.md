@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased 0.5.0-rc.1 candidate
+
+- Add szl-clustered-replication: distinguish observations from declared experimental units,
+  equal-cluster paired effects, an exact conditional cluster sign-flip calculation and
+  leave-one-cluster sensitivity. Missing commitments or undeclared assumptions stay
+  DESCRIPTIVE_ONLY; independence and preregistration timing remain unverified.
+- Correct source inventory, marketplace version, installer/profile descriptions and the
+  distinction between the workbench's seven integrated core checks and standalone tools.
+  Published v0.4.0 and earlier tags retain their original inventories.
+- New numerical tests use an independent Cartesian sign-vector oracle and invariance to
+  technical replication; test execution and app efficacy are reported separately.
+- Preserve the separately developed experiment replay contract in a second import family.
+  Both science families retain complete helpers, licenses and notices and the 1 MB SDK
+  bundle limit; the shared installer attaches all twenty-five tools across two calls.
+
 ## 0.4.0
 
 - Five new science skills, all stdlib and offline: szl-refutation-ledger (append-only, hash-chained
