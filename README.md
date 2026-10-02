@@ -1,14 +1,15 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. Twenty-five skills for
-Claude Science, Claude Code and claude.ai: twenty-three science checks and two evidence skills.
+Executable, offline checks that make scientific claims carry their evidence. The current source
+skills for Claude Science, Claude Code and claude.ai are counted in SKILL_INVENTORY.json.
 The checks use the Python standard library, run without network or credentials, and report what
 they did not verify alongside what they did. Repository pins also use the local Git executable;
 optional session-receipt signing requires szl-receipt-dsse.
 
 ## Import
 
-Claude Science: Skills > Import from GitHub, paste:
+Claude Science: Skills > Import from GitHub, paste the tagged v0.4.0 release below. Newer source
+skills, including szl-skill-update-review, require a reviewed source commit until a later release.
 
     szl-holdings/szl-skills@v0.4.0
 
@@ -33,6 +34,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | know whether the 4-bit or ported model still answers like the one you validated | szl-quantization-check | WITHIN_TOLERANCE / DEGRADED with the worst inputs named |
 | name the exact commits of every repository an analysis used | szl-repo-pin | one composite digest, only when every tree is clean; MATCH / DRIFT later |
 | know how many outcome changes stand between a result and p = 0.05 | szl-result-fragility | fragility index against the number lost to follow-up |
+| review a local skill package update before relying on its new bytes | szl-skill-update-review | added and changed skills, declarations, and evidence or tests to rerun |
 
 ## Science checks
 
