@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased 0.5.0-rc.1 candidate
+## 0.5.0-rc.1
 
 - Add szl-paper-evidence-audit as a separate, bounded paper import family. It matches complete
   extracted table-cell or figure-caption text to byte-pinned local inputs and separate PDF
@@ -12,7 +12,7 @@
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
 - Source inventory becomes twenty-four core science tools, one replay tool, one paper audit,
-  one assay audit and two evidence skills. This source candidate is not proof of Claude Science
+  one assay audit and two evidence skills. This source release is not proof of Claude Science
   host registration, method validation or clinical use.
 - Add szl-clustered-replication: distinguish observations from declared experimental units,
   equal-cluster paired effects, an exact conditional cluster sign-flip calculation and

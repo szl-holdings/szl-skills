@@ -1,27 +1,27 @@
 # SZL Skills
 
-Executable checks that make scientific claims carry their evidence. This unreleased source
-candidate contains twenty-nine skills for Claude Science, Claude Code and claude.ai:
-twenty-seven science tools and two evidence skills. They use the Python standard library and
-report what they did not verify. Normal checks are offline. Repository pins also use local Git;
-optional session-receipt signing requires szl-receipt-dsse. The TypeSafe evidence skill declares
-its separate optional service and credential requirements below.
+Executable checks that make scientific claims carry their evidence. The v0.5.0-rc.1 prerelease
+contains twenty-nine skills for Claude Science, Claude Code and claude.ai: twenty-seven science
+tools and two evidence skills. They use the Python standard library and report what they did not
+verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
+signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
+service and credential requirements below.
 
 The science tools have four import families: twenty-four core checks, one bounded experiment
 replay check, one paper evidence audit, and one declared assay-run audit. Each SDK bundle retains
 the 1 MB limit, licenses and notices. All four families use the same installer and can attach to
-the same specialist. The published v0.4.0 tag retains its original twenty-three-tool science scope.
+the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
 
 ## Import
 
 Claude Science: Skills > Import from GitHub, paste:
 
-    szl-holdings/szl-skills@v0.4.0
+    szl-holdings/szl-skills@v0.5.0-rc.1
 
-The published v0.4.0 tag contains twenty-three science tools and two evidence skills. Paper
-evidence audit, clustered replication, experiment replay, and assay measurement below are
-unreleased source candidates; use a reviewed immutable source commit for testing until a
-separately verified release is published.
+This prerelease includes paper evidence audit, clustered replication, experiment replay, and assay
+measurement. The stable v0.4.0 tag still contains twenty-three science tools and two evidence
+skills. A GitHub tag does not prove Claude Science host registration or measured skill
+effectiveness; verify those separately.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
