@@ -1,7 +1,8 @@
 # SZL Skills
 
-Executable, offline checks that make scientific claims carry their evidence. Twenty-five skills for
-Claude Science, Claude Code and claude.ai: twenty-three science checks and two evidence skills.
+Executable, offline checks that make scientific claims carry their evidence. Main now contains
+twenty-six skills: twenty-four science checks and two evidence skills. The immutable v0.4.0
+release below contains twenty-three science checks; the paper evidence audit is not in that tag.
 The checks use the Python standard library, run without network or credentials, and report what
 they did not verify alongside what they did. Repository pins also use the local Git executable;
 optional session-receipt signing requires szl-receipt-dsse.
@@ -23,6 +24,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 |---|---|---|
 | connect dataset, model, math, kernel and paired checks and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
+| check that a PDF table quote or figure caption has a pinned page and source region | szl-paper-evidence-audit | exact text locator or unresolved, always requiring human review |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
 | know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
 | write an honest energy or CO2e sentence for the methods section | szl-compute-energy-receipt | MEASURED / REPORTED / UNAVAILABLE with the sentence |
@@ -60,6 +62,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-quantization-check | Does the quantized or ported model agree with the reference on these inputs? | Not accuracy; nothing about inputs not included |
 | szl-repo-pin | Which exact commits, in which repositories, with nothing uncommitted? | Not publication or correctness of the code |
 | szl-result-fragility | How many outcome flips remove significance, compared with the dropouts? | Not effect size, design or adjusted analyses |
+| szl-paper-evidence-audit | Where did an extracted table cell or figure caption come from in a pinned PDF? | Does not perform OCR or verify values in pixels |
 | szl-science-workbench | Dataset, binary/categorical model, math, kernel, calibration and paired checks, with immutable runs and invalidation | Other pack audits use their own CLIs; not an experiment runner |
 
 Every skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
