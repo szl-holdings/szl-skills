@@ -60,13 +60,15 @@ def cli_run(records, gold, output=False, raw_records=None, pdf=PDF):
         command = [sys.executable, "-I", "-B", str(SKILL / "scripts" / "run.py"),
                    "--pdf", str(pdf_path), "--records", str(records_path),
                    "--gold", str(gold_path)]
-        if output:
-            report_path = base / "report.json"
+        report_path = base / "report.json" if output else None
+        if report_path is not None:
             command += ["--output", str(report_path)]
         first = subprocess.run(command, capture_output=True, text=True, check=False)
-        rendered = report_path.read_text(encoding="utf-8") if output and report_path.exists() else first.stdout
-        second = subprocess.run(command, capture_output=True, text=True, check=False) if output else None
-        retained = report_path.read_text(encoding="utf-8") if output else None
+        rendered = (report_path.read_text(encoding="utf-8") if
+                    report_path is not None and report_path.exists() else first.stdout)
+        second = (subprocess.run(command, capture_output=True, text=True, check=False)
+                  if report_path is not None else None)
+        retained = report_path.read_text(encoding="utf-8") if report_path is not None else None
         return first, json.loads(rendered), second, retained
 
 
