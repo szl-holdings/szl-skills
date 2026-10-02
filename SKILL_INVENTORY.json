@@ -2,9 +2,10 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 26,
+    "total": 27,
     "by_plugin": {
       "szl-evidence-skills": 2,
+      "szl-science-replay-skills": 1,
       "szl-science-skills": 24
     }
   },
@@ -13,15 +14,18 @@
       "szl-governed-decision",
       "szl-typesafe-ai"
     ],
+    "szl-science-replay-skills": [
+      "szl-experiment-replay"
+    ],
     "szl-science-skills": [
       "szl-analysis-mutation-test",
       "szl-analysis-plan-audit",
       "szl-artifact-lineage",
+      "szl-clustered-replication",
       "szl-compute-energy-receipt",
       "szl-cross-implementation-check",
       "szl-dataset-readiness",
       "szl-evidence-gate",
-      "szl-experiment-replay",
       "szl-kernel-comparison",
       "szl-math-claim-check",
       "szl-model-evaluation",
