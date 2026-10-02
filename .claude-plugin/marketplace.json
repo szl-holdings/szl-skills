@@ -11,12 +11,13 @@
   "plugins": [
     {
       "name": "szl-evidence-skills",
-      "description": "TypeSafe Jev as a second reader (never the gate) and governed decisions that carry their own evidence.",
+      "description": "TypeSafe Jev as a second reader, governed decisions, and synthetic-only rare-disease evidence mapping with source-bound HOLD results.",
       "source": "./",
       "strict": false,
       "skills": [
         "./skills/szl-typesafe-ai",
-        "./skills/szl-governed-decision"
+        "./skills/szl-governed-decision",
+        "./skills/szl-rare-disease-evidence-map"
       ]
     },
     {

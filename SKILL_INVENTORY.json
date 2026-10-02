@@ -2,9 +2,9 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 29,
+    "total": 30,
     "by_plugin": {
-      "szl-evidence-skills": 2,
+      "szl-evidence-skills": 3,
       "szl-paper-evidence-skills": 1,
       "szl-science-assay-skills": 1,
       "szl-science-replay-skills": 1,
@@ -14,6 +14,7 @@
   "plugins": {
     "szl-evidence-skills": [
       "szl-governed-decision",
+      "szl-rare-disease-evidence-map",
       "szl-typesafe-ai"
     ],
     "szl-paper-evidence-skills": [
