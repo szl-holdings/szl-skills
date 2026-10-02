@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add szl-research-change-impact: compare retained research-anatomy snapshots, preserve removed
+  dependencies in impact reachability, retain absent required claims and unavailable evidence,
+  and return deterministic witness paths and a dependency-first reassessment order. The helper
+  executes no experiments and does not establish scientific truth. Integrated in the source
+  marketplace and SDK installer; actual Claude Science task performance remains unmeasured.
+
 ## 0.4.0
 
 - Five new science skills, all stdlib and offline: szl-refutation-ledger (append-only, hash-chained

@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-four offline science skills: research workbench, claim and refutation ledgers, dataset leakage, model and retrieval evaluation, quantization, math and kernel checks, paired qualification, capsules, bounded experiment replay, lineage, units, negative controls, analysis plans, evidence gates, cross-implementation checks, mutation coverage, energy and session receipts, repository pins, result fragility and reviewer packs. Optional pinned public study fetch; no credentials required.",
+      "description": "Twenty-five offline science skills: research workbench, fixed-operation experiment replay, claim and refutation ledgers, retained-snapshot change impact, dataset leakage, model and retrieval evaluation, quantization, math and kernel checks, paired qualification, capsules, lineage, units, negative controls, analysis plans, evidence gates, cross-implementation checks, mutation coverage, energy and session receipts, repository pins, result fragility and reviewer packs. Optional pinned public study fetch; no credentials required.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -48,7 +48,8 @@
         "./skills/szl-retrieval-eval",
         "./skills/szl-quantization-check",
         "./skills/szl-repo-pin",
-        "./skills/szl-result-fragility"
+        "./skills/szl-result-fragility",
+        "./skills/szl-research-change-impact"
       ]
     }
   ]

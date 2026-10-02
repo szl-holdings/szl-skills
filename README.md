@@ -1,8 +1,8 @@
 # SZL Skills
 
 Executable, offline checks that make scientific claims carry their evidence. This unreleased
-source candidate has twenty-six skills for Claude Science, Claude Code and claude.ai:
-twenty-four science checks and two evidence skills. The v0.4.0 tag retains twenty-three
+source candidate has twenty-seven skills for Claude Science, Claude Code and claude.ai:
+twenty-five science checks and two evidence skills. The v0.4.0 tag retains twenty-three
 science checks and two evidence skills.
 The checks use the Python standard library, run without network or credentials, and report what
 they did not verify alongside what they did. Repository pins also use the local Git executable;
@@ -24,6 +24,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | If you want to... | Use | It tells you |
 |---|---|---|
 | connect dataset, model, math, kernel and paired checks and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
+| compare two research graphs without letting removed dependencies hide stale claims | szl-research-change-impact | retained removed edges, missing evidence, witness paths and recheck order |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
 | know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
@@ -48,6 +49,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
+| szl-research-change-impact | What must be reassessed across two retained graphs, including removed edges and claims? | Computes a review plan; never executes experiments or proves truth |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
 | szl-negative-control-audit | Do the negative controls actually rule out the mechanism they claim to, and were outcomes retained? | Does not design interventions |

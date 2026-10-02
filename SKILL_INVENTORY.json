@@ -2,10 +2,10 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 26,
+    "total": 27,
     "by_plugin": {
       "szl-evidence-skills": 2,
-      "szl-science-skills": 24
+      "szl-science-skills": 25
     }
   },
   "plugins": {
@@ -32,6 +32,7 @@
       "szl-repo-pin",
       "szl-reproducibility-capsule",
       "szl-research-anatomy",
+      "szl-research-change-impact",
       "szl-result-fragility",
       "szl-retrieval-eval",
       "szl-reviewer-pack",

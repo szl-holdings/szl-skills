@@ -12,7 +12,8 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-artifact-lineage", "szl-unit-invariants", "szl-negative-control-audit", "szl-analysis-plan-audit",
          "szl-evidence-gate", "szl-cross-implementation-check", "szl-analysis-mutation-test",
          "szl-compute-energy-receipt", "szl-session-receipt", "szl-reviewer-pack",
-         "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility"]
+         "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility",
+         "szl-research-change-impact"]
 AGENT = "SZL_SCIENCE"
 PROMPT = """You are SZL Science Workbench, a scientific workflow assistant. Connect the scientist's
 question to inspectable artifacts, selected calculations, actual outputs and retained
