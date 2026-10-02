@@ -13,6 +13,8 @@ replay check, one paper evidence audit, one declared assay-run audit and one com
 multiplicity audit. Each SDK bundle retains the 1 MB limit, licenses and notices. All five families
 use the same installer and can attach to the same specialist. The published v0.4.0 tag retains its
 original twenty-three-tool science scope.
+Protected main prepared v0.5.0-rc.1 with twenty-nine packages before this multiplicity addition;
+at the last readback, its tag and GitHub Release were not present. Preparation is not publication.
 
 ## Import
 
@@ -22,9 +24,9 @@ Claude Science: Skills > Import from GitHub, paste:
 
 The published v0.4.0 tag contains twenty-three science tools and two evidence skills. The new
 experiment-replay, clustered-replication, paper-evidence-audit, assay-measurement-audit and
-multiplicity-audit skills below are unreleased source candidates; use a reviewed immutable source
-commit for testing until a
-separately verified release is published.
+multiplicity-audit skills below are source candidates beyond that tag. Use a reviewed immutable
+source commit for testing until a separate release tag and assets are published and read back.
+Even a GitHub release does not prove Claude Science host registration or measured skill efficacy.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.

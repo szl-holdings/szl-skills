@@ -5,12 +5,14 @@ evidence skills. The default core family selects twenty-four science tools; sepa
 paper, assay and multiplicity families select szl-experiment-replay, szl-paper-evidence-audit,
 szl-assay-measurement-audit and szl-multiplicity-audit respectively. Each complete family must fit
 the existing 1 MB resource limit. All five exclude szl-typesafe-ai and szl-governed-decision. The
-published v0.4.0 tag contains twenty-three science tools; experiment replay, clustered replication,
-paper evidence audit, assay measurement audit and multiplicity audit remain source candidates until
-their releases are separately verified. The historical v0.2.0-rc.1 tag contains eight science
-skills. GitHub importing skills does not create a specialist. The workbench integrates seven core
-checks; the other tools run separately. SCIENCE_ACCEPTANCE.md retains the historical ten-package
-acceptance scope, which does not cover all current science tools.
+published v0.4.0 tag contains twenty-three science tools and two evidence skills. Protected main
+prepared v0.5.0-rc.1 with twenty-nine packages before multiplicity was added; its tag and GitHub
+Release were not present at the last readback. Experiment replay, clustered replication, paper
+evidence audit, assay measurement audit and multiplicity audit remain beyond the verified v0.4.0
+tag. The historical v0.2.0-rc.1 tag contains eight science skills. GitHub importing skills does
+not create a specialist. The workbench integrates seven core checks; the other tools run
+separately. SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does
+not cover all current science tools.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
 bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
