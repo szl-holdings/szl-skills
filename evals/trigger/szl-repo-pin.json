@@ -1,0 +1,87 @@
+{
+  "skill": "szl-repo-pin",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Record the exact commits of the analysis repo, the data-prep repo and our utility library for the methods section.",
+      "should_trigger": true
+    },
+    {
+      "query": "Which commits did we actually run? Pin every repository the pipeline depends on.",
+      "should_trigger": true
+    },
+    {
+      "query": "Six months later the result differs. Check which of the three repositories moved since the pin.",
+      "should_trigger": true
+    },
+    {
+      "query": "Refuse to pin if anything is uncommitted and tell me which repo is dirty.",
+      "should_trigger": true
+    },
+    {
+      "query": "Verify my collaborator's checkout against the pin file I sent.",
+      "should_trigger": true
+    },
+    {
+      "query": "The capsule should name code versions, not branch names. Produce the composite digest over all repos.",
+      "should_trigger": true
+    },
+    {
+      "query": "Are all four repos clean and at the recorded commits?",
+      "should_trigger": true
+    },
+    {
+      "query": "Make one hash over every repository in this multi-repo analysis.",
+      "should_trigger": true
+    },
+    {
+      "query": "Show me the recorded pin: repo, commit, tag.",
+      "should_trigger": true
+    },
+    {
+      "query": "Before archiving, pin the vendored library commit along with our own code.",
+      "should_trigger": true
+    },
+    {
+      "query": "Push my commits to GitHub.",
+      "should_trigger": false
+    },
+    {
+      "query": "Which branch should we use for the release?",
+      "should_trigger": false
+    },
+    {
+      "query": "Hash every file in the project directory.",
+      "should_trigger": false
+    },
+    {
+      "query": "Record the environment and package versions for the analysis.",
+      "should_trigger": false
+    },
+    {
+      "query": "Resolve this merge conflict.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is the code in this repository correct?",
+      "should_trigger": false
+    },
+    {
+      "query": "Tag a new release in the analysis repository.",
+      "should_trigger": false
+    },
+    {
+      "query": "Clone these three repositories for me.",
+      "should_trigger": false
+    },
+    {
+      "query": "Record what this session read, ran and produced.",
+      "should_trigger": false
+    },
+    {
+      "query": "Check whether the dependency pins in requirements.txt are exact.",
+      "should_trigger": false
+    }
+  ]
+}

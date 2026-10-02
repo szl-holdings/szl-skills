@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0
+
+- Five new science skills, all stdlib and offline: szl-refutation-ledger (append-only, hash-chained
+  record of claims, replication attempts and withdrawals; per-claim REPLICATED / NOT_REPLICATED /
+  CONTESTED / INCONCLUSIVE / UNTESTED / WITHDRAWN with a SOUND / SHAKEN / UNKNOWN foundation from the
+  dependency trace; unreceipted attempts counted and flagged; `verify` finds the first broken link),
+  szl-retrieval-eval (nDCG@k, MRR, MAP, precision@k, recall@k with judged queries missing from the
+  run kept at zero, unjudged queries listed, duplicates dropped and counted; JSON or TREC files),
+  szl-quantization-check (row-wise cosine, softmax KL at a declared temperature, top-1 agreement,
+  worst rows named; WITHIN_TOLERANCE / DEGRADED / INCOMPARABLE against declared tolerances),
+  szl-repo-pin (HEAD, clean/dirty, exact tag and configured origin per declared repository; the
+  composite digest exists only when every tree is clean; MATCH / DRIFT / DIRTY / MISSING on verify),
+  szl-result-fragility (exact Fisher two-sided p, Walsh fragility index and quotient against the
+  number lost to follow-up, reverse fragility index for non-significant results).
+- Not added: a separate calibration skill (szl-model-evaluation already reports ECE, MCE, Brier,
+  log loss, AUROC and reliability bins) and a separate signed-capsule skill (szl-session-receipt
+  already signs through szl-receipt-dsse when installed).
+- Marketplace plugin szl-science-skills now lists twenty-three skills; installer and packaging tests
+  updated; 15 new behavioral tests (244 total). Trigger evaluation sets added for the five skills
+  (rates NOT_MEASURED until executed).
+
 ## 0.3.0
 
 - Six new science skills, all stdlib and offline: szl-evidence-gate (PASS/FAIL/ABSTAIN/ERROR per

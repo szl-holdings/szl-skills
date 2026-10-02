@@ -42,7 +42,12 @@
         "./skills/szl-analysis-mutation-test",
         "./skills/szl-compute-energy-receipt",
         "./skills/szl-session-receipt",
-        "./skills/szl-reviewer-pack"
+        "./skills/szl-reviewer-pack",
+        "./skills/szl-refutation-ledger",
+        "./skills/szl-retrieval-eval",
+        "./skills/szl-quantization-check",
+        "./skills/szl-repo-pin",
+        "./skills/szl-result-fragility"
       ]
     }
   ]

@@ -1,0 +1,87 @@
+{
+  "skill": "szl-result-fragility",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "The trial reached p = 0.03 with 12 versus 25 deaths and seven patients lost to follow-up. How fragile is that?",
+      "should_trigger": true
+    },
+    {
+      "query": "How many patients away from p = 0.05 is this result?",
+      "should_trigger": true
+    },
+    {
+      "query": "Compute the fragility index for the primary endpoint and compare it with the dropout count.",
+      "should_trigger": true
+    },
+    {
+      "query": "A reviewer asks for the fragility index of our binary outcome.",
+      "should_trigger": true
+    },
+    {
+      "query": "Our A/B test is significant on 40 conversions versus 58. How many outcome flips would remove significance?",
+      "should_trigger": true
+    },
+    {
+      "query": "State the fragility of each included trial the same way for the systematic review.",
+      "should_trigger": true
+    },
+    {
+      "query": "The result is not significant; how far from significance is it in outcome changes?",
+      "should_trigger": true
+    },
+    {
+      "query": "Fisher exact p and fragility quotient for this 2x2 table, please.",
+      "should_trigger": true
+    },
+    {
+      "query": "Is a fragility index of 3 robust when 11 participants were lost?",
+      "should_trigger": true
+    },
+    {
+      "query": "Judge this result FRAGILE or ROBUST against a threshold of five outcome changes.",
+      "should_trigger": true
+    },
+    {
+      "query": "Calculate the hazard ratio for the time-to-event outcome.",
+      "should_trigger": false
+    },
+    {
+      "query": "What sample size do we need for 80 percent power?",
+      "should_trigger": false
+    },
+    {
+      "query": "Is the effect clinically meaningful?",
+      "should_trigger": false
+    },
+    {
+      "query": "Run a logistic regression adjusting for age and sex.",
+      "should_trigger": false
+    },
+    {
+      "query": "Explain what a p value means.",
+      "should_trigger": false
+    },
+    {
+      "query": "Compute the fragility of a continuous outcome.",
+      "should_trigger": false
+    },
+    {
+      "query": "Design the randomization for the next trial.",
+      "should_trigger": false
+    },
+    {
+      "query": "Why were patients lost to follow-up?",
+      "should_trigger": false
+    },
+    {
+      "query": "Compute a confidence interval for the risk difference using the Wilson method.",
+      "should_trigger": false
+    },
+    {
+      "query": "Meta-analyze these five trials.",
+      "should_trigger": false
+    }
+  ]
+}

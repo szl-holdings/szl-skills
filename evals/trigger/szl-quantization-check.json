@@ -1,0 +1,87 @@
+{
+  "skill": "szl-quantization-check",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Built per Anthropic skill-creator guidance; not yet executed against a model, so trigger rates are NOT_MEASURED.",
+  "queries": [
+    {
+      "query": "Is the 4-bit GGUF still the same model? Here are logits from both on 200 inputs.",
+      "should_trigger": true
+    },
+    {
+      "query": "We ported the classifier from PyTorch to ONNX; compare the outputs row by row with tolerances.",
+      "should_trigger": true
+    },
+    {
+      "query": "Does the int8 model agree with the fp32 reference on top-1 predictions, and which inputs disagree most?",
+      "should_trigger": true
+    },
+    {
+      "query": "Compare the student model's embeddings with the teacher's using cosine similarity.",
+      "should_trigger": true
+    },
+    {
+      "query": "A reviewer asked how we verified that the deployed quantized model matches the evaluated one.",
+      "should_trigger": true
+    },
+    {
+      "query": "Check KL divergence between the reference and quantized softmax outputs at temperature 1.",
+      "should_trigger": true
+    },
+    {
+      "query": "Set tolerances: worst-row cosine above 0.99 and top-1 agreement above 98 percent. Does the candidate pass?",
+      "should_trigger": true
+    },
+    {
+      "query": "Which five inputs changed most after quantization?",
+      "should_trigger": true
+    },
+    {
+      "query": "The two output files have different shapes; tell me whether they are comparable at all.",
+      "should_trigger": true
+    },
+    {
+      "query": "Validate the laptop build of the model against the server build on our comparison set.",
+      "should_trigger": true
+    },
+    {
+      "query": "Quantize this model to 4-bit for me.",
+      "should_trigger": false
+    },
+    {
+      "query": "Is the quantized model accurate on the test set?",
+      "should_trigger": false
+    },
+    {
+      "query": "How much faster is the int8 model?",
+      "should_trigger": false
+    },
+    {
+      "query": "Explain how GPTQ works.",
+      "should_trigger": false
+    },
+    {
+      "query": "Compare the energy use of the two model builds.",
+      "should_trigger": false
+    },
+    {
+      "query": "Fine-tune the student model to match the teacher.",
+      "should_trigger": false
+    },
+    {
+      "query": "Convert these logits to probabilities.",
+      "should_trigger": false
+    },
+    {
+      "query": "Which quantization method should we use for a 7B model?",
+      "should_trigger": false
+    },
+    {
+      "query": "Check whether two kernels produce the same outputs and report the speedup.",
+      "should_trigger": false
+    },
+    {
+      "query": "Evaluate the model's calibration.",
+      "should_trigger": false
+    }
+  ]
+}
