@@ -19,12 +19,14 @@ SKILL_PATH = re.compile(r"\./skills/(szl-[a-z0-9-]+)\Z")
 FRONTMATTER_NAME = re.compile(r"\A---\s*\n(.*?)\n---", re.S)
 
 
-def installer_names(root):
+def installer_names(root, variable="NAMES", required=True):
     """Read the SDK selection as a literal, without running installer code."""
     source = (pathlib.Path(root) / "tools" / "install_claude_science.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     assignments = [node.value for node in tree.body if isinstance(node, ast.Assign)
-                   and any(isinstance(target, ast.Name) and target.id == "NAMES" for target in node.targets)]
+                   and any(isinstance(target, ast.Name) and target.id == variable for target in node.targets)]
+    if not assignments and not required:
+        return []
     if len(assignments) != 1:
         raise ValueError("installer must have exactly one literal NAMES assignment")
     names = ast.literal_eval(assignments[0])
@@ -89,6 +91,12 @@ def build(root):
     if selected != science:
         raise ValueError("installer/science catalog mismatch: unselected=%s, unlisted=%s" %
                          (sorted(science - selected), sorted(selected - science)))
+    replay = set(installer_names(root, "REPLAY_NAMES", required=False))
+    if replay != set(grouped.get("szl-science-replay-skills", [])) or replay & selected:
+        raise ValueError("installer/replay catalog mismatch")
+    assay = set(installer_names(root, "ASSAY_NAMES", required=False))
+    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | replay):
+        raise ValueError("installer/assay catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",

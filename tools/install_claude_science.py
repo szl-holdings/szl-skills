@@ -8,12 +8,14 @@ import pathlib
 import re
 
 NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check", "szl-dataset-readiness",
-         "szl-model-evaluation", "szl-assay-measurement-audit", "szl-kernel-comparison", "szl-reproducibility-capsule", "szl-paired-science",
+         "szl-model-evaluation", "szl-kernel-comparison", "szl-reproducibility-capsule", "szl-paired-science",
          "szl-artifact-lineage", "szl-unit-invariants", "szl-negative-control-audit", "szl-analysis-plan-audit",
          "szl-evidence-gate", "szl-cross-implementation-check", "szl-analysis-mutation-test",
          "szl-compute-energy-receipt", "szl-session-receipt", "szl-reviewer-pack",
-         "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility"]
+         "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility", "szl-clustered-replication"]
 AGENT = "SZL_SCIENCE"
+REPLAY_NAMES = ["szl-experiment-replay"]
+ASSAY_NAMES = ["szl-assay-measurement-audit"]
 PROMPT = """You are SZL Science Workbench, a scientific workflow assistant. Connect the scientist's
 question to inspectable artifacts, selected calculations, actual outputs and retained
 project memory. Prefer the integrated workbench for a project that should survive a session;
@@ -25,10 +27,20 @@ Lambda is Conjecture 1 (OPEN). Propose the next useful experiment with its assum
 source ids, and leave scientific judgments with the researcher."""
 
 
-def bundle(root):
+def family_names(family):
+    if family == "core":
+        return NAMES
+    if family == "replay":
+        return REPLAY_NAMES
+    if family == "assay":
+        return ASSAY_NAMES
+    raise ValueError("Unknown reviewed science family")
+
+
+def bundle(root, family="core"):
     root = pathlib.Path(root).resolve(strict=True)
     result = {}
-    for name in NAMES:
+    for name in family_names(family):
         directory = root / "skills" / name
         entry = (directory / "SKILL.md").read_text(encoding="utf-8")
         if not re.search(r"(?m)^name: " + re.escape(name) + r"$", entry):
@@ -47,19 +59,22 @@ def bundle(root):
     return result
 
 
-def install(host, resources, receipt_path, update=False):
+def install(host, resources, receipt_path, update=False, family="core"):
     """Preflight the complete bundle; publish and read back through the actual SDK."""
     receipt_path = pathlib.Path(receipt_path)
     if receipt_path.exists():
         raise FileExistsError("Retain the previous receipt; choose a new receipt path")
-    if set(resources) != set(NAMES):
+    names = family_names(family)
+    if set(resources) != set(names):
         raise ValueError("Expected the complete reviewed science skill inventory")
+    if sum(len(content.encode()) for files in resources.values() for content in files.values()) > 1000000:
+        raise ValueError("Bundle exceeds 1 MB")
     inventory = {s["name"]: s for s in host.skills.list()}
     profiles = {a["name"]: a for a in host.agents.list()}
     if AGENT in profiles and profiles[AGENT].get("systemPrompt") != PROMPT:
         raise ValueError("Existing specialist name collision: " + AGENT)
     edits, readbacks = [], {}
-    for name in NAMES:
+    for name in names:
         existing = inventory.get(name)
         if existing and existing.get("origin") == "anthropic":
             raise ValueError("Protected skill name collision: " + name)
@@ -81,7 +96,7 @@ def install(host, resources, receipt_path, update=False):
             edits.append((name, path, content, previous))
     # All collisions are assessed before any write.
     receipt = {"schema": "szl.claude-science-install.v1", "status": "IN_PROGRESS", "skills": {},
-               "agent": None, "runtime_task_evaluation": "NOT_EXECUTED", "signed": False}
+               "agent": None, "family": family, "runtime_task_evaluation": "NOT_EXECUTED", "signed": False}
     try:
         for name, path, content, previous in edits:
             edited = host.skills.edit(name, path, content, old_string=previous)
@@ -90,7 +105,7 @@ def install(host, resources, receipt_path, update=False):
                 receipt["skills"].setdefault(name, {})["sidecar_gate"] = gate if gate is not None else {"status": "PROBE_UNAVAILABLE"}
                 if gate is not None and gate.get("ok") is not True:
                     raise ValueError("Claude Science sidecar gate rejected " + name)
-        for name in NAMES:
+        for name in names:
             changed = any(edit[0] == name for edit in edits)
             if changed or inventory.get(name, {}).get("origin") == "draft":
                 published = host.skills.publish(name, overwrite=bool(inventory.get(name)))
@@ -104,22 +119,22 @@ def install(host, resources, receipt_path, update=False):
                 readbacks[name][path] = hashlib.sha256(actual.encode()).hexdigest()
             receipt["skills"].setdefault(name, {})["readback_sha256"] = readbacks[name]
         live = {s["name"]: s for s in host.skills.list()}
-        if any(n not in live or live[n].get("origin") == "draft" for n in NAMES):
+        if any(n not in live or live[n].get("origin") == "draft" for n in names):
             raise ValueError("Skills did not appear in the live catalog")
         agents = {a["name"]: a for a in host.agents.list()}
         existing = agents.get(AGENT)
         if existing:
             if existing.get("systemPrompt") != PROMPT:
                 raise ValueError("Existing specialist name collision: " + AGENT)
-            for name in NAMES:
+            for name in names:
                 if name not in existing.get("skillNames", []):
                     host.agents.attach_skill(AGENT, name)
         else:
             host.agents.create(AGENT, "SZL Science Workbench",
                                "Reproducible scientific checks and living project evidence with the SZL Science Pack",
-                               system_prompt=PROMPT, skill_names=NAMES)
+                               system_prompt=PROMPT, skill_names=names)
         agent = next(a for a in host.agents.list() if a["name"] == AGENT)
-        if not set(NAMES) <= set(agent.get("skillNames", [])):
+        if not set(names) <= set(agent.get("skillNames", [])):
             raise ValueError("Specialist skill readback mismatch")
         receipt["agent"] = {k: agent.get(k) for k in ("name", "displayName", "skillNames", "connectors", "unrestricted")}
         receipt["status"] = "PUBLISHED_AND_READ_BACK"

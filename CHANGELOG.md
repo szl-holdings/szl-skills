@@ -1,14 +1,27 @@
 # Changelog
 
-## 0.5.0 (source candidate; not tagged)
+## Unreleased 0.5.0-rc.1 candidate
 
 - Added szl-assay-measurement-audit, a stdlib-only offline check for one researcher-declared
   increasing linear assay run. It gates calibration residuals, a separately identified blank,
   QC recovery, sample range, quantification minimum and final-result uncertainty declarations.
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
-- Source inventory becomes twenty-four science skills plus two evidence skills. This source
-  candidate is not proof of Claude Science host registration, method validation or clinical use.
+- Source inventory becomes twenty-four core science tools, one replay tool, one assay tool and
+  two evidence skills. This source candidate is not proof of Claude Science host registration, method
+  validation or clinical use.
+- Add szl-clustered-replication: distinguish observations from declared experimental units,
+  equal-cluster paired effects, an exact conditional cluster sign-flip calculation and
+  leave-one-cluster sensitivity. Missing commitments or undeclared assumptions stay
+  DESCRIPTIVE_ONLY; independence and preregistration timing remain unverified.
+- Correct source inventory, marketplace version, installer/profile descriptions and the
+  distinction between the workbench's seven integrated core checks and standalone tools.
+  Published v0.4.0 and earlier tags retain their original inventories.
+- New numerical tests use an independent Cartesian sign-vector oracle and invariance to
+  technical replication; test execution and app efficacy are reported separately.
+- Preserve the separately developed experiment replay contract in a second import family.
+  All three science families retain complete helpers, licenses and notices and the 1 MB SDK
+  bundle limit; the shared installer attaches all twenty-six science tools across three calls.
 
 ## 0.4.0
 

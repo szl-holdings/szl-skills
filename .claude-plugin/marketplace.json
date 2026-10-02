@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Evidence, decisions and reproducible research skills from SZL Holdings: executable, offline checks that make scientific claims carry their evidence.",
-    "version": "0.5.0"
+    "version": "0.5.0-rc.1"
   },
   "plugins": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-four offline science skills: research workbench, claim and refutation ledgers, dataset leakage, model and retrieval evaluation, quantization, math and kernel checks, declared assay-run measurement audit, paired qualification, capsules, lineage, units, negative controls, analysis plans, evidence gates, cross-implementation checks, mutation coverage, energy and session receipts, repository pins, result fragility and reviewer packs. Optional pinned public study fetch; no credentials required.",
+      "description": "Twenty-four offline science tools for reproducible research: claims, data leakage, model and retrieval evaluation, math, kernels, units, analysis plans, lineage, refutation, quantization, clustered replication, receipts and reviewer reports. Optional explicit pinned public study fetch; no credentials required.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -29,7 +29,6 @@
         "./skills/szl-math-claim-check",
         "./skills/szl-dataset-readiness",
         "./skills/szl-model-evaluation",
-        "./skills/szl-assay-measurement-audit",
         "./skills/szl-kernel-comparison",
         "./skills/szl-reproducibility-capsule",
         "./skills/szl-science-workbench",
@@ -48,7 +47,26 @@
         "./skills/szl-retrieval-eval",
         "./skills/szl-quantization-check",
         "./skills/szl-repo-pin",
-        "./skills/szl-result-fragility"
+        "./skills/szl-result-fragility",
+        "./skills/szl-clustered-replication"
+      ]
+    },
+    {
+      "name": "szl-science-assay-skills",
+      "description": "One bounded offline assay-run audit for a researcher-declared increasing linear calibration, blank, QC and sample uncertainty disclosures. Synthetic fixtures only; not method validation or clinical qualification.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-assay-measurement-audit"
+      ]
+    },
+    {
+      "name": "szl-science-replay-skills",
+      "description": "One bounded offline experiment replay skill: pin a local CSV, reference and helper, rerun its built-in mean, and retain match, divergence or incomplete evidence. No supplied code, network or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-experiment-replay"
       ]
     }
   ]
