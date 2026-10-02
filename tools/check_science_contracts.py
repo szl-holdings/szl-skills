@@ -14,14 +14,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 NAMES = ['szl-dataset-readiness', 'szl-paired-science', 'szl-model-evaluation',
          'szl-reproducibility-capsule', 'szl-math-claim-check', 'szl-research-anatomy',
          'szl-artifact-lineage', 'szl-unit-invariants', 'szl-negative-control-audit',
-         'szl-analysis-plan-audit']
+         'szl-analysis-plan-audit', 'szl-outcome-preservation', 'szl-release-continuity']
 MIRRORS = {'anatomy.py': 'skills/szl-research-anatomy/kernel.py',
            'math_claim.py': 'skills/szl-math-claim-check/kernel.py',
            'dataset.py': 'skills/szl-dataset-readiness/kernel.py',
            'model.py': 'skills/szl-model-evaluation/kernel.py',
            'kernel_compare.py': 'skills/szl-kernel-comparison/kernel.py',
            'capsule.py': 'skills/szl-reproducibility-capsule/kernel.py',
-           'paired.py': 'skills/szl-paired-science/scripts/qualify.py'}
+           'paired.py': 'skills/szl-paired-science/scripts/qualify.py',
+           'outcome_preservation.py': 'skills/szl-outcome-preservation/kernel.py',
+           'release_continuity.py': 'skills/szl-release-continuity/kernel.py'}
 
 
 def pairs(items):

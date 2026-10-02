@@ -16,6 +16,8 @@ SOURCES = {
     "kernel_compare.py": "skills/szl-kernel-comparison/kernel.py",
     "capsule.py": "skills/szl-reproducibility-capsule/kernel.py",
     "paired.py": "skills/szl-paired-science/scripts/qualify.py",
+    "outcome_preservation.py": "skills/szl-outcome-preservation/kernel.py",
+    "release_continuity.py": "skills/szl-release-continuity/kernel.py",
 }
 
 

@@ -12,15 +12,18 @@ szl-paired-science, szl-artifact-lineage, szl-unit-invariants, szl-negative-cont
 szl-analysis-plan-audit, szl-evidence-gate, szl-cross-implementation-check,
 szl-analysis-mutation-test, szl-compute-energy-receipt, szl-session-receipt,
 szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
-szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication.
+szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication,
+szl-outcome-preservation, szl-release-continuity, szl-skill-update-review.
 
-This source candidate selects twenty-four core science tools from thirty total packages;
+This source candidate selects twenty-seven core science tools from thirty-three total packages;
 the two evidence skills are excluded. Separate replay-, paper-, assay- and multiplicity-family
 installs can attach szl-experiment-replay, szl-paper-evidence-audit,
 szl-assay-measurement-audit and szl-multiplicity-audit to the
-same profile, giving twenty-eight science tools across five families. The stable v0.4.0 tag
-has twenty-three science tools; the newer skills are in v0.5.0-rc.1. The workbench
-integrates seven core checks; all other tools run separately. SCIENCE_ACCEPTANCE.md retains the
+same profile, giving thirty-one science tools across five families. The published
+v0.5.0-rc.1 tag has twenty-seven science tools and two evidence skills. Multiplicity,
+outcome preservation, release continuity and skill update review are newer source-candidate
+skills. The stable v0.4.0 tag has twenty-three science tools and two evidence skills. The
+workbench integrates nine checks; all other tools run separately. SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 
 Connectors on creation: none. Attach a selected connector only when the scientific task needs it.

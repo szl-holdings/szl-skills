@@ -1,16 +1,17 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty skills for Claude Science, Claude Code and claude.ai: twenty-eight science
+contains thirty-three skills for Claude Science, Claude Code and claude.ai: thirty-one science
 tools and two evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have five import families: twenty-four core checks, one bounded experiment
-replay check, one paper evidence audit, one declared assay-run audit, and one multiplicity audit. Each SDK bundle retains
-the 1 MB limit, licenses and notices. All four families use the same installer and can attach to
-the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
+The science tools have five import families: twenty-seven core checks, one bounded experiment
+replay check, one paper evidence audit, one declared assay-run audit, and one multiplicity audit.
+The SDK stages the complete selection in at most eight batches of at most 1 MB each, with a
+200 KB limit per skill including its license and notice. These are local staging bounds, not
+measured application import limits. All five families can attach to the same specialist.
 
 ## Import
 
@@ -18,13 +19,12 @@ Claude Science: Skills > Import from GitHub, paste:
 
     szl-holdings/szl-skills@v0.5.0-rc.1
 
-This prerelease includes paper evidence audit, clustered replication, experiment replay, and assay
-measurement. The stable v0.4.0 tag still contains twenty-three science tools and two evidence
-skills. A GitHub tag does not prove Claude Science host registration or measured skill
-effectiveness; verify those separately.
-
-That published v0.4.0 tag contains twenty-three science skills. The new multiplicity skill is
-source-candidate work until a separately reviewed tag and byte readback are published.
+This prerelease contains twenty-seven science tools (twenty-four core plus replay, paper and
+assay) and two evidence skills. The stable v0.4.0 tag contains twenty-three science tools and
+two evidence skills. Multiplicity audit, outcome preservation, release continuity and skill
+update review are newer source-candidate work; use a reviewed source commit for them until a
+separately reviewed tag is published. A GitHub tag does not prove Claude Science host
+registration or measured skill effectiveness; verify those separately.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -35,7 +35,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 
 | If you want to... | Use | It tells you |
 |---|---|---|
-| run the seven integrated core checks on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
+| run the nine integrated checks on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
 | check that a PDF table quote or figure caption has a pinned page and source region | szl-paper-evidence-audit | exact text locator or unresolved, always requiring human review |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
@@ -50,6 +50,9 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | know how many outcome changes stand between a result and p = 0.05 | szl-result-fragility | fragility index against the number lost to follow-up |
 | distinguish many measurements from independent replications | szl-clustered-replication | declared unit counts, conditional cluster sign-flip result and leave-one-unit sensitivity |
 | adjust a complete predeclared family without hiding missing tests | szl-multiplicity-audit | Holm FWER or declared-assumption BH FDR; HOLD if any planned result is missing |
+| catch a scientific decision flip after a numerically close optimization | szl-outcome-preservation | complete-cohort regressions, inactive modes and withheld performance ratios |
+| trace source identity through a wheel, Hub artifact and runtime | szl-release-continuity | missing bindings, conflicts and refused readiness |
+| review a local skill package update before relying on its new bytes | szl-skill-update-review | added and changed skills, declarations, and evidence or tests to rerun |
 
 ## Science checks
 
@@ -82,7 +85,10 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-paper-evidence-audit | Where did an extracted table cell or figure caption come from in a pinned PDF? | Does not perform OCR or verify values in pixels |
 | szl-clustered-replication | Does a paired change survive equal experimental-unit weighting and removal of one cluster? | Independence and plan timing are declarations, not verified facts |
 | szl-multiplicity-audit | Were all planned tests reported, and what are their Holm/BH adjusted p-values? | Supplied plan hash is not preregistration; raw p-values and BH dependence are unverified |
-| szl-science-workbench | Seven integrated core checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
+| szl-outcome-preservation | Did optimization preserve scientific decisions on every declared case? | Supplied measurements only; not GPU or scientific qualification |
+| szl-release-continuity | Do registry artifacts and runtime bind to the intended source? | Supplied identity comparison; not attestation verification or release authority |
+| szl-skill-update-review | What changed between two locally pinned skill packages, and which evidence or tests need another run? | Offline byte and declaration comparison; not safety, approval or scientific validity |
+| szl-science-workbench | Nine integrated checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
 
 Each science skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
 under `references/` where the input format is non-trivial, and tests in `tests/`. The workbench
