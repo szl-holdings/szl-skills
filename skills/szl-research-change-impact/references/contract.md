@@ -7,6 +7,11 @@ directed dependencies. Every declared parent must exist in that snapshot. Model 
 run id; cycles are rejected. Evidence links target claim/proof/decision nodes and have relation
 supports/contradicts/qualifies. Existing workbench metadata and retained history are accepted as JSON.
 
+Either snapshot may contain zero nodes. An empty current snapshot represents complete retirement:
+all baseline nodes and edges remain in the removal report, and required claims remain
+MISSING_REQUIRED_CLAIM. Two empty snapshots do not establish healthy coverage. The required-claim
+list must still be nonempty; dangling evidence links and readbacks for absent nodes remain invalid.
+
 The artifact digest field is `sha256`: a 64-character lowercase hexadecimal SHA-256 digest, or
 omitted/null when no artifact is pinned. A minimal snapshot is self-contained:
 
@@ -49,7 +54,7 @@ artifacts to reacquire and claims to review; it is not an executable or globally
 plan. Unrelated branches are omitted on the supplied graph, subject to missing readbacks remaining
 explicit. NO_DECLARED_IMPACT says nothing about omitted dependencies, authenticity or truth.
 
-Bounds: 2 MiB input, JSON depth 64, 100,000 JSON values, 1000 nodes and 10,000 declared dependencies
+Bounds: 2 MiB input, JSON depth 64, 100,000 JSON values, 0..1000 nodes and 10,000 declared dependencies
 per snapshot. Invalid JSON, duplicate JSON keys, nonfinite values, duplicate ids, dangling parents,
 duplicate edges, invalid digests and per-snapshot cycles are rejected. CLI exit 0 means the report
 was computed, including REVIEW_REQUIRED; exit 2 means invalid input or I/O failure. Output creation
