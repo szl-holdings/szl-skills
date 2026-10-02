@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased source candidate
+
+- Add szl-research-change-impact as a separate bounded import family. It compares retained
+  baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
+  keeps missing required claims visible, and gives a deterministic reassessment order.
+  Supplied digests and synthetic examples do not establish scientific truth or host registration.
+- Current source inventory is thirty-one skills: twenty-four core science tools, five separate
+  science tools, and two evidence skills. The new change-impact family retains the 1 MB bundle
+  limit and does not change the published v0.5.0-rc.1 tag.
+
 ## 0.5.0-rc.1
 
 - Add szl-paper-evidence-audit as a separate, bounded paper import family. It matches complete

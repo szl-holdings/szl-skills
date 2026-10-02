@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-four core science skills for evidence-grounded research, including clustered replication. Offline by default; optional explicit pinned public study fetch. No credentials required. Replay, paper evidence, assay audit and multiplicity audit are separate import families.",
+      "description": "Twenty-four core science skills for evidence-grounded research, including clustered replication. Offline by default; optional explicit pinned public study fetch. No credentials required. Replay, paper evidence, assay, multiplicity and change-impact audits are separate import families.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -76,6 +76,15 @@
       "strict": false,
       "skills": [
         "./skills/szl-experiment-replay"
+      ]
+    },
+    {
+      "name": "szl-science-change-impact-skills",
+      "description": "One offline research change-impact skill: compare retained dependency graphs and supplied artifact digests, preserve withdrawn dependencies and required claims, and plan reassessment. No experiment execution, services or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-research-change-impact"
       ]
     },
     {

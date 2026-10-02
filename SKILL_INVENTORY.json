@@ -2,11 +2,12 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 30,
+    "total": 31,
     "by_plugin": {
       "szl-evidence-skills": 2,
       "szl-paper-evidence-skills": 1,
       "szl-science-assay-skills": 1,
+      "szl-science-change-impact-skills": 1,
       "szl-science-multiplicity-skills": 1,
       "szl-science-replay-skills": 1,
       "szl-science-skills": 24
@@ -22,6 +23,9 @@
     ],
     "szl-science-assay-skills": [
       "szl-assay-measurement-audit"
+    ],
+    "szl-science-change-impact-skills": [
+      "szl-research-change-impact"
     ],
     "szl-science-multiplicity-skills": [
       "szl-multiplicity-audit"
