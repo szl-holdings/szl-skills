@@ -1,16 +1,16 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty-two skills for Claude Science, Claude Code and claude.ai: twenty-nine science
+contains thirty-three skills for Claude Science, Claude Code and claude.ai: thirty science
 tools and three evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have six import families: twenty-four core checks, one bounded experiment
-replay check, one paper evidence audit, one declared assay-run audit, one multiplicity audit and
-one research change-impact check. Each SDK bundle retains the 1 MB limit, licenses and notices.
-All six families use the same installer and can attach to
+The science tools have seven import families: twenty-four core checks, one prospective experiment
+draft, one bounded experiment replay check, one paper evidence audit, one declared assay-run audit,
+one multiplicity audit and one research change-impact check. Each SDK bundle retains the 1 MB limit,
+licenses and notices. All seven families use the same installer and can attach to
 the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
 
 ## Import
@@ -24,8 +24,8 @@ measurement. The stable v0.4.0 tag still contains twenty-three science tools and
 skills. A GitHub tag does not prove Claude Science host registration or measured skill
 effectiveness; verify those separately.
 
-Multiplicity and research change impact remain source-candidate work until a separately
-reviewed tag and byte readback are published.
+Experiment-contract design, multiplicity and research change impact remain source-candidate
+work until a separately reviewed tag and byte readback are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -70,6 +70,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
 | szl-negative-control-audit | Do the negative controls actually rule out the mechanism they claim to, and were outcomes retained? | Does not design interventions |
 | szl-analysis-plan-audit | Did the analysis that ran match the frozen plan, or is the result exploratory now? | No p value, power or efficacy |
+| szl-experiment-contract | Which design choices and assumptions are still missing before a prospective experiment can be reviewed? | Draft only; no preregistration, execution or scientific finding |
 | szl-evidence-gate | Does each stated claim have an intact artifact behind it? | Does not judge scientific correctness |
 | szl-cross-implementation-check | Do two independent implementations agree within declared tolerances on the same input? | Does not say which one is right |
 | szl-analysis-mutation-test | Which classes of data corruption would the project's QC catch? | Never runs the pipeline; not a quality score |

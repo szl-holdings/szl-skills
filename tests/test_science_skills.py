@@ -288,7 +288,7 @@ class PackagingTests(unittest.TestCase):
             reports = package["package_skills"](destination)
             market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
-                        if plugin["name"] in {"szl-science-skills", "szl-science-replay-skills",
+                        if plugin["name"] in {"szl-science-skills", "szl-science-design-skills", "szl-science-replay-skills",
                                               "szl-paper-evidence-skills", "szl-science-assay-skills",
                                               "szl-science-multiplicity-skills", "szl-science-change-impact-skills"}
                         for path in plugin["skills"]}

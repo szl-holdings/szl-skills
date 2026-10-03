@@ -2,13 +2,16 @@
 
 ## Unreleased source candidate
 
+- Add szl-experiment-contract as a bounded prospective experiment-design draft family.
+  It exposes missing controls, experimental units, falsifiers and harm limits; it is not
+  preregistration, experiment execution or a scientific finding.
 - Add szl-rare-disease-evidence-map as a synthetic-only evidence skill with source-bound
   phenotype and variant assertions, explicit HOLD results, and no clinical-use claim.
 - Add szl-research-change-impact as a separate bounded import family. It compares retained
   baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
   keeps missing required claims visible, and gives a deterministic reassessment order.
   Supplied digests and synthetic examples do not establish scientific truth or host registration.
-- Current source inventory is thirty-two skills: twenty-four core science tools, five separate
+- Current source inventory is thirty-three skills: twenty-four core science tools, six separate
   science tools, and three evidence skills. The new change-impact family retains the 1 MB bundle
   limit and does not change the published v0.5.0-rc.1 tag.
 
