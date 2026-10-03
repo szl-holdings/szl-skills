@@ -159,7 +159,7 @@ class SetupTests(unittest.TestCase):
         change = SETUP["bundle"](ROOT, family="change")
         multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
         self.assertEqual(set(design), {"szl-experiment-contract"})
-        self.assertEqual(set(replay), {"szl-experiment-replay", "szl-figure-data-contract"})
+        self.assertEqual(set(replay), {"szl-experiment-replay", "szl-figure-data-contract", "szl-measurement-harmonizer"})
         self.assertEqual(set(paper), {"szl-paper-evidence-audit"})
         self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
         self.assertEqual(set(change), {"szl-research-change-impact"})
@@ -227,6 +227,9 @@ class SetupTests(unittest.TestCase):
             SETUP["install"](self.host, {"szl-assay-measurement-audit": {"huge": "x" * 1000001}}, self.path, family="assay")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001}}, self.path, family="replay")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001},
+                                             "szl-measurement-harmonizer": {}}, self.path, family="replay")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="paper")
         with self.assertRaises(ValueError):
