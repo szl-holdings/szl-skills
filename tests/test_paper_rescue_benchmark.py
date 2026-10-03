@@ -91,6 +91,29 @@ class PaperRescuePilotTests(unittest.TestCase):
         self.assertEqual(report["denominator"], 2)
         self.assertEqual(report["counts"]["missing"], 1)
 
+    def test_empty_candidates_score_as_complete_miss(self):
+        records, gold = documents()
+        records["items"] = []
+        report = kernel.score(records, gold, PDF_SHA256)
+        self.assertEqual(report["status"], "SCORED_REVIEW_REQUIRED")
+        self.assertEqual(report["denominator"], 2)
+        self.assertEqual(report["counts"]["missing"], 2)
+        self.assertEqual(report["counts"]["matched_reference"], 0)
+        self.assertEqual(report["findings"], [
+            {"id": "cellA", "result": "MISSING"},
+            {"id": "captionB", "result": "MISSING"},
+        ])
+        self.assertFalse(report["visual_truth_verified"])
+        self.assertFalse(report["rights_verified"])
+        completed, cli_report, _, _ = cli_run(records, gold)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(cli_report["counts"]["missing"], 2)
+        self.assertEqual(cli_report["denominator"], 2)
+
+        gold["items"] = []
+        with self.assertRaisesRegex(ValueError, "^BAD_ITEM_COUNT$"):
+            kernel.score(records, gold, PDF_SHA256)
+
     def test_wrong_reference_locator_and_content_are_not_matches(self):
         records, gold = documents()
         records["items"][0]["bbox"] = [0.65, 0.65, 0.75, 0.75]
@@ -128,6 +151,19 @@ class PaperRescuePilotTests(unittest.TestCase):
                 with self.assertRaises(ValueError) as caught:
                     kernel.score(records, gold, PDF_SHA256)
                 self.assertEqual(str(caught.exception), code)
+
+    def test_malformed_rights_basis_fails_as_invalid_input(self):
+        for basis in ([], {}, "not-a-rights-basis"):
+            with self.subTest(basis=basis):
+                records, gold = documents()
+                records["rights"]["basis"] = basis
+                with self.assertRaises(ValueError) as caught:
+                    kernel.score(records, gold, PDF_SHA256)
+                self.assertEqual(str(caught.exception), "RIGHTS_BASIS_MISSING")
+                completed, report, _, _ = cli_run(records, gold)
+                self.assertEqual(completed.returncode, 2, completed.stderr)
+                self.assertEqual(report["status"], "INVALID_INPUT")
+                self.assertEqual(report["error_code"], "RIGHTS_BASIS_MISSING")
 
     def test_bbox_page_and_partial_unresolved_fail_closed(self):
         for mutation, code in (
