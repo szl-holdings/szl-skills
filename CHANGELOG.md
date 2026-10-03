@@ -3,19 +3,23 @@
 ## Unreleased source candidate (after v0.5.0-rc.2)
 
 - Add szl-rare-disease-evidence-replay as its own bounded import family without changing the
-  one-skill experiment replay family. It replays only pinned synthetic case and HPO/ClinVar-shaped
+  existing experiment-and-figure replay family. It replays only pinned synthetic case and HPO/ClinVar-shaped
   declarations at a cutoff, with source/provenance ablations and permanent HOLD readiness;
   it does not diagnose, rank disease, evaluate a model or qualify clinical use.
+- Add szl-figure-data-contract to the bounded replay import family: render a declared
+  CSV scatter/line figure, retain point IDs and numeric captions, and parse the SVG
+  during replay to detect geometry, units and caption changes. Offline stdlib only;
+  unsigned receipts do not establish scientific truth or independent replication.
 - Add szl-research-change-impact as a separate bounded import family. It compares retained
   baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
   keeps missing required claims visible, and gives a deterministic reassessment order.
   Supplied digests and synthetic examples do not establish scientific truth or host registration.
-- Current source inventory is thirty-six skills: twenty-seven core science tools, seven separate
+- Current source inventory is thirty-seven skills: twenty-seven core science tools, eight separate
   science tools, and two evidence skills. Outcome preservation, release continuity, skill update
-  review, change impact, prospective experiment design and rare-disease evidence replay are
-  unpublished source candidates. The SDK stages selected tools in at most eight batches of at
-  most 1 MB each, with a 200 KB per-skill limit; these are local staging bounds. They do not
-  change the published v0.5.0-rc.2 tag.
+  review, figure data contract, change impact, prospective experiment design and rare-disease
+  evidence replay are unpublished source candidates. The SDK stages selected tools in at most
+  eight batches of at most 1 MB each, with a 200 KB per-skill limit; these are local staging
+  bounds. They do not change the published v0.5.0-rc.2 tag.
 - Correct Claude Science import instructions, release history, and marketplace source metadata
   after the published v0.5.0-rc.2 tag. Native GitHub import is not advertised as an
   undocumented tag pin; manual per-skill ZIP upload is the fixed-release path. This

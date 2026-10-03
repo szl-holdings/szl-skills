@@ -17,7 +17,7 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-skill-update-review"]
 AGENT = "SZL_SCIENCE"
 DESIGN_NAMES = ["szl-experiment-contract"]
-REPLAY_NAMES = ["szl-experiment-replay"]
+REPLAY_NAMES = ["szl-experiment-replay", "szl-figure-data-contract"]
 RARE_DISEASE_REPLAY_NAMES = ["szl-rare-disease-evidence-replay"]
 PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]

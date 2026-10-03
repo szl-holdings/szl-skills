@@ -376,6 +376,25 @@ class PackagingTests(unittest.TestCase):
                                          ("DECLARED_ONLY", "HOLD", "NOT_EVALUATED"))
                         self.assertEqual(parsed, json.loads((unpacked / "rare-replay-report.json").read_text(encoding="utf-8")))
                         continue
+                    if report["skill"] == "szl-figure-data-contract":
+                        runner = str(unpacked / "scripts" / "run.py")
+                        render = subprocess.run(
+                            [sys.executable, "-I", "-B", runner, "render", "assets/spec.json",
+                             "--root", str(unpacked), "--output", "figure-bundle"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(render.returncode, 0, render.stderr)
+                        self.assertEqual(json.loads(render.stdout)["status"], "MATCH")
+                        verify = subprocess.run(
+                            [sys.executable, "-I", "-B", runner, "verify", "figure-bundle",
+                             "--root", str(unpacked)],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(verify.returncode, 0, verify.stderr)
+                        verdict = json.loads(verify.stdout)
+                        self.assertEqual((verdict["status"], verdict["points"]), ("MATCH", 3))
+                        self.assertFalse(verdict["signed"])
+                        continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
                                str(unpacked / "assets" / "example.json")]

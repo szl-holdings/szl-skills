@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "szl-rare-disease-evidence-replay"
