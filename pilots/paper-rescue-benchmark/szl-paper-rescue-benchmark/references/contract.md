@@ -1,5 +1,9 @@
 # Paper rescue pilot contract
 
+For optional Docling-to-candidate conversion, read the separate
+[adapter contract](docling-adapter.md). It does not alter the record, gold, or
+scoring schemas below.
+
 The CLI takes three explicitly selected local files: `--pdf`, `--records`, and `--gold`. It reads at most 128 MiB of PDF bytes and 1,000,000 bytes from each UTF-8 JSON input. The PDF must begin `%PDF-`; the tool is **not** a PDF parser and does not verify its true page count. JSON duplicate keys, unknown fields, non-finite numbers, malformed boxes, and undeclared candidate IDs fail closed. Each list has 1–1,000 items; IDs are unique and match `[A-Za-z][A-Za-z0-9_-]{0,63}`. SHA-256 values are lowercase hex.
 
 `records.json` has exactly `schema`, `pdf_sha256`, `declared_pages`, `rights`, `pipeline`, `items`. Schema is `szl.paper-rescue.records.v1`. `declared_pages` is an operator assertion from 1 to 10,000. `rights` has exactly `basis` (`operator-created`, `public-domain`, `licensed`, or `permission-granted`), `evidence_uri`, `attestation_id`, `local_processing_authorized: true`, and `contains_patient_data: false`. This gate requires an explicit assertion; the code cannot authenticate a license or detect undisclosed patient data. `pipeline` has exactly `name`, `version`, `ocr_engine`, and `remote_services_used: false`; this is recorded provenance, not proof of the pipeline that actually ran.
