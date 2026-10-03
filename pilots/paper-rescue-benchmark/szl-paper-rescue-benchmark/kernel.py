@@ -75,8 +75,8 @@ def validate_item(item, declared_pages):
         bounded_text(item["unit"], 64, "BAD_UNIT")
 
 
-def validate_items(items, declared_pages):
-    require(type(items) is list and 1 <= len(items) <= 1000, "BAD_ITEM_COUNT")
+def validate_items(items, declared_pages, minimum=1):
+    require(type(items) is list and minimum <= len(items) <= 1000, "BAD_ITEM_COUNT")
     result = {}
     for item in items:
         validate_item(item, declared_pages)
@@ -88,7 +88,8 @@ def validate_items(items, declared_pages):
 def validate_rights(value):
     exact_keys(value, ("basis", "evidence_uri", "attestation_id",
                        "local_processing_authorized", "contains_patient_data"))
-    require(value["basis"] in RIGHTS_BASES, "RIGHTS_BASIS_MISSING")
+    require(type(value["basis"]) is str and value["basis"] in RIGHTS_BASES,
+            "RIGHTS_BASIS_MISSING")
     bounded_text(value["evidence_uri"], 512, "RIGHTS_EVIDENCE_MISSING")
     bounded_text(value["attestation_id"], 128, "RIGHTS_ATTESTATION_MISSING")
     require(value["local_processing_authorized"] is True, "PROCESSING_NOT_AUTHORIZED")
@@ -110,7 +111,7 @@ def validate_records(value, pdf_sha256):
     require(type(pages) is int and 1 <= pages <= 10000, "BAD_DECLARED_PAGES")
     validate_rights(value["rights"])
     validate_pipeline(value["pipeline"])
-    return validate_items(value["items"], pages)
+    return validate_items(value["items"], pages, minimum=0)
 
 
 def validate_gold(value, pdf_sha256, declared_pages):
