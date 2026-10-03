@@ -18,6 +18,7 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
 AGENT = "SZL_SCIENCE"
 DESIGN_NAMES = ["szl-experiment-contract"]
 REPLAY_NAMES = ["szl-experiment-replay", "szl-figure-data-contract"]
+HARMONIZER_NAMES = ["szl-measurement-harmonizer"]
 PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]
 CHANGE_NAMES = ["szl-research-change-impact"]
@@ -45,6 +46,8 @@ def family_names(family):
         return DESIGN_NAMES
     if family == "replay":
         return REPLAY_NAMES
+    if family == "harmonizer":
+        return HARMONIZER_NAMES
     if family == "paper":
         return PAPER_NAMES
     if family == "assay":
@@ -56,7 +59,7 @@ def family_names(family):
     if family == "uncertainty":
         return UNCERTAINTY_NAMES
     if family == "all":
-        return (NAMES + DESIGN_NAMES + REPLAY_NAMES + PAPER_NAMES + ASSAY_NAMES +
+        return (NAMES + DESIGN_NAMES + REPLAY_NAMES + HARMONIZER_NAMES + PAPER_NAMES + ASSAY_NAMES +
                 MULTIPLICITY_NAMES + CHANGE_NAMES + UNCERTAINTY_NAMES)
     raise ValueError("Unknown reviewed science family")
 

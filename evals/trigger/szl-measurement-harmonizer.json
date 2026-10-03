@@ -1,0 +1,27 @@
+{
+  "skill": "szl-measurement-harmonizer",
+  "schema": "szl.trigger-eval.v1",
+  "note": "20 queries: 10 should trigger, 10 near-miss should not. Not yet executed against Claude Science; trigger rates are NOT_MEASURED.",
+  "queries": [
+    {"query": "Lab A calls the specimens A-1 and A-2 in Celsius; Lab B calls them B1 and B2 in Kelvin. Align their rows using my approved ID map and show the raw and converted values.", "should_trigger": true},
+    {"query": "Before comparing two instrument exports, hash both CSV files and join only under the specimen mapping we reviewed.", "should_trigger": true},
+    {"query": "These two sites measured the same samples but used different identifiers and units. Make an auditable canonical table from the declared mappings.", "should_trigger": true},
+    {"query": "A reviewer wants each original lab value beside its Kelvin conversion and the exact source-file digest.", "should_trigger": true},
+    {"query": "Reject any many-to-one specimen join while harmonizing these two assay CSV exports.", "should_trigger": true},
+    {"query": "Convert the declared Fahrenheit readings into Celsius and align records by our explicit sample crosswalk.", "should_trigger": true},
+    {"query": "One site has three fewer mapped specimens than expected. Stop the combined measurement table instead of silently dropping rows.", "should_trigger": true},
+    {"query": "Normalize two thermometer exports to one unit, but preserve the observed values and row numbers for audit.", "should_trigger": true},
+    {"query": "I have three UTF-8 CSV files with different sample IDs and approved affine unit conversions. Produce a row-level harmonization report.", "should_trigger": true},
+    {"query": "Check that the two measurement files still match their manifest hashes before applying our mapping and offset conversions.", "should_trigger": true},
+    {"query": "Infer which samples are the same from similar names in these two CSV files.", "should_trigger": false},
+    {"query": "Decide whether this instrument is calibrated correctly from its readings.", "should_trigger": false},
+    {"query": "Estimate the uncertainty of a Celsius measurement after conversion to Kelvin.", "should_trigger": false},
+    {"query": "Run a statistical test to determine whether these labs agree within a clinically meaningful margin.", "should_trigger": false},
+    {"query": "Merge these CSV files on the first column and pick a unit automatically.", "should_trigger": false},
+    {"query": "Check whether every value in this single CSV stays inside its allowed range.", "should_trigger": false},
+    {"query": "Compare two implementations' already-normalized metrics against a tolerance.", "should_trigger": false},
+    {"query": "Explain the SI definition of kelvin.", "should_trigger": false},
+    {"query": "Design a blinded allocation for the next assay experiment.", "should_trigger": false},
+    {"query": "Download a live instrument feed and discover its specimen IDs.", "should_trigger": false}
+  ]
+}

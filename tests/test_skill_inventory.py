@@ -68,6 +68,17 @@ class InventoryTests(unittest.TestCase):
         installer.write_text(installer.read_text() + "REPLAY_NAMES = ['szl-replay']\n")
         self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
 
+    def test_harmonizer_family_requires_an_exact_separate_installer_selection(self):
+        directory = self.root / "skills" / "szl-harmonizer"; directory.mkdir()
+        (directory / "SKILL.md").write_text("---\nname: szl-harmonizer\ndescription: fixture\n---\n")
+        self.market["plugins"].append({"name": "szl-science-harmonizer-skills", "skills": ["./skills/szl-harmonizer"]})
+        self.save_market()
+        with self.assertRaisesRegex(ValueError, "installer/harmonizer catalog mismatch"):
+            skill_inventory.build(self.root)
+        installer = self.root / "tools" / "install_claude_science.py"
+        installer.write_text(installer.read_text() + "HARMONIZER_NAMES = ['szl-harmonizer']\n")
+        self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
+
     def test_design_family_requires_an_exact_separate_installer_selection(self):
         directory = self.root / "skills" / "szl-design"; directory.mkdir()
         (directory / "SKILL.md").write_text("---\nname: szl-design\ndescription: fixture\n---\n")
