@@ -1,0 +1,25 @@
+{
+  "schema": "szl.synthetic-clinvar.v1",
+  "synthetic": true,
+  "rights": "SYNTHETIC_ONLY",
+  "release": "SYNTHETIC-CLINVAR-1",
+  "records": [
+    {
+      "condition": "SYNTH-COND:0001",
+      "vcv": "SYNTH-VCV:0001.1",
+      "rcv": "SYNTH-RCV:0001.1",
+      "submissions": [
+        {"scv": "SYNTH-SCV:0001.1", "assertion_token": "SYNTH-ASSERT:0001", "source_ref": "SYNTH-REF:SUBMISSION-A"},
+        {"scv": "SYNTH-SCV:0002.2", "assertion_token": "SYNTH-ASSERT:0002", "source_ref": "SYNTH-REF:SUBMISSION-B"}
+      ]
+    },
+    {
+      "condition": "SYNTH-COND:0003",
+      "vcv": "SYNTH-VCV:0002.1",
+      "rcv": "SYNTH-RCV:0002.1",
+      "submissions": [
+        {"scv": "SYNTH-SCV:0003.1", "assertion_token": "SYNTH-ASSERT:0003", "source_ref": "SYNTH-REF:SUBMISSION-C"}
+      ]
+    }
+  ]
+}
