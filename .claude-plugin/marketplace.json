@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay, paper evidence, assay, multiplicity and change-impact audits are separate import families.",
+      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay, harmonizer, paper evidence, assay, multiplicity and change-impact audits are separate import families.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -83,11 +83,20 @@
     },
     {
       "name": "szl-science-replay-skills",
-      "description": "Two bounded offline data skills: pin and replay a local CSV mean, or align multiple CSV exports under declared specimen IDs and unit conversions. No supplied code, network or credentials.",
+      "description": "Two bounded offline replay skills: pin and rerun a CSV mean, or render and inspect a declared CSV-to-SVG figure with point and caption evidence. No supplied code, network or credentials.",
       "source": "./",
       "strict": false,
       "skills": [
         "./skills/szl-experiment-replay",
+        "./skills/szl-figure-data-contract"
+      ]
+    },
+    {
+      "name": "szl-science-harmonizer-skills",
+      "description": "One bounded offline measurement harmonizer: align two to four byte-pinned CSV exports under declared specimen IDs and affine unit conversions. No supplied code, network or credentials; no clinical qualification.",
+      "source": "./",
+      "strict": false,
+      "skills": [
         "./skills/szl-measurement-harmonizer"
       ]
     },

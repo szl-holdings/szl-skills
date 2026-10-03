@@ -1,16 +1,17 @@
 # Claude Science setup
 
-This source candidate contains thirty-six skills: thirty-four science tools and two evidence
-skills. The core family selects twenty-seven science tools; separate design, replay, paper,
-assay, multiplicity and change-impact families select szl-experiment-contract,
-szl-experiment-replay and szl-measurement-harmonizer, szl-paper-evidence-audit,
-szl-assay-measurement-audit, szl-multiplicity-audit and szl-research-change-impact. The SDK
-stages all thirty-four science tools in at most eight batches, each at most 1 MB, with a
-200 KB limit per skill including its license and notice. These are local staging bounds,
-not measured application import limits. All seven families exclude szl-typesafe-ai and
-szl-governed-decision. The published v0.5.0-rc.2 tag contains thirty skills: twenty-eight
-science tools and two evidence skills; it adds multiplicity and the corrected manual-upload
-ZIP layout to v0.5.0-rc.1. Outcome preservation, release continuity, skill update review,
+This source candidate contains thirty-seven skills: thirty-five science tools and two evidence
+skills. The core family selects twenty-seven science tools; separate design, replay,
+harmonizer, paper, assay, multiplicity and change-impact families select
+szl-experiment-contract, szl-experiment-replay and szl-figure-data-contract,
+szl-measurement-harmonizer, szl-paper-evidence-audit, szl-assay-measurement-audit,
+szl-multiplicity-audit and szl-research-change-impact. The SDK stages all thirty-five science
+tools in at most eight batches, each at most 1 MB, with a 200 KB limit per skill including its
+license and notice. These are local staging bounds, not measured application import limits.
+All eight families exclude szl-typesafe-ai and szl-governed-decision. The published
+v0.5.0-rc.2 tag contains thirty skills: twenty-eight science tools and two evidence skills;
+it adds multiplicity and the corrected manual-upload ZIP layout to v0.5.0-rc.1.
+Outcome preservation, release continuity, skill update review, figure data contract,
 change impact, prospective experiment design and measurement harmonizer remain source
 candidates until a later reviewed tag. The stable v0.4.0 tag contains twenty-three science
 tools and two evidence skills. The historical v0.2.0-rc.1 tag contains eight science skills.
@@ -52,10 +53,10 @@ print({"status": receipt["status"], "agent": receipt["agent"],
        "staging": receipt["staging"]})
 ```
 
-The SDK procedure preflights all thirty-four selected science tools and batch limits before any
+The SDK procedure preflights all thirty-five selected science tools and batch limits before any
 write, checks returned sidecar gates for edited kernel.py resources, publishes through
 host.skills and reads every staged resource path back. A new SZL_SCIENCE profile requests
-exactly the thirty-four selected tools and zero connectors on creation. It does not switch the
+exactly the thirty-five selected tools and zero connectors on creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
 `update=True` updates staged paths for the selected science skills; protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles

@@ -289,6 +289,7 @@ class PackagingTests(unittest.TestCase):
             market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
                         if plugin["name"] in {"szl-science-skills", "szl-science-design-skills", "szl-science-replay-skills",
+                                              "szl-science-harmonizer-skills",
                                               "szl-paper-evidence-skills", "szl-science-assay-skills",
                                               "szl-science-multiplicity-skills", "szl-science-change-impact-skills"}
                         for path in plugin["skills"]}
@@ -372,6 +373,25 @@ class PackagingTests(unittest.TestCase):
                         normalized = json.loads(output.read_text(encoding="utf-8"))
                         self.assertEqual(normalized["status"], "HARMONIZED")
                         self.assertEqual(len(normalized["rows"]), 4)
+                        continue
+                    if report["skill"] == "szl-figure-data-contract":
+                        runner = str(unpacked / "scripts" / "run.py")
+                        render = subprocess.run(
+                            [sys.executable, "-I", "-B", runner, "render", "assets/spec.json",
+                             "--root", str(unpacked), "--output", "figure-bundle"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(render.returncode, 0, render.stderr)
+                        self.assertEqual(json.loads(render.stdout)["status"], "MATCH")
+                        verify = subprocess.run(
+                            [sys.executable, "-I", "-B", runner, "verify", "figure-bundle",
+                             "--root", str(unpacked)],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(verify.returncode, 0, verify.stderr)
+                        verdict = json.loads(verify.stdout)
+                        self.assertEqual((verdict["status"], verdict["points"]), ("MATCH", 3))
+                        self.assertFalse(verdict["signed"])
                         continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
