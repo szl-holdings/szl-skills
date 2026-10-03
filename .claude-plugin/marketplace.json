@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Evidence, decisions and reproducible research skills from SZL Holdings: executable, offline checks that make scientific claims carry their evidence.",
-    "version": "0.5.0-rc.1"
+    "version": "0.5.0-rc.2"
   },
   "plugins": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Replay, paper evidence, assay audit and multiplicity audit are separate import families.",
+      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay, paper evidence, assay, multiplicity and change-impact audits are separate import families.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -55,6 +55,15 @@
       ]
     },
     {
+      "name": "szl-science-design-skills",
+      "description": "One bounded offline prospective experiment-contract draft: expose missing controls, units, falsifier, harm limit and cheapest decisive measurement. No preregistration, execution, inference or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-experiment-contract"
+      ]
+    },
+    {
       "name": "szl-science-multiplicity-skills",
       "description": "One bounded offline complete-family multiplicity audit. Holm FWER or declared-assumption BH FDR; HOLD if any planned result is missing. Plan hash is not preregistration.",
       "source": "./",
@@ -79,6 +88,15 @@
       "strict": false,
       "skills": [
         "./skills/szl-experiment-replay"
+      ]
+    },
+    {
+      "name": "szl-science-change-impact-skills",
+      "description": "One offline research change-impact skill: compare retained dependency graphs and supplied artifact digests, preserve withdrawn dependencies and required claims, and plan reassessment. No experiment execution, services or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-research-change-impact"
       ]
     },
     {

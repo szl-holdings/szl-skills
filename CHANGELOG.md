@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased source candidate (after v0.5.0-rc.2)
+
+- Add szl-research-change-impact as a separate bounded import family. It compares retained
+  baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
+  keeps missing required claims visible, and gives a deterministic reassessment order.
+  Supplied digests and synthetic examples do not establish scientific truth or host registration.
+- Current source inventory is thirty-five skills: twenty-seven core science tools, six separate
+  science tools, and two evidence skills. Outcome preservation, release continuity, skill
+  update review, change impact and prospective experiment design are unpublished source
+  candidates. The SDK stages selected tools in at most eight batches of at most 1 MB each,
+  with a 200 KB per-skill limit; these are local staging bounds. They do not change the
+  published v0.5.0-rc.2 tag.
+- Correct Claude Science import instructions, release history, and marketplace source metadata
+  after the published v0.5.0-rc.2 tag. Native GitHub import is not advertised as an
+  undocumented tag pin; manual per-skill ZIP upload is the fixed-release path. This
+  source-only correction does not alter either signed tag
+  or claim that a Claude Science import has occurred.
+
+## 0.5.0-rc.2
+
+- Publish szl-multiplicity-audit as a separate import family: Holm FWER or
+  declared-assumption BH FDR over a complete predeclared family; HOLD if any planned
+  result is missing. Plan hash is not preregistration. It stays outside the 1 MB core bundle.
+- Package each science-skill ZIP inside one skill-named top-level folder for manual
+  claude.ai upload. The 28 release assets were built from the signed tag's immutable
+  source and their provider SHA-256 digests and sizes were read back. Actual app import
+  and agent efficacy remain unverified.
+- Source inventory is twenty-four core science tools, one replay tool, one paper audit,
+  one assay audit, one multiplicity audit and two evidence skills.
+
 ## 0.5.0-rc.1
 
 - Add szl-paper-evidence-audit as a separate, bounded paper import family. It matches complete
@@ -11,11 +41,8 @@
   QC recovery, sample range, quantification minimum and final-result uncertainty declarations.
   Measured-control failure withholds all sample concentrations. Synthetic fixtures and
   adversarial regression tests cover dilution-basis and numeric-precision edges.
-- Add szl-multiplicity-audit as a separate import family: Holm FWER or declared-assumption
-  BH FDR over a complete predeclared family; HOLD if any planned result is missing. Plan hash
-  is not preregistration. It stays outside the 1 MB core bundle.
 - Source inventory becomes twenty-four core science tools, one replay tool, one paper audit,
-  one assay audit, one multiplicity audit and two evidence skills. This source release is not
+  one assay audit and two evidence skills. This source release is not
   proof of Claude Science host registration, method validation or clinical use.
 - Add szl-clustered-replication: distinguish observations from declared experimental units,
   equal-cluster paired effects, an exact conditional cluster sign-flip calculation and
@@ -28,7 +55,7 @@
   technical replication; test execution and app efficacy are reported separately.
 - Preserve the separately developed experiment replay contract and keep paper and assay audits
   outside the core bundle. All four science families retain complete helpers, licenses and
-  notices and the 1 MB SDK bundle limit; the shared installer can attach all twenty-eight tools
+  notices and the 1 MB SDK bundle limit; the shared installer can attach all twenty-seven tools
   across four separately verified calls.
 
 ## 0.4.0

@@ -1,30 +1,43 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty-three skills for Claude Science, Claude Code and claude.ai: thirty-one science
+contains thirty-five skills for Claude Science, Claude Code and claude.ai: thirty-three science
 tools and two evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have five import families: twenty-seven core checks, one bounded experiment
-replay check, one paper evidence audit, one declared assay-run audit, and one multiplicity audit.
-The SDK stages the complete selection in at most eight batches of at most 1 MB each, with a
-200 KB limit per skill including its license and notice. These are local staging bounds, not
-measured application import limits. All five families can attach to the same specialist.
+The science tools have seven import families: twenty-seven core checks, one prospective experiment
+draft, one bounded experiment replay check, one paper evidence audit, one declared assay-run audit,
+one multiplicity audit and one research change-impact check. The SDK stages the complete selection
+in at most eight batches of at most 1 MB each, with a 200 KB limit per skill including its license
+and notice. These are local staging bounds, not measured application import limits. All seven
+families can attach to the same specialist. The stable v0.4.0 tag retains its original
+twenty-three-tool science scope.
 
 ## Import
 
-Claude Science: Skills > Import from GitHub, paste:
+Claude Science: Settings > Skills > Add skill > Import from GitHub; select
+`szl-holdings/szl-skills`. [Anthropic's current instructions](https://claude.com/docs/claude-science/connectors-and-skills)
+document repository import and default-branch update checks, but not a `repo@tag`
+pin. GitHub imports do not update automatically. Check the imported revision and contents
+in the application before relying on them.
+For the fixed prerelease, review and individually upload the skill-named ZIPs from the
+[v0.5.0-rc.2 release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.2)
+using Upload a skill. The signed tag points to commit
+`d36e803dc7dfa56c23aee8c0d4baff647f52fac7`.
 
-    szl-holdings/szl-skills@v0.5.0-rc.1
+The v0.5.0-rc.2 prerelease includes paper evidence audit, clustered replication, experiment replay, assay
+measurement and multiplicity audit. Its individual science ZIPs use the enclosing-folder layout
+for manual claude.ai upload. The stable v0.4.0 tag still contains twenty-three science tools and two evidence
+skills. A GitHub tag or uploaded ZIP does not prove Claude Science host registration or measured skill
+effectiveness; verify those separately.
 
-This prerelease contains twenty-seven science tools (twenty-four core plus replay, paper and
-assay) and two evidence skills. The stable v0.4.0 tag contains twenty-three science tools and
-two evidence skills. Multiplicity audit, outcome preservation, release continuity and skill
-update review are newer source-candidate work; use a reviewed source commit for them until a
-separately reviewed tag is published. A GitHub tag does not prove Claude Science host
-registration or measured skill effectiveness; verify those separately.
+The older v0.5.0-rc.1 tag and its ZIP assets remain immutable; use rc.2 for the
+published multiplicity family and corrected manual-upload layout.
+Outcome preservation, release continuity, skill update review, research change impact and
+prospective experiment design remain source candidates until separately reviewed tags and byte
+readbacks are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -53,6 +66,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | catch a scientific decision flip after a numerically close optimization | szl-outcome-preservation | complete-cohort regressions, inactive modes and withheld performance ratios |
 | trace source identity through a wheel, Hub artifact and runtime | szl-release-continuity | missing bindings, conflicts and refused readiness |
 | review a local skill package update before relying on its new bytes | szl-skill-update-review | added and changed skills, declarations, and evidence or tests to rerun |
+| see which conclusions need reassessment when a dependency disappears | szl-research-change-impact | retained before/after graph impact, missing required claims and deterministic recheck order |
 
 ## Science checks
 
@@ -71,6 +85,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
 | szl-negative-control-audit | Do the negative controls actually rule out the mechanism they claim to, and were outcomes retained? | Does not design interventions |
 | szl-analysis-plan-audit | Did the analysis that ran match the frozen plan, or is the result exploratory now? | No p value, power or efficacy |
+| szl-experiment-contract | Which design choices and assumptions are still missing before a prospective experiment can be reviewed? | Draft only; no preregistration, execution or scientific finding |
 | szl-evidence-gate | Does each stated claim have an intact artifact behind it? | Does not judge scientific correctness |
 | szl-cross-implementation-check | Do two independent implementations agree within declared tolerances on the same input? | Does not say which one is right |
 | szl-analysis-mutation-test | Which classes of data corruption would the project's QC catch? | Never runs the pipeline; not a quality score |
@@ -88,7 +103,8 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-outcome-preservation | Did optimization preserve scientific decisions on every declared case? | Supplied measurements only; not GPU or scientific qualification |
 | szl-release-continuity | Do registry artifacts and runtime bind to the intended source? | Supplied identity comparison; not attestation verification or release authority |
 | szl-skill-update-review | What changed between two locally pinned skill packages, and which evidence or tests need another run? | Offline byte and declaration comparison; not safety, approval or scientific validity |
-| szl-science-workbench | Nine integrated checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
+| szl-research-change-impact | Which conclusions still need review after a research dependency changes or disappears? | Uses declared retained graphs and supplied digests; does not verify scientific truth |
+| szl-science-workbench | Nine integrated core checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
 
 Each science skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
 under `references/` where the input format is non-trivial, and tests in `tests/`. The workbench

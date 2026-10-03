@@ -16,9 +16,11 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-clustered-replication", "szl-outcome-preservation", "szl-release-continuity",
          "szl-skill-update-review"]
 AGENT = "SZL_SCIENCE"
+DESIGN_NAMES = ["szl-experiment-contract"]
 REPLAY_NAMES = ["szl-experiment-replay"]
 PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]
+CHANGE_NAMES = ["szl-research-change-impact"]
 MULTIPLICITY_NAMES = ["szl-multiplicity-audit"]
 MAX_BATCH_BYTES = 1000000
 MAX_SKILL_BYTES = 200000
@@ -38,16 +40,21 @@ source ids, and leave scientific judgments with the researcher."""
 def family_names(family):
     if family == "core":
         return NAMES
+    if family == "design":
+        return DESIGN_NAMES
     if family == "replay":
         return REPLAY_NAMES
     if family == "paper":
         return PAPER_NAMES
     if family == "assay":
         return ASSAY_NAMES
+    if family == "change":
+        return CHANGE_NAMES
     if family == "multiplicity":
         return MULTIPLICITY_NAMES
     if family == "all":
-        return NAMES + REPLAY_NAMES + PAPER_NAMES + ASSAY_NAMES + MULTIPLICITY_NAMES
+        return (NAMES + DESIGN_NAMES + REPLAY_NAMES + PAPER_NAMES + ASSAY_NAMES +
+                MULTIPLICITY_NAMES + CHANGE_NAMES)
     raise ValueError("Unknown reviewed science family")
 
 
