@@ -21,7 +21,7 @@
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay, paper evidence, assay, multiplicity and change-impact audits are separate import families.",
+      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay, paper evidence, assay, multiplicity, change-impact and uncertainty audits are separate import families.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -98,6 +98,15 @@
       "strict": false,
       "skills": [
         "./skills/szl-research-change-impact"
+      ]
+    },
+    {
+      "name": "szl-science-uncertainty-skills",
+      "description": "One bounded offline first-order uncertainty-lineage skill for declared arithmetic graphs and complete input correlations. Exact decimal correlation PSD check; synthetic fixtures only. No unit, coverage, scientific-truth, network or credential verification.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-uncertainty-lineage"
       ]
     },
     {
