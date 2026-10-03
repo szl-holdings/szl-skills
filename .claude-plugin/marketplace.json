@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Evidence, decisions and reproducible research skills from SZL Holdings: executable, offline checks that make scientific claims carry their evidence.",
-    "version": "0.5.0-rc.1"
+    "version": "0.5.0-rc.2"
   },
   "plugins": [
     {
@@ -80,11 +80,19 @@
     },
     {
       "name": "szl-science-replay-skills",
-      "description": "Two bounded offline replay skills: a pinned CSV mean rerun and a synthetic-only, cutoff-bound rare-disease evidence timeline with HPO/ClinVar-shaped source ablations. No diagnosis, supplied code, network or credentials.",
+      "description": "One bounded offline experiment replay skill: pin a local CSV, reference and helper, rerun its built-in mean, and retain match, divergence or incomplete evidence. No supplied code, network or credentials.",
       "source": "./",
       "strict": false,
       "skills": [
-        "./skills/szl-experiment-replay",
+        "./skills/szl-experiment-replay"
+      ]
+    },
+    {
+      "name": "szl-science-rare-disease-replay-skills",
+      "description": "One synthetic-only offline rare-disease evidence timeline replay with pinned HPO/ClinVar-shaped snapshots and source/provenance ablations. Always HOLD; no diagnosis, model use, network or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
         "./skills/szl-rare-disease-evidence-replay"
       ]
     },

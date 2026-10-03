@@ -97,17 +97,21 @@ def build(root):
     replay = set(installer_names(root, "REPLAY_NAMES", required=False))
     if replay != set(grouped.get("szl-science-replay-skills", [])) or replay & (selected | design):
         raise ValueError("installer/replay catalog mismatch")
+    rare_replay = set(installer_names(root, "RARE_DISEASE_REPLAY_NAMES", required=False))
+    if (rare_replay != set(grouped.get("szl-science-rare-disease-replay-skills", [])) or
+            rare_replay & (selected | design | replay)):
+        raise ValueError("installer/rare-disease-replay catalog mismatch")
     paper = set(installer_names(root, "PAPER_NAMES", required=False))
-    if paper != set(grouped.get("szl-paper-evidence-skills", [])) or paper & (selected | design | replay):
+    if paper != set(grouped.get("szl-paper-evidence-skills", [])) or paper & (selected | design | replay | rare_replay):
         raise ValueError("installer/paper catalog mismatch")
     assay = set(installer_names(root, "ASSAY_NAMES", required=False))
-    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | design | replay | paper):
+    if assay != set(grouped.get("szl-science-assay-skills", [])) or assay & (selected | design | replay | rare_replay | paper):
         raise ValueError("installer/assay catalog mismatch")
     change = set(installer_names(root, "CHANGE_NAMES", required=False))
-    if change != set(grouped.get("szl-science-change-impact-skills", [])) or change & (selected | design | replay | paper | assay):
+    if change != set(grouped.get("szl-science-change-impact-skills", [])) or change & (selected | design | replay | rare_replay | paper | assay):
         raise ValueError("installer/change catalog mismatch")
     multiplicity = set(installer_names(root, "MULTIPLICITY_NAMES", required=False))
-    if multiplicity != set(grouped.get("szl-science-multiplicity-skills", [])) or multiplicity & (selected | design | replay | paper | assay | change):
+    if multiplicity != set(grouped.get("szl-science-multiplicity-skills", [])) or multiplicity & (selected | design | replay | rare_replay | paper | assay | change):
         raise ValueError("installer/multiplicity catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {

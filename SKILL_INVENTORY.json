@@ -10,7 +10,8 @@
       "szl-science-change-impact-skills": 1,
       "szl-science-design-skills": 1,
       "szl-science-multiplicity-skills": 1,
-      "szl-science-replay-skills": 2,
+      "szl-science-rare-disease-replay-skills": 1,
+      "szl-science-replay-skills": 1,
       "szl-science-skills": 24
     }
   },
@@ -34,9 +35,11 @@
     "szl-science-multiplicity-skills": [
       "szl-multiplicity-audit"
     ],
-    "szl-science-replay-skills": [
-      "szl-experiment-replay",
+    "szl-science-rare-disease-replay-skills": [
       "szl-rare-disease-evidence-replay"
+    ],
+    "szl-science-replay-skills": [
+      "szl-experiment-replay"
     ],
     "szl-science-skills": [
       "szl-analysis-mutation-test",

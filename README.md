@@ -7,25 +7,35 @@ verify. Normal checks are offline. Repository pins also use local Git; optional 
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have seven import families: twenty-four core checks, one prospective experiment
-draft, two bounded offline replay checks, one paper evidence audit, one declared assay-run audit,
-one multiplicity audit and one research change-impact check. Each SDK bundle retains the 1 MB limit,
-licenses and notices. All seven families use the same installer and can attach to
-the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
+The science tools have eight import families: twenty-four core checks, one prospective experiment
+draft, one CSV experiment replay, one synthetic rare-disease evidence replay, one paper evidence
+audit, one declared assay-run audit, one multiplicity audit and one research change-impact check.
+Each SDK bundle retains the 1 MB limit, licenses and notices. All eight families use the same
+installer and can attach to the same specialist. The stable v0.4.0 tag retains its original
+twenty-three-tool science scope.
 
 ## Import
 
-Claude Science: Skills > Import from GitHub, paste:
+Claude Science: Settings > Skills > Add skill > Import from GitHub; select
+`szl-holdings/szl-skills`. [Anthropic's current instructions](https://claude.com/docs/claude-science/connectors-and-skills)
+document repository import and default-branch update checks, but not a `repo@tag`
+pin. GitHub imports do not update automatically. Check the imported revision and contents
+in the application before relying on them.
+For the fixed prerelease, review and individually upload the skill-named ZIPs from the
+[v0.5.0-rc.2 release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.2)
+using Upload a skill. The signed tag points to commit
+`d36e803dc7dfa56c23aee8c0d4baff647f52fac7`.
 
-    szl-holdings/szl-skills@v0.5.0-rc.1
-
-This prerelease includes paper evidence audit, clustered replication, experiment replay, and assay
-measurement. The stable v0.4.0 tag still contains twenty-three science tools and two evidence
-skills. A GitHub tag does not prove Claude Science host registration or measured skill
+The v0.5.0-rc.2 prerelease includes paper evidence audit, clustered replication, experiment replay, assay
+measurement and multiplicity audit. Its individual science ZIPs use the enclosing-folder layout
+for manual claude.ai upload. The stable v0.4.0 tag still contains twenty-three science tools and two evidence
+skills. A GitHub tag or uploaded ZIP does not prove Claude Science host registration or measured skill
 effectiveness; verify those separately.
 
-Multiplicity, research change impact, experiment contract and synthetic rare-disease evidence
-replay remain source-candidate work until a separately reviewed tag and byte readback are published.
+The older v0.5.0-rc.1 tag and its ZIP assets remain immutable; use rc.2 for the
+published multiplicity family and corrected manual-upload layout.
+Research change impact, prospective experiment design and synthetic rare-disease evidence
+replay remain source candidates until separately reviewed tags and byte readbacks are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.

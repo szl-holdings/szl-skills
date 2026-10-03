@@ -1,20 +1,34 @@
 # Claude Science setup
 
 This source candidate contains thirty-three skills: thirty-one science tools and two evidence
-skills. The default core family selects twenty-four science tools; the design family selects
-szl-experiment-contract, and the replay family selects szl-experiment-replay and
-szl-rare-disease-evidence-replay. Separate paper, assay, multiplicity and change-impact families
-select szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
-szl-research-change-impact. Each complete family must fit the existing 1 MB resource limit.
-All seven families exclude szl-typesafe-ai and szl-governed-decision. The stable v0.4.0 tag contains
-twenty-three science tools and two evidence skills; clustered replication, replay, paper evidence
-and the assay audit were added in v0.5.0-rc.1. Multiplicity and change impact remain source
-candidates; experiment contract and rare-disease evidence replay are also source-candidate only.
-The historical v0.2.0-rc.1 tag contains eight
+skills. The default core family selects twenty-four science tools; separate design, replay,
+rare-disease-replay, paper, assay, multiplicity and change-impact families each select one
+science tool. The rare-disease family selects szl-rare-disease-evidence-replay without changing
+the existing szl-experiment-replay family. Each complete family must fit the existing 1 MB
+resource limit. All eight science families exclude szl-typesafe-ai and szl-governed-decision.
+The stable v0.4.0 tag contains twenty-three science tools and two evidence skills; clustered
+replication, replay, paper evidence
+and the assay audit were added in v0.5.0-rc.1; multiplicity and corrected manual-upload
+ZIP packaging are in v0.5.0-rc.2. That published prerelease contains thirty skills:
+twenty-eight science tools and two evidence skills across five science families. Change impact,
+prospective experiment design and rare-disease evidence replay remain unpublished source
+candidates. The historical v0.2.0-rc.1 tag contains eight
 science skills. GitHub importing skills does not create a specialist. The workbench integrates
 seven core checks; other tools run separately.
 SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does not cover
 all current science tools.
+
+For the native Claude Science GitHub import, use Settings > Skills > Add skill >
+Import from GitHub and select `szl-holdings/szl-skills`. The
+[published instructions](https://claude.com/docs/claude-science/connectors-and-skills)
+do not document a `repo@tag` pin; their update check compares with the latest default-branch
+commit, and imported skills do not update automatically. Check installed revisions and
+contents in the application. To use the fixed
+v0.5.0-rc.2 prerelease, review the individual skill-named ZIPs from its
+[release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.2)
+and use Upload a skill. The signed tag points to
+`d36e803dc7dfa56c23aee8c0d4baff647f52fac7`. This source release does not prove
+the import or specialist activation occurred.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
 bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
@@ -35,6 +49,9 @@ design_receipt = setup["install"](host, design, "claude-science-design-receipt.j
 replay = setup["bundle"](".", family="replay")
 replay_receipt = setup["install"](host, replay, "claude-science-replay-receipt.json",
                                   update=True, family="replay")
+rare_replay = setup["bundle"](".", family="rare-disease-replay")
+rare_replay_receipt = setup["install"](host, rare_replay, "claude-science-rare-replay-receipt.json",
+                                       update=True, family="rare-disease-replay")
 paper = setup["bundle"](".", family="paper")
 paper_receipt = setup["install"](host, paper, "claude-science-paper-receipt.json",
                                  update=True, family="paper")
@@ -48,7 +65,7 @@ change = setup["bundle"](".", family="change")
 change_receipt = setup["install"](host, change, "claude-science-change-receipt.json",
                                   update=True, family="change")
 print({"core": receipt["status"], "design": design_receipt["status"],
-       "replay": replay_receipt["status"],
+       "replay": replay_receipt["status"], "rare_replay": rare_replay_receipt["status"],
        "paper": paper_receipt["status"], "assay": assay_receipt["status"],
        "multiplicity": multiplicity_receipt["status"], "change": change_receipt["status"]})
 ```

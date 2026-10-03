@@ -15,14 +15,14 @@ szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
 szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication.
 
 This source candidate selects twenty-four core science tools from thirty-three total packages;
-the two evidence skills are excluded. Separate design-, replay-, paper-, assay-, multiplicity- and
-change-impact-family installs can attach szl-experiment-contract, szl-experiment-replay,
-szl-rare-disease-evidence-replay, szl-paper-evidence-audit, szl-assay-measurement-audit,
-szl-multiplicity-audit and szl-research-change-impact to the same profile, giving thirty-one
-science tools across seven families. The stable v0.4.0 tag has twenty-three science tools;
-multiplicity, change impact, experiment contract and rare-disease evidence replay remain source
-candidates. The workbench
-integrates seven core checks; all other tools run separately. SCIENCE_ACCEPTANCE.md retains the
+the two evidence skills are excluded. Separate design-, replay-, rare-disease-replay-, paper-,
+assay-, multiplicity- and change-impact-family installs can attach one tool each to the same
+profile, giving thirty-one science tools across eight science families. The stable v0.4.0 tag has
+twenty-three science tools; replay, paper, assay and clustered replication are in v0.5.0-rc.1,
+while multiplicity and corrected manual-upload packaging are in v0.5.0-rc.2. Change impact,
+prospective experiment design and rare-disease evidence replay remain unpublished source
+candidates. The workbench integrates seven core checks; all other tools run separately.
+SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 
 Connectors on creation: none. Attach a selected connector only when the scientific task needs it.

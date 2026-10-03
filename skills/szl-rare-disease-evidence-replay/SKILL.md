@@ -25,6 +25,9 @@ kind at or before `cutoff_utc`. Future snapshots are not opened. A missing or
 ambiguous latest snapshot, changed bytes, or an incomplete latest snapshot yields
 `HOLD`; an older complete snapshot is **never** substituted.
 
+Before authoring another synthetic exercise, read the [input and output contract](references/contract.md)
+for the exact manifest, case and snapshot fields and the declared-time boundary.
+
 The case contains only synthetic `SYNTH-HP:` feature tokens with a `recorded_at_utc`
 and explicit `PRESENT` or `EXCLUDED` state. For each term, the latest state at the
 cutoff wins; later case entries are excluded and counted, not backfilled. An absent

@@ -16,7 +16,8 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-clustered-replication"]
 AGENT = "SZL_SCIENCE"
 DESIGN_NAMES = ["szl-experiment-contract"]
-REPLAY_NAMES = ["szl-experiment-replay", "szl-rare-disease-evidence-replay"]
+REPLAY_NAMES = ["szl-experiment-replay"]
+RARE_DISEASE_REPLAY_NAMES = ["szl-rare-disease-evidence-replay"]
 PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]
 CHANGE_NAMES = ["szl-research-change-impact"]
@@ -39,6 +40,8 @@ def family_names(family):
         return DESIGN_NAMES
     if family == "replay":
         return REPLAY_NAMES
+    if family == "rare-disease-replay":
+        return RARE_DISEASE_REPLAY_NAMES
     if family == "paper":
         return PAPER_NAMES
     if family == "assay":
