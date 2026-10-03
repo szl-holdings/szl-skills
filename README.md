@@ -1,14 +1,14 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty-two skills for Claude Science, Claude Code and claude.ai: thirty science
+contains thirty-three skills for Claude Science, Claude Code and claude.ai: thirty-one science
 tools and two evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
 The science tools have seven import families: twenty-four core checks, one prospective experiment
-draft, one bounded experiment replay check, one paper evidence audit, one declared assay-run audit,
+draft, two bounded replay checks, one paper evidence audit, one declared assay-run audit,
 one multiplicity audit and one research change-impact check. Each SDK bundle retains the 1 MB limit,
 licenses and notices. All seven families use the same installer and can attach to
 the same specialist. The stable v0.4.0 tag retains its original twenty-three-tool science scope.
@@ -33,7 +33,7 @@ effectiveness; verify those separately.
 
 The older v0.5.0-rc.1 tag and its ZIP assets remain immutable; use rc.2 for the
 published multiplicity family and corrected manual-upload layout.
-Research change impact and prospective experiment design remain source candidates until
+Figure data contract, research change impact and prospective experiment design remain source candidates until
 separately reviewed tags and byte readbacks are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
@@ -74,6 +74,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
+| szl-figure-data-contract | Does a declared CSV-to-SVG figure retain every point, axis unit and numeric caption assertion? | Bounded scatter/line replay; unsigned local receipt, not measurement authenticity or scientific truth |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
 | szl-unit-invariants | Are dimensions, units, ranges and conservation checks consistent row by row? | No offset or log units, no uncertainty propagation |
