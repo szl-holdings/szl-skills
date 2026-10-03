@@ -71,6 +71,30 @@ class FigureContractTests(unittest.TestCase):
         self.assertEqual(caught.exception.status, "MISMATCH")
         self.assertFalse((self.root / "bundle").exists())
 
+    def test_xml_invalid_axis_text_refused_before_write(self):
+        for value in ("\ufffe", "\uffff", "\ud800", "\x00"):
+            with self.subTest(value=repr(value)):
+                path = self.root / "assets" / "spec.json"
+                spec = json.loads(path.read_text(encoding="utf-8"))
+                spec["x"]["unit"] = value
+                path.write_bytes(json.dumps(spec, ensure_ascii=True).encode("utf-8"))
+                with self.assertRaises(RUN.ContractError):
+                    self.render()
+                self.assertFalse((self.root / "bundle").exists())
+
+    def test_unsupported_evidence_claims_in_reminted_receipt_refused(self):
+        self.render()
+        path = self.root / "bundle" / "receipt.json"
+        original = path.read_bytes()
+        for field in ("third_party_witness", "scientific_truth", "production_approved"):
+            with self.subTest(field=field):
+                receipt = json.loads(original)
+                receipt.pop("receipt_sha256")
+                receipt[field] = True
+                receipt["receipt_sha256"] = RUN.digest(RUN.encoded(receipt))
+                path.write_bytes(RUN.encoded(receipt))
+                self.assert_mismatch()
+
     def test_input_byte_change_detected(self):
         self.render()
         path = self.root / "assets" / "data.csv"

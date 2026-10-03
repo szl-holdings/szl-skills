@@ -18,6 +18,8 @@ RECEIPT_SCHEMA = "szl.figure-data-receipt.v1"
 MAX_BYTES = 262144
 MAX_ROWS = 10000
 SVG_NS = "http://www.w3.org/2000/svg"
+RECEIPT_KEYS = {"schema", "spec", "data", "spec_sha256", "data_sha256", "generator_sha256",
+                "outputs", "signed", "independent_witness", "scientific_claims_verified", "receipt_sha256"}
 
 
 class ContractError(ValueError):
@@ -128,7 +130,9 @@ def load_contract(root, spec_path, *, raw_spec=None, raw_data=None):
         a = spec[axis]
         if not isinstance(a, dict) or set(a) != {"column", "unit"}:
             raise ContractError("axis requires column and unit")
-        if any(not isinstance(a[k], str) or not 1 <= len(a[k]) <= 80 or any(ord(c) < 32 for c in a[k]) for k in a):
+        if any(not isinstance(a[k], str) or not 1 <= len(a[k]) <= 80 or
+               any(not (32 <= ord(c) <= 0xD7FF or 0xE000 <= ord(c) <= 0xFFFD or
+                        0x10000 <= ord(c) <= 0x10FFFF) for c in a[k]) for k in a):
             raise ContractError("invalid axis text")
     columns = (spec["id_column"], spec["x"]["column"], spec["y"]["column"])
     if any(not isinstance(c, str) for c in columns) or len(set(columns)) != 3:
@@ -210,6 +214,7 @@ def render(root, spec_path, output):
     if directory.exists() or not directory.parent.is_dir():
         raise ContractError("output directory must be new with an existing parent")
     svg, plotted = make_svg(spec, points, summary), encoded(sidecar(spec, points, summary))
+    inspect_svg(svg, spec, points, summary)
     receipt = {"schema": RECEIPT_SCHEMA, "spec": spec_path, "data": spec["data"],
                "spec_sha256": digest(raw_spec), "data_sha256": digest(raw_data),
                "generator_sha256": digest(read_bytes(Path(__file__), 131072)),
@@ -271,6 +276,8 @@ def verify(root, output):
     receipt = read_json(read_bytes(directory / "receipt.json", 16384))
     if not isinstance(receipt, dict) or receipt.get("schema") != RECEIPT_SCHEMA:
         raise ContractError("unsupported receipt")
+    if set(receipt) != RECEIPT_KEYS:
+        raise ContractError("unsupported receipt fields", "MISMATCH")
     claimed = receipt.pop("receipt_sha256", None)
     if claimed != digest(encoded(receipt)) or receipt.get("signed") is not False or receipt.get("independent_witness") is not False or receipt.get("scientific_claims_verified") is not False:
         raise ContractError("receipt changed or unsupported evidence claim", "MISMATCH")
