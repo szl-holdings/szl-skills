@@ -187,6 +187,27 @@ class SetupTests(unittest.TestCase):
         self.assertFalse(result["agent"]["unrestricted"])
         self.assertEqual(result["agent"]["connectors"], [])
 
+    def test_uncertainty_family_is_cli_only_opt_in_and_bounded(self):
+        resources = SETUP["bundle"](ROOT, family="uncertainty")
+        self.assertEqual(set(resources), {"szl-uncertainty-lineage"})
+        self.assertNotIn("szl-uncertainty-lineage", SETUP["family_names"]("core"))
+        self.assertEqual(SETUP["bundle_batches"](ROOT, family="uncertainty"), [resources])
+        files = resources["szl-uncertainty-lineage"]
+        self.assertIn("scripts/run.py", files)
+        self.assertNotIn("kernel.py", files)
+        self.assertLessEqual(resource_bytes(files), SETUP["MAX_SKILL_BYTES"])
+        for malformed in ({}, {"szl-uncertainty-lineage": {"huge": "x" * 1000001}}):
+            with self.assertRaises(ValueError):
+                SETUP["install"](self.host, malformed, self.path, family="uncertainty")
+        self.assertEqual(self.host.skills.files, {})
+        self.assertFalse(self.path.exists())
+        result = SETUP["install"](self.host, resources, self.path, family="uncertainty")
+        self.assertEqual(result["family"], "uncertainty")
+        self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
+        self.assertEqual(result["runtime_task_evaluation"], "NOT_EXECUTED")
+        self.assertEqual(set(result["skills"]), {"szl-uncertainty-lineage"})
+        self.assertEqual(result["agent"]["connectors"], [])
+
     def test_unknown_partial_or_oversized_family_never_writes(self):
         with self.assertRaises(ValueError):
             SETUP["bundle"](ROOT, family="unreviewed")
