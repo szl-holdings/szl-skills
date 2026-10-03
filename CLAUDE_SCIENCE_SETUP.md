@@ -1,15 +1,16 @@
 # Claude Science setup
 
-This source candidate contains thirty-two skills: thirty science tools and two evidence
-skills. The default core family selects twenty-four science tools; separate replay, paper,
-assay, multiplicity and change-impact families select szl-experiment-replay and
-szl-rare-disease-evidence-replay (the two replay tools),
-szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
+This source candidate contains thirty-three skills: thirty-one science tools and two evidence
+skills. The default core family selects twenty-four science tools; the design family selects
+szl-experiment-contract, and the replay family selects szl-experiment-replay and
+szl-rare-disease-evidence-replay. Separate paper, assay, multiplicity and change-impact families
+select szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
 szl-research-change-impact. Each complete family must fit the existing 1 MB resource limit.
-All six families exclude szl-typesafe-ai and szl-governed-decision. The stable v0.4.0 tag contains
+All seven families exclude szl-typesafe-ai and szl-governed-decision. The stable v0.4.0 tag contains
 twenty-three science tools and two evidence skills; clustered replication, replay, paper evidence
 and the assay audit were added in v0.5.0-rc.1. Multiplicity and change impact remain source
-candidates; rare-disease evidence replay is also source-candidate only. The historical v0.2.0-rc.1 tag contains eight
+candidates; experiment contract and rare-disease evidence replay are also source-candidate only.
+The historical v0.2.0-rc.1 tag contains eight
 science skills. GitHub importing skills does not create a specialist. The workbench integrates
 seven core checks; other tools run separately.
 SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does not cover
@@ -28,6 +29,9 @@ import runpy
 setup = runpy.run_path("tools/install_claude_science.py")
 resources = setup["bundle"](".")
 receipt = setup["install"](host, resources, "claude-science-install-receipt.json", update=True)
+design = setup["bundle"](".", family="design")
+design_receipt = setup["install"](host, design, "claude-science-design-receipt.json",
+                                  update=True, family="design")
 replay = setup["bundle"](".", family="replay")
 replay_receipt = setup["install"](host, replay, "claude-science-replay-receipt.json",
                                   update=True, family="replay")
@@ -43,7 +47,8 @@ multiplicity_receipt = setup["install"](host, multiplicity, "claude-science-mult
 change = setup["bundle"](".", family="change")
 change_receipt = setup["install"](host, change, "claude-science-change-receipt.json",
                                   update=True, family="change")
-print({"core": receipt["status"], "replay": replay_receipt["status"],
+print({"core": receipt["status"], "design": design_receipt["status"],
+       "replay": replay_receipt["status"],
        "paper": paper_receipt["status"], "assay": assay_receipt["status"],
        "multiplicity": multiplicity_receipt["status"], "change": change_receipt["status"]})
 ```

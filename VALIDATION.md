@@ -5,9 +5,9 @@ historical evidence, not measurements of the expanded v0.5.0-rc.1 prerelease or 
 For the later six-upgrade, four-audit candidate and its notice follow-up, see
 [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That candidate routed fourteen packages:
 twelve science skills selected by its installer and two separate evidence skills.
-Current source routing is thirty-two total packages: twenty-four core science tools, two
-separate replay tools, one each for paper evidence, assay, multiplicity and change impact, and two
-excluded evidence skills. This count is not a new
+Current source routing is thirty-three total packages: twenty-four core science tools, one
+design tool, two replay tools, one each for paper evidence, assay, multiplicity and change impact,
+and two excluded evidence skills. This count is not a new
 behavioral acceptance result.
 The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL.md files
 and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These

@@ -15,6 +15,7 @@ NAMES = ["szl-science-workbench", "szl-research-anatomy", "szl-math-claim-check"
          "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin", "szl-result-fragility",
          "szl-clustered-replication"]
 AGENT = "SZL_SCIENCE"
+DESIGN_NAMES = ["szl-experiment-contract"]
 REPLAY_NAMES = ["szl-experiment-replay", "szl-rare-disease-evidence-replay"]
 PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]
@@ -34,6 +35,8 @@ source ids, and leave scientific judgments with the researcher."""
 def family_names(family):
     if family == "core":
         return NAMES
+    if family == "design":
+        return DESIGN_NAMES
     if family == "replay":
         return REPLAY_NAMES
     if family == "paper":
