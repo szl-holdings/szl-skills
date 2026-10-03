@@ -23,6 +23,7 @@ PAPER_NAMES = ["szl-paper-evidence-audit"]
 ASSAY_NAMES = ["szl-assay-measurement-audit"]
 CHANGE_NAMES = ["szl-research-change-impact"]
 MULTIPLICITY_NAMES = ["szl-multiplicity-audit"]
+UNCERTAINTY_NAMES = ["szl-uncertainty-lineage"]
 MAX_BATCH_BYTES = 1000000
 MAX_SKILL_BYTES = 200000
 MAX_BATCHES = 8
@@ -55,9 +56,11 @@ def family_names(family):
         return CHANGE_NAMES
     if family == "multiplicity":
         return MULTIPLICITY_NAMES
+    if family == "uncertainty":
+        return UNCERTAINTY_NAMES
     if family == "all":
         return (NAMES + DESIGN_NAMES + REPLAY_NAMES + HARMONIZER_NAMES + PAPER_NAMES + ASSAY_NAMES +
-                MULTIPLICITY_NAMES + CHANGE_NAMES)
+                MULTIPLICITY_NAMES + CHANGE_NAMES + UNCERTAINTY_NAMES)
     raise ValueError("Unknown reviewed science family")
 
 

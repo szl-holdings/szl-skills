@@ -41,7 +41,8 @@ def package_skills(destination, revision=None, manifest=False):
                 if plugin["name"] in {"szl-science-skills", "szl-science-design-skills", "szl-science-replay-skills",
                                        "szl-science-harmonizer-skills",
                                        "szl-paper-evidence-skills", "szl-science-assay-skills",
-                                       "szl-science-multiplicity-skills", "szl-science-change-impact-skills"}
+                                       "szl-science-multiplicity-skills", "szl-science-change-impact-skills",
+                                       "szl-science-uncertainty-skills"}
                 for skill in plugin["skills"]]
     if len(selected) != len(set(selected)):
         raise ValueError("Duplicate skill across science families")
