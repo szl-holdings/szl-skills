@@ -15,16 +15,17 @@ szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
 szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication,
 szl-outcome-preservation, szl-release-continuity, szl-skill-update-review.
 
-This source candidate selects twenty-seven core science tools from thirty-five total packages;
-the two evidence skills are excluded. Separate design-, replay-, paper-, assay-, multiplicity- and
+This source candidate selects twenty-seven core science tools from thirty-seven total packages;
+the three evidence skills are excluded. Separate design-, replay-, paper-, assay-, multiplicity- and
 change-impact-family installs can attach szl-experiment-contract, szl-experiment-replay,
-szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
-szl-research-change-impact to the same profile, giving thirty-three science tools across seven
+szl-figure-data-contract, szl-paper-evidence-audit, szl-assay-measurement-audit,
+szl-multiplicity-audit and szl-research-change-impact to the same profile, giving thirty-four science tools across seven
 families. The published v0.5.0-rc.2 tag has twenty-eight science tools and two evidence skills;
-outcome preservation, release continuity, skill update review, change impact and prospective
-experiment design remain source candidates. The stable v0.4.0 tag has twenty-three science tools
-and two evidence skills. The workbench integrates nine checks; all other tools run separately.
-SCIENCE_ACCEPTANCE.md retains the
+outcome preservation, release continuity, skill update review, figure data contract, change impact
+and prospective experiment design remain source candidates. The synthetic-only rare-disease evidence map is
+also an unpublished evidence candidate outside the science profile. The stable v0.4.0 tag has
+twenty-three science tools and two evidence skills. The workbench integrates nine checks; all
+other tools run separately. SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 
 Connectors on creation: none. Attach a selected connector only when the scientific task needs it.

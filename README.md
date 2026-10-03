@@ -1,8 +1,8 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty-seven skills for Claude Science, Claude Code and claude.ai: thirty-five science
-tools and two evidence skills. They use the Python standard library and report what they did not
+contains thirty-eight skills for Claude Science, Claude Code and claude.ai: thirty-five science
+tools and three evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
@@ -35,8 +35,9 @@ effectiveness; verify those separately.
 
 The older v0.5.0-rc.1 tag and its ZIP assets remain immutable; use rc.2 for the
 published multiplicity family and corrected manual-upload layout.
-Outcome preservation, release continuity, skill update review, figure data contract, research change impact and
-prospective experiment design and uncertainty lineage remain source candidates until separately reviewed tags and byte
+Outcome preservation, release continuity, skill update review, figure data contract, research
+change impact, prospective experiment design, uncertainty lineage and the synthetic-only
+rare-disease evidence map remain source candidates until separately reviewed tags and byte
 readbacks are published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
@@ -120,6 +121,7 @@ identical to the reviewed originals).
 |---|---|---|
 | szl-typesafe-ai | Uses TypeSafe Jev (Choice / Noul / Score) as an optional second reader for evidence-class triage. Fail-closed: any error gives UNAVAILABLE, never PASS. | Not a gate. Not TypeScript, Zod, Pydantic, mypy, or JSON Schema. Never marks anything LIVE. |
 | szl-governed-decision | Wraps a classifier, policy engine, or System One model so each decision carries its own evidence. | Does not prove a model output is true. Receipts cover integrity and origin only. |
+| szl-rare-disease-evidence-map | Reconciles synthetic phenotype and variant assertions into source-bound evidence with explicit HOLD results. | Not a diagnosis, clinical ranking, or validation of external source truth. |
 
 ## Try it in two minutes
 

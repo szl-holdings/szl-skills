@@ -1,17 +1,19 @@
 # Claude Science setup
 
-This source candidate contains thirty-seven skills: thirty-five science tools and two evidence
+This source candidate contains thirty-eight skills: thirty-five science tools and three evidence
 skills. The core family selects twenty-seven science tools; separate design, replay, paper,
 assay, multiplicity, change-impact and uncertainty families select szl-experiment-contract,
 szl-experiment-replay and szl-figure-data-contract, szl-paper-evidence-audit, szl-assay-measurement-audit,
 szl-multiplicity-audit, szl-research-change-impact and szl-uncertainty-lineage. The SDK stages all thirty-five science
 tools in at most eight batches, each at most 1 MB, with a 200 KB limit per skill including its
 license and notice. These are local staging bounds, not measured application import limits.
-All eight families exclude szl-typesafe-ai and szl-governed-decision. The published
-v0.5.0-rc.2 tag contains thirty skills: twenty-eight science tools and two evidence skills;
-it adds multiplicity and the corrected manual-upload ZIP layout to v0.5.0-rc.1.
-Outcome preservation, release continuity, skill update review, figure data contract, change impact and prospective
-experiment design and uncertainty lineage remain source candidates until a later reviewed tag. The stable v0.4.0 tag
+All eight families exclude szl-typesafe-ai, szl-governed-decision and the synthetic-only
+szl-rare-disease-evidence-map. The published v0.5.0-rc.2 tag contains thirty skills:
+twenty-eight science tools and two evidence skills; it adds multiplicity and the corrected
+manual-upload ZIP layout to v0.5.0-rc.1. Outcome preservation, release continuity, skill
+update review, figure data contract, change impact, prospective experiment design,
+uncertainty lineage and the rare-disease evidence map remain source candidates until a later
+reviewed tag. The stable v0.4.0 tag
 contains twenty-three science tools and two evidence skills. The historical v0.2.0-rc.1 tag
 contains eight science skills. GitHub importing skills does not create a specialist. The
 workbench integrates nine checks; other tools run separately.

@@ -2,6 +2,11 @@
 
 ## Unreleased source candidate (after v0.5.0-rc.2)
 
+- Add szl-experiment-contract as a bounded prospective experiment-design draft family.
+  It exposes missing controls, experimental units, falsifiers and harm limits; it is not
+  preregistration, experiment execution or a scientific finding.
+- Add szl-rare-disease-evidence-map as a synthetic-only evidence skill with source-bound
+  phenotype and variant assertions, explicit HOLD results, and no clinical-use claim.
 - Add szl-figure-data-contract to the bounded replay import family: render a declared
   CSV scatter/line figure, retain point IDs and numeric captions, and parse the SVG
   during replay to detect geometry, units and caption changes. Offline stdlib only;
@@ -10,12 +15,12 @@
   baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
   keeps missing required claims visible, and gives a deterministic reassessment order.
   Supplied digests and synthetic examples do not establish scientific truth or host registration.
-- Current source inventory is thirty-six skills: twenty-seven core science tools, seven separate
-  science tools, and two evidence skills. Outcome preservation, release continuity, skill
-  update review, figure data contract, change impact and prospective experiment design are unpublished source
-  candidates. The SDK stages selected tools in at most eight batches of at most 1 MB each,
-  with a 200 KB per-skill limit; these are local staging bounds. They do not change the
-  published v0.5.0-rc.2 tag.
+- Current source inventory is thirty-seven skills: twenty-seven core science tools, seven
+  separate science tools, and three evidence skills. Outcome preservation, release continuity,
+  skill update review, figure data contract, change impact, prospective experiment design and
+  the synthetic-only rare-disease evidence map are unpublished source candidates. The SDK stages
+  selected science tools in at most eight batches of at most 1 MB each, with a 200 KB per-skill
+  limit; these are local staging bounds. They do not change the published v0.5.0-rc.2 tag.
 - Correct Claude Science import instructions, release history, and marketplace source metadata
   after the published v0.5.0-rc.2 tag. Native GitHub import is not advertised as an
   undocumented tag pin; manual per-skill ZIP upload is the fixed-release path. This
