@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased source candidate (after v0.5.0-rc.2)
+## Unreleased source guidance (after v0.5.0-rc.3)
+
+- Point manual-upload guidance and current marketplace metadata to the published
+  rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
+  distinction between package verification, host registration and scientific use.
+
+## 0.5.0-rc.3
 
 - Add szl-figure-data-contract to the bounded replay import family: render a declared
   CSV scatter/line figure, retain point IDs and numeric captions, and parse the SVG
@@ -10,12 +16,20 @@
   baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
   keeps missing required claims visible, and gives a deterministic reassessment order.
   Supplied digests and synthetic examples do not establish scientific truth or host registration.
-- Current source inventory is thirty-six skills: twenty-seven core science tools, seven separate
-  science tools, and two evidence skills. Outcome preservation, release continuity, skill
-  update review, figure data contract, change impact and prospective experiment design are unpublished source
-  candidates. The SDK stages selected tools in at most eight batches of at most 1 MB each,
+- Add bounded uncertainty lineage as a separate family: declared first-order covariance
+  propagation, retained ancestry and explicit precision failures; no new statistical
+  method or scientific validity claim.
+- Publish thirty-five science ZIPs from source
+  `baf0160e1acb2bee0de3c2324211d8d95e1b68b1`. The source inventory is thirty-seven
+  skills: twenty-seven core science tools, eight separate science tools, and two
+  evidence skills. The SDK stages selected tools in at most eight batches of at most 1 MB each,
   with a 200 KB per-skill limit; these are local staging bounds. They do not change the
   published v0.5.0-rc.2 tag.
+- MEASURED: all 306 ZIP members matched immutable Git source; all 39 public release
+  assets matched their hashes after unauthenticated download. Existing assertions
+  passed for 34 SIMULATED CLI cases and paired-science entrypoint presence. Host
+  import was NOT RUN and scientific usefulness remains UNKNOWN. The fixed source's
+  older marketplace metadata and historical counts are disclosed in release notes.
 - Correct Claude Science import instructions, release history, and marketplace source metadata
   after the published v0.5.0-rc.2 tag. Native GitHub import is not advertised as an
   undocumented tag pin; manual per-skill ZIP upload is the fixed-release path. This

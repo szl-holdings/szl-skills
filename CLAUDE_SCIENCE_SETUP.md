@@ -1,6 +1,6 @@
 # Claude Science setup
 
-This source candidate contains thirty-seven skills: thirty-five science tools and two evidence
+This source tree contains thirty-seven skills: thirty-five science tools and two evidence
 skills. The core family selects twenty-seven science tools; separate design, replay, paper,
 assay, multiplicity, change-impact and uncertainty families select szl-experiment-contract,
 szl-experiment-replay and szl-figure-data-contract, szl-paper-evidence-audit, szl-assay-measurement-audit,
@@ -8,10 +8,11 @@ szl-multiplicity-audit, szl-research-change-impact and szl-uncertainty-lineage. 
 tools in at most eight batches, each at most 1 MB, with a 200 KB limit per skill including its
 license and notice. These are local staging bounds, not measured application import limits.
 All eight families exclude szl-typesafe-ai and szl-governed-decision. The published
-v0.5.0-rc.2 tag contains thirty skills: twenty-eight science tools and two evidence skills;
-it adds multiplicity and the corrected manual-upload ZIP layout to v0.5.0-rc.1.
-Outcome preservation, release continuity, skill update review, figure data contract, change impact and prospective
-experiment design and uncertainty lineage remain source candidates until a later reviewed tag. The stable v0.4.0 tag
+v0.5.0-rc.3 prerelease has thirty-five science ZIPs at immutable source
+`baf0160e1acb2bee0de3c2324211d8d95e1b68b1`, including outcome preservation,
+release continuity, skill update review, figure data contract, change impact,
+prospective experiment design and uncertainty lineage. The earlier v0.5.0-rc.2
+tag retains twenty-eight science tools and two evidence skills. The stable v0.4.0 tag
 contains twenty-three science tools and two evidence skills. The historical v0.2.0-rc.1 tag
 contains eight science skills. GitHub importing skills does not create a specialist. The
 workbench integrates nine checks; other tools run separately.
@@ -24,17 +25,21 @@ Import from GitHub and select `szl-holdings/szl-skills`. The
 do not document a `repo@tag` pin; their update check compares with the latest default-branch
 commit, and imported skills do not update automatically. Check installed revisions and
 contents in the application. To use the fixed
-v0.5.0-rc.2 prerelease, review the individual skill-named ZIPs from its
-[release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.2)
+v0.5.0-rc.3 prerelease, review the individual skill-named ZIPs from its
+[release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.3)
 and use Upload a skill. The signed tag points to
-`d36e803dc7dfa56c23aee8c0d4baff647f52fac7`. This source release does not prove
-the import or specialist activation occurred.
+`baf0160e1acb2bee0de3c2324211d8d95e1b68b1`. MEASURED package checks cover
+all 306 ZIP members, public asset hashes, 34 SIMULATED CLI cases and paired-science
+entrypoint presence. Actual host import and specialist activation were NOT RUN;
+scientific usefulness remains UNKNOWN. The release's fixed source snapshot retains
+older marketplace metadata, disclosed in its notes; the source-bound manifest
+identifies the exact ZIP bytes.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
 bundle_batches() reads the working tree; it does not resolve an immutable revision itself. Actual
 application registration requires separate human review and authorization.
 The older one-bundle `bundle(".", family="core")` call exceeds the unchanged 1 MB limit for
-this source candidate; use the bounded batch path below.
+this source tree; use the bounded batch path below.
 
 For supported SDK registration and specialist setup, select this repository as the Claude
 Science project. In that application's **repl** control-plane tool (not its scientific
