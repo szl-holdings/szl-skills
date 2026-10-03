@@ -11,8 +11,9 @@ have the exact shapes in the [scorer contract](contract.md) and are checked
 exact bytes. The Docling JSON limit is 32 MiB; its `pages` mapping must provide
 finite, positive page sizes for exactly the declared 1-based pages.
 
-Each selected item has exactly `id`, `kind`, and `ref`. IDs and item-count bounds
-are the same as `records.json`; duplicate IDs or source references fail. A
+Each selected item has exactly `id`, `kind`, and `ref`. IDs use the same bounds
+as `records.json`; the adapter requires 1–1,000 selected items, while the scorer
+also accepts an empty candidate list as a complete miss. Duplicate IDs or source references fail. A
 `cell` reference is `#/tables/N/data/table_cells/M`; a `caption` reference is
 `#/pictures/N`. No text, header, unit, page, or box is supplied by the
 selection. A located cell requires its own cell box, complete text, explicit
