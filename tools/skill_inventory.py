@@ -109,6 +109,9 @@ def build(root):
     multiplicity = set(installer_names(root, "MULTIPLICITY_NAMES", required=False))
     if multiplicity != set(grouped.get("szl-science-multiplicity-skills", [])) or multiplicity & (selected | design | replay | paper | assay | change):
         raise ValueError("installer/multiplicity catalog mismatch")
+    uncertainty = set(installer_names(root, "UNCERTAINTY_NAMES", required=False))
+    if uncertainty != set(grouped.get("szl-science-uncertainty-skills", [])) or uncertainty & (selected | design | replay | paper | assay | change | multiplicity):
+        raise ValueError("installer/uncertainty catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",

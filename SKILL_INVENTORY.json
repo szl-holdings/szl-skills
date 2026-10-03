@@ -2,7 +2,7 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 36,
+    "total": 37,
     "by_plugin": {
       "szl-evidence-skills": 2,
       "szl-paper-evidence-skills": 1,
@@ -11,7 +11,8 @@
       "szl-science-design-skills": 1,
       "szl-science-multiplicity-skills": 1,
       "szl-science-replay-skills": 2,
-      "szl-science-skills": 27
+      "szl-science-skills": 27,
+      "szl-science-uncertainty-skills": 1
     }
   },
   "plugins": {
@@ -66,6 +67,9 @@
       "szl-session-receipt",
       "szl-skill-update-review",
       "szl-unit-invariants"
+    ],
+    "szl-science-uncertainty-skills": [
+      "szl-uncertainty-lineage"
     ]
   }
 }
