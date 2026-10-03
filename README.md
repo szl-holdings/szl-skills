@@ -1,6 +1,6 @@
 # SZL Skills
 
-Executable checks that make scientific claims carry their evidence. This source candidate
+Executable checks that make scientific claims carry their evidence. This source tree
 contains thirty-seven skills for Claude Science, Claude Code and claude.ai: thirty-five science
 tools and two evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
@@ -23,21 +23,28 @@ document repository import and default-branch update checks, but not a `repo@tag
 pin. GitHub imports do not update automatically. Check the imported revision and contents
 in the application before relying on them.
 For the fixed prerelease, review and individually upload the skill-named ZIPs from the
-[v0.5.0-rc.2 release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.2)
+[v0.5.0-rc.3 release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.3)
 using Upload a skill. The signed tag points to commit
-`d36e803dc7dfa56c23aee8c0d4baff647f52fac7`.
+`baf0160e1acb2bee0de3c2324211d8d95e1b68b1`. The source-bound manifest
+names and hashes all thirty-five ZIPs. Use that fixed revision when reproducing
+the release; later default-branch changes do not rewrite its assets.
 
-The v0.5.0-rc.2 prerelease includes paper evidence audit, clustered replication, experiment replay, assay
-measurement and multiplicity audit. Its individual science ZIPs use the enclosing-folder layout
-for manual claude.ai upload. The stable v0.4.0 tag still contains twenty-three science tools and two evidence
-skills. A GitHub tag or uploaded ZIP does not prove Claude Science host registration or measured skill
-effectiveness; verify those separately.
+The v0.5.0-rc.3 prerelease publishes all thirty-five science tools, including outcome
+preservation, release continuity, skill update review, figure data contract, research
+change impact, prospective experiment design and uncertainty lineage. Its individual
+science ZIPs use the enclosing-folder layout for manual claude.ai upload. MEASURED:
+all 306 ZIP members were checked against immutable Git source, and all 39 public
+assets were downloaded without authentication and hash-matched. The existing package
+assertions passed for 34 SIMULATED CLI cases and paired-science entrypoint presence.
+Actual Claude Science host import was NOT RUN; scientific usefulness remains UNKNOWN.
+The release includes a verification summary and two replay scripts. Signing-key trust
+remains REPO_DECLARED, without an external pin.
 
-The older v0.5.0-rc.1 tag and its ZIP assets remain immutable; use rc.2 for the
-published multiplicity family and corrected manual-upload layout.
-Outcome preservation, release continuity, skill update review, figure data contract, research change impact and
-prospective experiment design and uncertainty lineage remain source candidates until separately reviewed tags and byte
-readbacks are published.
+The older v0.5.0-rc.1 and v0.5.0-rc.2 tags and assets remain immutable.
+The stable v0.4.0 tag retains twenty-three science tools and two evidence skills.
+The fixed rc.3 source snapshot contains older marketplace metadata and historical
+CHANGELOG counts, as disclosed in its release notes; use its source revision and
+manifest rather than a version string to identify the published bytes.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
