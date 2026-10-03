@@ -15,11 +15,13 @@
   baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
   keeps missing required claims visible, and gives a deterministic reassessment order.
   Supplied digests and synthetic examples do not establish scientific truth or host registration.
-- Current source inventory is thirty-three skills: twenty-four core science tools, one design
-  tool, two replay/data tools, one each in the paper, assay, multiplicity and change-impact
-  families, and two evidence skills. Change impact, prospective experiment design and
-  measurement harmonizer are unpublished source candidates; their families retain the 1 MB
-  bundle limit and do not change the published v0.5.0-rc.2 tag.
+- Current source inventory is thirty-six skills: twenty-seven core science tools, seven
+  separate science tools (including two replay/data tools), and two evidence skills.
+  Outcome preservation, release continuity, skill update review, change impact,
+  prospective experiment design and measurement harmonizer are unpublished source
+  candidates. The SDK stages selected tools in at most eight batches of at most 1 MB each,
+  with a 200 KB per-skill limit; these are local staging bounds. They do not change the
+  published v0.5.0-rc.2 tag.
 - Correct Claude Science import instructions, release history, and marketplace source metadata
   after the published v0.5.0-rc.2 tag. Native GitHub import is not advertised as an
   undocumented tag pin; manual per-skill ZIP upload is the fixed-release path. This
