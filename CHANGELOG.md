@@ -2,6 +2,9 @@
 
 ## Unreleased source candidate
 
+- Add szl-experiment-contract as a separate bounded design family. It drafts an offline
+  prospective experiment contract with declared units, controls, falsifier, harm limit and
+  cheapest decisive measurement; it does not preregister, execute or validate an experiment.
 - Add szl-measurement-harmonizer to the bounded replay/data import family. It aligns two to
   four byte-pinned CSV exports using explicitly declared specimen IDs and affine unit
   conversions; ambiguous, incomplete, changed or malformed inputs yield no usable rows.
@@ -12,8 +15,9 @@
   baseline and current dependency graphs, preserves withdrawn dependencies for impact tracing,
   keeps missing required claims visible, and gives a deterministic reassessment order.
   Supplied digests and synthetic examples do not establish scientific truth or host registration.
-- Current source inventory is thirty-two skills: twenty-four core science tools, two replay/data
-  tools, one each in the paper, assay, multiplicity and change-impact families, and two evidence
+- Current source inventory is thirty-three skills: twenty-four core science tools, one design
+  tool, two replay/data tools, one each in the paper, assay, multiplicity and change-impact
+  families, and two evidence
   skills. Each family retains the 1 MB bundle limit; the published v0.5.0-rc.1 tag is unchanged.
 
 ## 0.5.0-rc.1
