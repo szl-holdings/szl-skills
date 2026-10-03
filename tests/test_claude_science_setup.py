@@ -151,22 +151,27 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(set(result["agent"]["skillNames"]), expected)
         self.assertEqual(result["agent"]["connectors"], [])
 
-    def test_seven_bounded_families_attach_all_tools_without_replacing_profile(self):
+    def test_nine_bounded_families_attach_all_tools_without_replacing_profile(self):
         design = SETUP["bundle"](ROOT, family="design")
         replay = SETUP["bundle"](ROOT, family="replay")
+        rare_replay = SETUP["bundle"](ROOT, family="rare-disease-replay")
         paper = SETUP["bundle"](ROOT, family="paper")
         assay = SETUP["bundle"](ROOT, family="assay")
         change = SETUP["bundle"](ROOT, family="change")
         multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
+        uncertainty = SETUP["bundle"](ROOT, family="uncertainty")
         self.assertEqual(set(design), {"szl-experiment-contract"})
         self.assertEqual(set(replay), {"szl-experiment-replay", "szl-figure-data-contract"})
+        self.assertEqual(set(rare_replay), {"szl-rare-disease-evidence-replay"})
         self.assertEqual(set(paper), {"szl-paper-evidence-audit"})
         self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
         self.assertEqual(set(change), {"szl-research-change-impact"})
         self.assertEqual(set(multiplicity), {"szl-multiplicity-audit"})
-        for family, resources in (("design", design), ("replay", replay), ("paper", paper),
+        self.assertEqual(set(uncertainty), {"szl-uncertainty-lineage"})
+        for family, resources in (("design", design), ("replay", replay),
+                                  ("rare-disease-replay", rare_replay), ("paper", paper),
                                   ("assay", assay), ("multiplicity", multiplicity),
-                                  ("change", change)):
+                                  ("change", change), ("uncertainty", uncertainty)):
             self.assertLessEqual(sum(map(resource_bytes, resources.values())), SETUP["MAX_BATCH_BYTES"])
             self.assertEqual(SETUP["bundle_batches"](ROOT, family=family), [resources])
         SETUP["install"](self.host, self.resources, self.path, family="core")
@@ -174,14 +179,22 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(design_result["family"], "design")
         replay_result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay")
         self.assertEqual(replay_result["family"], "replay")
+        rare_result = SETUP["install"](self.host, rare_replay,
+                                       self.path.with_name("rare-replay.json"), family="rare-disease-replay")
+        self.assertEqual(rare_result["family"], "rare-disease-replay")
         paper_result = SETUP["install"](self.host, paper, self.path.with_name("paper.json"), family="paper")
         self.assertEqual(paper_result["family"], "paper")
         SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay")
         multiplicity_result = SETUP["install"](self.host, multiplicity, self.path.with_name("multiplicity.json"), family="multiplicity")
         self.assertEqual(multiplicity_result["family"], "multiplicity")
+        uncertainty_result = SETUP["install"](self.host, uncertainty, self.path.with_name("uncertainty.json"), family="uncertainty")
+        self.assertEqual(uncertainty_result["family"], "uncertainty")
         result = SETUP["install"](self.host, change, self.path.with_name("change.json"), family="change")
         self.assertEqual(set(result["agent"]["skillNames"]),
-                         set(SETUP["NAMES"] + SETUP["DESIGN_NAMES"] + SETUP["REPLAY_NAMES"] + SETUP["PAPER_NAMES"] + SETUP["ASSAY_NAMES"] + SETUP["MULTIPLICITY_NAMES"] + SETUP["CHANGE_NAMES"]))
+                         set(SETUP["NAMES"] + SETUP["DESIGN_NAMES"] + SETUP["REPLAY_NAMES"] +
+                             SETUP["RARE_DISEASE_REPLAY_NAMES"] + SETUP["PAPER_NAMES"] +
+                             SETUP["ASSAY_NAMES"] + SETUP["MULTIPLICITY_NAMES"] +
+                             SETUP["CHANGE_NAMES"] + SETUP["UNCERTAINTY_NAMES"]))
         self.assertEqual(result["family"], "change")
         self.assertEqual(result["skills"]["szl-research-change-impact"]["sidecar_gate"]["ok"], True)
         self.assertFalse(result["agent"]["unrestricted"])
@@ -216,6 +229,12 @@ class SetupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="replay")
         with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {}, self.path, family="rare-disease-replay")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-experiment-replay": {},
+                                          "szl-rare-disease-evidence-replay": {}},
+                             self.path, family="replay")
+        with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="design")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="assay")
@@ -226,7 +245,11 @@ class SetupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-assay-measurement-audit": {"huge": "x" * 1000001}}, self.path, family="assay")
         with self.assertRaises(ValueError):
-            SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001}}, self.path, family="replay")
+            SETUP["install"](self.host, {"szl-experiment-replay": {"huge": "x" * 1000001}},
+                             self.path, family="replay")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {"szl-rare-disease-evidence-replay": {"huge": "x" * 1000001}},
+                             self.path, family="rare-disease-replay")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="paper")
         with self.assertRaises(ValueError):

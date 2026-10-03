@@ -1,18 +1,19 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source candidate
-contains thirty-seven skills for Claude Science, Claude Code and claude.ai: thirty-five science
+contains thirty-eight skills for Claude Science, Claude Code and claude.ai: thirty-six science
 tools and two evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have eight import families: twenty-seven core checks, one prospective experiment
-draft, two bounded replay checks, one paper evidence audit, one declared assay-run audit,
-one multiplicity audit, one research change-impact check and one uncertainty-lineage check. The SDK stages the complete selection
-in at most eight batches of at most 1 MB each, with a 200 KB limit per skill including its license
-and notice. These are local staging bounds, not measured application import limits. All eight
-families can attach to the same specialist. The stable v0.4.0 tag retains its original
+The science tools have nine import families: twenty-seven core checks, one prospective experiment
+draft, two bounded experiment-and-figure replay checks, one separate synthetic rare-disease
+evidence replay, one paper evidence audit, one declared assay-run audit, one multiplicity audit,
+one research change-impact check and one uncertainty-lineage check. The SDK stages the complete
+selection in at most eight batches of at most 1 MB each, with a 200 KB limit per skill including
+its license and notice. These are local staging bounds, not measured application import limits.
+All nine families can attach to the same specialist. The stable v0.4.0 tag retains its original
 twenty-three-tool science scope.
 
 ## Import
@@ -35,9 +36,10 @@ effectiveness; verify those separately.
 
 The older v0.5.0-rc.1 tag and its ZIP assets remain immutable; use rc.2 for the
 published multiplicity family and corrected manual-upload layout.
-Outcome preservation, release continuity, skill update review, figure data contract, research change impact and
-prospective experiment design and uncertainty lineage remain source candidates until separately reviewed tags and byte
-readbacks are published.
+Outcome preservation, release continuity, skill update review, figure data contract, research
+change impact, prospective experiment design, uncertainty lineage and synthetic rare-disease
+evidence replay remain source candidates until separately reviewed tags and byte readbacks are
+published.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -50,6 +52,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 |---|---|---|
 | run the nine integrated checks on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
+| replay a synthetic rare-disease evidence timeline without future leakage | szl-rare-disease-evidence-replay | selected HPO/ClinVar-shaped source snapshots, source/provenance ablations and a permanent HOLD readiness |
 | check that a PDF table quote or figure caption has a pinned page and source region | szl-paper-evidence-audit | exact text locator or unresolved, always requiring human review |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
 | know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
@@ -81,6 +84,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
+| szl-rare-disease-evidence-replay | What synthetic case-feature and HPO/ClinVar-shaped evidence was declared at a UTC cutoff, and what disappears under source/provenance ablation? | Synthetic source candidate only; readiness always HOLD; no diagnosis, ranking or model evaluation |
 | szl-figure-data-contract | Does a declared CSV-to-SVG figure retain every point, axis unit and numeric caption assertion? | Bounded scatter/line replay; unsigned local receipt, not measurement authenticity or scientific truth |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |
 | szl-artifact-lineage | Did every pipeline step consume the bytes the previous step produced? | Reads no artifacts, runs no transforms |
