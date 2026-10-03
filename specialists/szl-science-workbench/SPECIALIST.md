@@ -20,8 +20,9 @@ change-impact-family installs can attach szl-experiment-contract, szl-experiment
 szl-measurement-harmonizer, szl-paper-evidence-audit, szl-assay-measurement-audit,
 szl-multiplicity-audit and szl-research-change-impact to the same profile, giving thirty-one
 science tools across seven families. The stable v0.4.0 tag has twenty-three science tools;
-multiplicity, change impact, experiment contract and measurement harmonizer remain source
-candidates. The workbench
+replay, paper, assay and clustered replication are in v0.5.0-rc.1, while multiplicity and
+corrected manual-upload packaging are in v0.5.0-rc.2. Change impact, prospective experiment
+design and measurement harmonizer remain unpublished source candidates. The workbench
 integrates seven core checks; all other tools run separately. SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 

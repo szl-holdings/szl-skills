@@ -1,20 +1,34 @@
 # Claude Science setup
 
-This source candidate contains thirty-three skills: thirty-one science tools and two evidence
-skills. The default core family selects twenty-four science tools; separate design, replay, paper,
-assay, multiplicity and change-impact families select szl-experiment-contract,
+The current source candidate contains thirty-three skills: thirty-one science tools and two
+evidence skills. The default core family selects twenty-four science tools; separate design,
+replay, paper, assay, multiplicity and change-impact families select szl-experiment-contract,
 szl-experiment-replay and szl-measurement-harmonizer, szl-paper-evidence-audit,
-szl-assay-measurement-audit, szl-multiplicity-audit and szl-research-change-impact.
-Each complete family must fit the existing 1 MB resource limit. All seven families exclude
-szl-typesafe-ai and szl-governed-decision. The stable v0.4.0 tag contains twenty-three
-science tools and two evidence skills; clustered replication, replay, paper evidence and the
-assay audit were added in v0.5.0-rc.1. Multiplicity, change impact, experiment contract and
-measurement harmonizer remain source candidates. The historical v0.2.0-rc.1 tag contains eight
-science skills. GitHub importing skills does not create a specialist. The workbench integrates
+szl-assay-measurement-audit, szl-multiplicity-audit and szl-research-change-impact. Each complete
+family must fit the existing 1 MB resource limit. All seven families exclude szl-typesafe-ai and
+szl-governed-decision. The stable v0.4.0 tag contains twenty-three science tools and two evidence
+skills; clustered replication, replay, paper evidence and the assay audit were added in
+v0.5.0-rc.1; multiplicity and corrected manual-upload ZIP packaging are in v0.5.0-rc.2. That
+published prerelease contains thirty skills: twenty-eight science tools and two evidence skills
+across five families. Change impact, prospective experiment design and measurement harmonizer
+remain unpublished source candidates. The historical v0.2.0-rc.1 tag contains eight science
+skills. GitHub importing skills does not create a specialist. The workbench integrates
 seven core checks; other tools run separately.
 No published tag or actual Claude Science host registration is claimed for the source candidates.
 SCIENCE_ACCEPTANCE.md retains the historical ten-package acceptance scope, which does not cover
 all current science tools.
+
+For the native Claude Science GitHub import, use Settings > Skills > Add skill >
+Import from GitHub and select `szl-holdings/szl-skills`. The
+[published instructions](https://claude.com/docs/claude-science/connectors-and-skills)
+do not document a `repo@tag` pin; their update check compares with the latest default-branch
+commit, and imported skills do not update automatically. Check installed revisions and
+contents in the application. To use the fixed v0.5.0-rc.2 prerelease, review the individual
+skill-named ZIPs from its
+[release](https://github.com/szl-holdings/szl-skills/releases/tag/v0.5.0-rc.2)
+and use Upload a skill. The signed tag points to
+`d36e803dc7dfa56c23aee8c0d4baff647f52fac7`. This source release does not prove
+the import or specialist activation occurred.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
 bundle() reads the working tree; it does not resolve an immutable revision itself. Actual
