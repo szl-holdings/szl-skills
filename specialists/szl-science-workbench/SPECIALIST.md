@@ -15,14 +15,15 @@ szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
 szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication,
 szl-outcome-preservation, szl-release-continuity, szl-skill-update-review.
 
-This source candidate selects twenty-seven core science tools from thirty-seven total packages;
+This source candidate selects twenty-seven core science tools from thirty-eight total packages;
 the two evidence skills are excluded. Separate design-, rare-disease-replay-, paper-, assay-,
-multiplicity- and change-impact-family installs can attach one tool each; the replay family
-attaches both experiment replay and figure data contract. Together these give thirty-five science
-tools across eight science families. The published
+multiplicity-, change-impact- and uncertainty-family installs can attach one tool each; the replay
+family attaches both experiment replay and figure data contract. Together these give thirty-six
+science tools across nine science families. The published
 v0.5.0-rc.2 tag has twenty-eight science tools and two evidence skills. Outcome preservation,
 release continuity, skill update review, figure data contract, change impact, prospective
-experiment design and rare-disease evidence replay remain source candidates. The stable v0.4.0 tag has twenty-three
+experiment design, uncertainty lineage and rare-disease evidence replay remain source candidates.
+The stable v0.4.0 tag has twenty-three
 science tools and two evidence skills. The workbench integrates nine checks; all other tools run
 separately.
 SCIENCE_ACCEPTANCE.md retains the

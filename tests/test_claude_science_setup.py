@@ -151,7 +151,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(set(result["agent"]["skillNames"]), expected)
         self.assertEqual(result["agent"]["connectors"], [])
 
-    def test_eight_bounded_families_attach_all_tools_without_replacing_profile(self):
+    def test_nine_bounded_families_attach_all_tools_without_replacing_profile(self):
         design = SETUP["bundle"](ROOT, family="design")
         replay = SETUP["bundle"](ROOT, family="replay")
         rare_replay = SETUP["bundle"](ROOT, family="rare-disease-replay")
@@ -159,6 +159,7 @@ class SetupTests(unittest.TestCase):
         assay = SETUP["bundle"](ROOT, family="assay")
         change = SETUP["bundle"](ROOT, family="change")
         multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
+        uncertainty = SETUP["bundle"](ROOT, family="uncertainty")
         self.assertEqual(set(design), {"szl-experiment-contract"})
         self.assertEqual(set(replay), {"szl-experiment-replay", "szl-figure-data-contract"})
         self.assertEqual(set(rare_replay), {"szl-rare-disease-evidence-replay"})
@@ -166,10 +167,11 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(set(assay), {"szl-assay-measurement-audit"})
         self.assertEqual(set(change), {"szl-research-change-impact"})
         self.assertEqual(set(multiplicity), {"szl-multiplicity-audit"})
+        self.assertEqual(set(uncertainty), {"szl-uncertainty-lineage"})
         for family, resources in (("design", design), ("replay", replay),
                                   ("rare-disease-replay", rare_replay), ("paper", paper),
                                   ("assay", assay), ("multiplicity", multiplicity),
-                                  ("change", change)):
+                                  ("change", change), ("uncertainty", uncertainty)):
             self.assertLessEqual(sum(map(resource_bytes, resources.values())), SETUP["MAX_BATCH_BYTES"])
             self.assertEqual(SETUP["bundle_batches"](ROOT, family=family), [resources])
         SETUP["install"](self.host, self.resources, self.path, family="core")
@@ -185,14 +187,38 @@ class SetupTests(unittest.TestCase):
         SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay")
         multiplicity_result = SETUP["install"](self.host, multiplicity, self.path.with_name("multiplicity.json"), family="multiplicity")
         self.assertEqual(multiplicity_result["family"], "multiplicity")
+        uncertainty_result = SETUP["install"](self.host, uncertainty, self.path.with_name("uncertainty.json"), family="uncertainty")
+        self.assertEqual(uncertainty_result["family"], "uncertainty")
         result = SETUP["install"](self.host, change, self.path.with_name("change.json"), family="change")
         self.assertEqual(set(result["agent"]["skillNames"]),
                          set(SETUP["NAMES"] + SETUP["DESIGN_NAMES"] + SETUP["REPLAY_NAMES"] +
                              SETUP["RARE_DISEASE_REPLAY_NAMES"] + SETUP["PAPER_NAMES"] +
-                             SETUP["ASSAY_NAMES"] + SETUP["MULTIPLICITY_NAMES"] + SETUP["CHANGE_NAMES"]))
+                             SETUP["ASSAY_NAMES"] + SETUP["MULTIPLICITY_NAMES"] +
+                             SETUP["CHANGE_NAMES"] + SETUP["UNCERTAINTY_NAMES"]))
         self.assertEqual(result["family"], "change")
         self.assertEqual(result["skills"]["szl-research-change-impact"]["sidecar_gate"]["ok"], True)
         self.assertFalse(result["agent"]["unrestricted"])
+        self.assertEqual(result["agent"]["connectors"], [])
+
+    def test_uncertainty_family_is_cli_only_opt_in_and_bounded(self):
+        resources = SETUP["bundle"](ROOT, family="uncertainty")
+        self.assertEqual(set(resources), {"szl-uncertainty-lineage"})
+        self.assertNotIn("szl-uncertainty-lineage", SETUP["family_names"]("core"))
+        self.assertEqual(SETUP["bundle_batches"](ROOT, family="uncertainty"), [resources])
+        files = resources["szl-uncertainty-lineage"]
+        self.assertIn("scripts/run.py", files)
+        self.assertNotIn("kernel.py", files)
+        self.assertLessEqual(resource_bytes(files), SETUP["MAX_SKILL_BYTES"])
+        for malformed in ({}, {"szl-uncertainty-lineage": {"huge": "x" * 1000001}}):
+            with self.assertRaises(ValueError):
+                SETUP["install"](self.host, malformed, self.path, family="uncertainty")
+        self.assertEqual(self.host.skills.files, {})
+        self.assertFalse(self.path.exists())
+        result = SETUP["install"](self.host, resources, self.path, family="uncertainty")
+        self.assertEqual(result["family"], "uncertainty")
+        self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
+        self.assertEqual(result["runtime_task_evaluation"], "NOT_EXECUTED")
+        self.assertEqual(set(result["skills"]), {"szl-uncertainty-lineage"})
         self.assertEqual(result["agent"]["connectors"], [])
 
     def test_unknown_partial_or_oversized_family_never_writes(self):

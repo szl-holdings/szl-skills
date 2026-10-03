@@ -1,18 +1,18 @@
 # Claude Science setup
 
-This source candidate contains thirty-seven skills: thirty-five science tools and two evidence
+This source candidate contains thirty-eight skills: thirty-six science tools and two evidence
 skills. The core family selects twenty-seven science tools. Separate design, rare-disease replay,
-paper, assay, multiplicity and change-impact families select one tool each; the existing replay
-family selects both szl-experiment-replay and szl-figure-data-contract. The rare-disease family
-selects szl-rare-disease-evidence-replay without changing that existing replay selection. The SDK
-stages all thirty-five science tools in at most eight batches, each at most 1 MB, with a 200 KB
-limit per skill including its license and notice. These are local staging bounds, not measured
-application import limits. All eight science families exclude szl-typesafe-ai and
-szl-governed-decision. The published v0.5.0-rc.2 tag contains thirty skills: twenty-eight
+paper, assay, multiplicity, change-impact and uncertainty families select one tool each; the
+existing replay family selects both szl-experiment-replay and szl-figure-data-contract. The
+rare-disease family selects szl-rare-disease-evidence-replay without changing that existing replay
+selection. The SDK stages all thirty-six science tools in at most eight batches, each at most
+1 MB, with a 200 KB limit per skill including its license and notice. These are local staging
+bounds, not measured application import limits. All nine science families exclude szl-typesafe-ai
+and szl-governed-decision. The published v0.5.0-rc.2 tag contains thirty skills: twenty-eight
 science tools and two evidence skills; it adds multiplicity and the corrected manual-upload ZIP
-layout to v0.5.0-rc.1. Outcome preservation, release continuity, skill update review, figure
-data contract, change impact, prospective experiment design and rare-disease evidence replay
-remain source candidates until a later reviewed tag. The stable v0.4.0 tag
+layout to v0.5.0-rc.1. Outcome preservation, release continuity, skill update review, figure data
+contract, change impact, prospective experiment design, uncertainty lineage and rare-disease
+evidence replay remain source candidates until a later reviewed tag. The stable v0.4.0 tag
 contains twenty-three science tools and two evidence skills. The historical v0.2.0-rc.1 tag
 contains eight science skills. GitHub importing skills does not create a specialist. The
 workbench integrates nine checks; other tools run separately.
@@ -51,10 +51,10 @@ print({"status": receipt["status"], "agent": receipt["agent"],
        "staging": receipt["staging"]})
 ```
 
-The SDK procedure preflights all thirty-five selected science tools and batch limits before any
+The SDK procedure preflights all thirty-six selected science tools and batch limits before any
 write, checks returned sidecar gates for edited kernel.py resources, publishes through
 host.skills and reads every staged resource path back. A new SZL_SCIENCE profile requests
-exactly the thirty-five selected tools and zero connectors on creation. It does not switch the
+exactly the thirty-six selected tools and zero connectors on creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
 `update=True` updates staged paths for the selected science skills; protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles
@@ -67,7 +67,7 @@ It reports `resource_set_completeness: UNVERIFIED` and
 already present inside a skill, so a prior executable resource may remain after an update.
 A kernel gate rejection, unavailable SDK, publish refusal or mismatch is a visible failure.
 An absent sidecar probe is recorded as PROBE_UNAVAILABLE, even when publication/readback
-succeeds. Unchanged kernels do not receive a fresh probe; CLI-only paired-science and
+succeeds. Unchanged kernels do not receive a fresh probe; CLI-only uncertainty-lineage, paired-science and
 workbench resources do not enter the kernel gate path. Confirm all intended resources in
 the actual application's supported import/runtime and retain unresolved checks separately.
 Publication/readback is distinct from real sidecar validation and agent task evaluation;

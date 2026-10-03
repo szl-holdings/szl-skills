@@ -291,7 +291,8 @@ class PackagingTests(unittest.TestCase):
                         if plugin["name"] in {"szl-science-skills", "szl-science-design-skills", "szl-science-replay-skills",
                                               "szl-science-rare-disease-replay-skills",
                                               "szl-paper-evidence-skills", "szl-science-assay-skills",
-                                              "szl-science-multiplicity-skills", "szl-science-change-impact-skills"}
+                                              "szl-science-multiplicity-skills", "szl-science-change-impact-skills",
+                                              "szl-science-uncertainty-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
@@ -394,6 +395,20 @@ class PackagingTests(unittest.TestCase):
                         verdict = json.loads(verify.stdout)
                         self.assertEqual((verdict["status"], verdict["points"]), ("MATCH", 3))
                         self.assertFalse(verdict["signed"])
+                        continue
+                    if report["skill"] == "szl-uncertainty-lineage":
+                        checked = subprocess.run(
+                            [sys.executable, "-I", "-B", str(unpacked / "scripts" / "run.py"),
+                             str(unpacked / "assets" / "example.json")],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(checked.returncode, 0, checked.stderr)
+                        result = json.loads(checked.stdout)
+                        self.assertEqual(result["status"], "EVALUATED_DECLARED_FIRST_ORDER_MODEL")
+                        self.assertAlmostEqual(result["targets"][0]["variance"], 0.31)
+                        self.assertEqual(result["input_sha256"], hashlib.sha256(
+                            (unpacked / "assets" / "example.json").read_bytes()).hexdigest())
+                        self.assertFalse((unpacked / "kernel.py").exists())
                         continue
                     self.assertTrue((unpacked / "kernel.py").is_file())
                     command = [sys.executable, "-B", str(unpacked / "scripts" / "run.py"),
