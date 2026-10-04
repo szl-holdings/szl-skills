@@ -63,6 +63,33 @@ class MeasurementHarmonizerTests(unittest.TestCase):
         self.assertEqual(report["rows"], [])
         self.assertIn("UNMAPPED_ID", [item["code"] for item in report["findings"]])
 
+    def test_one_csv_cannot_masquerade_as_two_sources(self):
+        duplicate = copy.deepcopy(EXAMPLE)
+        duplicate["sources"][1] = copy.deepcopy(duplicate["sources"][0])
+        duplicate["sources"][1]["id"] = "lab-copy"
+        report = HARMONIZE(duplicate, SKILL / "assets")
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertEqual(report["rows"], [])
+        self.assertIn("DUPLICATE_SOURCE_FILE", [item["code"] for item in report["findings"]])
+
+    def test_hardlink_alias_cannot_masquerade_as_second_export(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            original = root / "lab-a.csv"
+            original.write_bytes((SKILL / "assets" / "lab-a.csv").read_bytes())
+            try:
+                (root / "alias.csv").hardlink_to(original)
+            except OSError:
+                self.skipTest("Hard links unavailable on this filesystem")
+            duplicate = copy.deepcopy(EXAMPLE)
+            duplicate["sources"][1] = copy.deepcopy(duplicate["sources"][0])
+            duplicate["sources"][1]["id"] = "lab-copy"
+            duplicate["sources"][1]["path"] = "alias.csv"
+            report = HARMONIZE(duplicate, root)
+            self.assertEqual(report["status"], "BLOCKED")
+            self.assertEqual(report["rows"], [])
+            self.assertIn("DUPLICATE_SOURCE_FILE", [item["code"] for item in report["findings"]])
+
     def test_rejects_unsafe_path_and_nonidentity_target_conversion(self):
         unsafe = copy.deepcopy(EXAMPLE)
         unsafe["sources"][0]["path"] = "../lab-a.csv"
@@ -94,6 +121,24 @@ class MeasurementHarmonizerTests(unittest.TestCase):
                                     capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 2)
             self.assertEqual(existing.read_text(encoding="utf-8"), "keep")
+
+    def test_deep_or_oversized_integer_manifest_returns_blocked_report(self):
+        script = SKILL / "scripts" / "run.py"
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            for index, body in enumerate(("[" * 1500 + "0" + "]" * 1500,
+                                          '{"schema":' + "9" * 5000 + "}")):
+                with self.subTest(index=index):
+                    manifest = root / f"input-{index}.json"
+                    output = root / f"report-{index}.json"
+                    manifest.write_text(body, encoding="utf-8")
+                    result = subprocess.run([sys.executable, "-B", str(script), str(manifest),
+                                             "--root", str(SKILL / "assets"), "--output", str(output)],
+                                            capture_output=True, text=True, check=False)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    report = json.loads(output.read_text(encoding="utf-8"))
+                    self.assertEqual(report["status"], "BLOCKED")
+                    self.assertEqual(report["rows"], [])
 
 
 if __name__ == "__main__":
