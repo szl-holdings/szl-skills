@@ -26,7 +26,7 @@ the manifest, or an existing report.
 
 ## Use on real measurements
 
-1. Put two to four small, two-column UTF-8 CSV exports under one input root. Keep raw files
+1. Put two to four distinct, small, two-column UTF-8 CSV exports under one input root. Keep raw files
    unchanged; record their SHA-256 digests.
 2. Copy [the manifest example](assets/example.json). Declare every expected canonical ID,
    every source ID mapping, target unit, and each unit's scale and offset. Review these

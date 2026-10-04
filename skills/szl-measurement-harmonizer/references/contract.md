@@ -4,8 +4,9 @@
 `schema`, `sources`, `expected_ids`, `target_unit`, and `conversions`. It is at most 64 KiB.
 Duplicate JSON keys and nonfinite JSON constants are rejected.
 
-`expected_ids` contains 1–1000 distinct canonical IDs. `sources` contains 2–4 objects,
-each with exactly `id`, `path`, `sha256`, `id_column`, `value_column`, `unit`, and `id_map`.
+`expected_ids` contains 1–1000 distinct canonical IDs. `sources` contains 2–4 objects
+selecting distinct physical files; repeated paths or file identities are blocked.
+Each source has exactly `id`, `path`, `sha256`, `id_column`, `value_column`, `unit`, and `id_map`.
 The source path is POSIX-style, relative to `--root`; absolute paths, traversal, backslashes,
 drive designators, symlinks, and Windows reparse points are rejected. Source files are at most
 1 MiB each. Only two-column UTF-8 CSV is accepted: the header must exactly equal the two

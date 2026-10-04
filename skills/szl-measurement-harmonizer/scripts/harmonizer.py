@@ -8,6 +8,7 @@ import csv
 import hashlib
 import io
 import json
+import os
 import re
 import stat
 from decimal import Decimal, InvalidOperation, localcontext
@@ -70,6 +71,7 @@ def _validate(manifest: object) -> tuple[list[dict], list[str], str, dict[str, t
     if not isinstance(sources, list) or not 2 <= len(sources) <= 4:
         raise AuditError("INVALID_SOURCES")
     ids: set[str] = set()
+    paths: set[str] = set()
     units = {target}
     checked: list[dict] = []
     for source in sources:
@@ -80,6 +82,9 @@ def _validate(manifest: object) -> tuple[list[dict], list[str], str, dict[str, t
             raise AuditError("DUPLICATE_SOURCE")
         ids.add(sid)
         path = _text(source["path"], limit=512)
+        if path in paths:
+            raise AuditError("DUPLICATE_SOURCE_FILE")
+        paths.add(path)
         digest = source["sha256"]
         if not isinstance(digest, str) or not HEX.fullmatch(digest):
             raise AuditError("INVALID_DIGEST")
@@ -179,10 +184,20 @@ def harmonize(manifest: object, root: str | Path) -> dict:
         sources, expected, target, conversions = _validate(manifest)
         staged = []
         unavailable = False
+        seen_locations: set[str] = set()
+        seen_file_ids: set[tuple[int, int]] = set()
         for source in sources:
             sid = source["id"]
             try:
                 path = _safe_file(base, source["path"])
+                location = os.path.normcase(str(path.resolve(strict=True)))
+                metadata = path.stat()
+                file_id = (metadata.st_dev, metadata.st_ino)
+                if location in seen_locations or (metadata.st_ino and file_id in seen_file_ids):
+                    raise AuditError("DUPLICATE_SOURCE_FILE")
+                seen_locations.add(location)
+                if metadata.st_ino:
+                    seen_file_ids.add(file_id)
                 content = _bytes(path)
                 digest = hashlib.sha256(content).hexdigest()
                 report["input_sha256"][sid] = digest
@@ -245,5 +260,10 @@ def read_manifest(path: str | Path) -> dict:
         content = stream.read(64 * 1024 + 1)
     if len(content) > 64 * 1024:
         raise AuditError("MANIFEST_TOO_LARGE")
-    return json.loads(content.decode("utf-8"), object_pairs_hook=pairs,
-                      parse_constant=lambda _: (_ for _ in ()).throw(AuditError("NONFINITE_JSON")))
+    try:
+        return json.loads(content.decode("utf-8"), object_pairs_hook=pairs,
+                          parse_constant=lambda _: (_ for _ in ()).throw(AuditError("NONFINITE_JSON")))
+    except AuditError:
+        raise
+    except (RecursionError, ValueError) as exc:
+        raise AuditError("INVALID_MANIFEST_JSON") from exc
