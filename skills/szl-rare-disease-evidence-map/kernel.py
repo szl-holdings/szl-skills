@@ -8,6 +8,7 @@ import os
 import pathlib
 import re
 import stat
+import sys
 
 MAX_INPUT_BYTES = 256 * 1024
 MAX_ANNOTATIONS = 256
@@ -54,9 +55,14 @@ def _regular(info):
     return stat.S_ISREG(info.st_mode) and not (getattr(info, "st_file_attributes", 0) & 0x400)
 
 
-def _identity(info):
+def _identity(info, *, cross_api=False):
+    clock = info.st_ctime_ns
+    if cross_api and sys.platform == "win32":
+        # Windows 3.12 lstat uses creation time for ctime; fstat uses ChangeTime.
+        # Keep ctime stability within each API and compare birthtime across them.
+        clock = getattr(info, "st_birthtime_ns", clock)
     return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
-            info.st_mtime_ns, info.st_ctime_ns)
+            info.st_mtime_ns, clock)
 
 
 def read_input(path):
@@ -72,7 +78,8 @@ def read_input(path):
     descriptor = os.open(target, flags)
     try:
         opened = os.fstat(descriptor)
-        if not _regular(opened) or _identity(opened) != _identity(observed):
+        if (not _regular(opened)
+                or _identity(opened, cross_api=True) != _identity(observed, cross_api=True)):
             raise EvidenceMapError("input changed before read")
         chunks = []
         remaining = observed.st_size + 1
@@ -88,7 +95,7 @@ def read_input(path):
         os.close(descriptor)
     after = target.lstat()
     if (not _regular(after) or len(payload) != observed.st_size
-            or _identity(observed) != _identity(finished)
+            or _identity(opened) != _identity(finished)
             or _identity(observed) != _identity(after)):
         raise EvidenceMapError("input changed during read")
     _parse_input(payload)
