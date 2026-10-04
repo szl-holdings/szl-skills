@@ -15,15 +15,17 @@ szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
 szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication,
 szl-outcome-preservation, szl-release-continuity, szl-skill-update-review.
 
-This source candidate selects twenty-seven core science tools from thirty-five total packages;
-the two evidence skills are excluded. Separate design-, replay-, paper-, assay-, multiplicity- and
-change-impact-family installs can attach szl-experiment-contract, szl-experiment-replay,
-szl-paper-evidence-audit, szl-assay-measurement-audit, szl-multiplicity-audit and
-szl-research-change-impact to the same profile, giving thirty-three science tools across seven
-families. The published v0.5.0-rc.2 tag has twenty-eight science tools and two evidence skills;
-outcome preservation, release continuity, skill update review, change impact and prospective
-experiment design remain source candidates. The stable v0.4.0 tag has twenty-three science tools
-and two evidence skills. The workbench integrates nine checks; all other tools run separately.
+This source tree selects twenty-seven core science tools from forty total packages;
+the three evidence skills are excluded, including synthetic rare-disease evidence mapping.
+Separate design-, rare-disease-replay-, paper-, assay-,
+multiplicity-, change-impact- and uncertainty-family installs can attach one tool each. The
+replay family attaches experiment replay, figure data contract and measurement harmonizer.
+Together these give thirty-seven science tools across nine science families. The fixed
+v0.5.0-rc.3 source has thirty-five science tools and two evidence skills; measurement
+harmonizer and both rare-disease tools remain unreleased source additions. The earlier
+v0.5.0-rc.2 tag has twenty-eight science tools and two evidence skills. The stable v0.4.0
+tag has twenty-three science tools and two evidence skills. The workbench integrates nine
+checks; all other tools run separately.
 SCIENCE_ACCEPTANCE.md retains the
 historical ten-package acceptance scope. The historical v0.2.0-rc.1 profile selected eight.
 

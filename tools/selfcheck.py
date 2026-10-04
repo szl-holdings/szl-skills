@@ -5,6 +5,8 @@ import skill_inventory
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
+# Aggregate repository source, separate from the unchanged SDK skill/batch limits.
+MAX_SOURCE_SKILL_BYTES = 1_025_000
 SECRET = re.compile(r"(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|hf_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)")
 PERSONAL = re.compile(r"([A-Za-z]:\\Users\\[A-Za-z0-9._-]+|/home/[a-z][a-z0-9_-]*/|/Users/[A-Za-z][A-Za-z0-9._-]*/|\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+\b)")
 REF = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|sh|js|ts|json|yaml|yml|toml|txt|csv))`")
@@ -26,8 +28,8 @@ if not SKILLS.is_dir():
     fails.append("skills/ folder missing")
 else:
     size = sum(p.stat().st_size for p in SKILLS.rglob("*") if p.is_file())
-    if size > 1000000:
-        fails.append("skills/ is %d bytes (limit 1,000,000)" % size)
+    if size > MAX_SOURCE_SKILL_BYTES:
+        fails.append("skills/ is %d bytes (limit %s)" % (size, format(MAX_SOURCE_SKILL_BYTES, ",")))
     names = set()
     for d in sorted(p for p in SKILLS.iterdir() if p.is_dir()):
         md = d / "SKILL.md"

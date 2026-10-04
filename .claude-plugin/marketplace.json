@@ -11,17 +11,18 @@
   "plugins": [
     {
       "name": "szl-evidence-skills",
-      "description": "TypeSafe Jev as a second reader (never the gate) and governed decisions that carry their own evidence.",
+      "description": "TypeSafe Jev as a second reader (never the gate), governed decisions, and synthetic-only rare-disease evidence mapping with source-bound HOLD results.",
       "source": "./",
       "strict": false,
       "skills": [
         "./skills/szl-typesafe-ai",
-        "./skills/szl-governed-decision"
+        "./skills/szl-governed-decision",
+        "./skills/szl-rare-disease-evidence-map"
       ]
     },
     {
       "name": "szl-science-skills",
-      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay, paper evidence, assay, multiplicity, change-impact and uncertainty audits are separate import families.",
+      "description": "Twenty-seven core science skills for evidence-grounded research, including clustered replication, outcome preservation, release continuity and offline skill update review. Offline by default; optional explicit pinned public study fetch. No credentials required. Design, replay and harmonization, synthetic rare-disease replay, paper evidence, assay, multiplicity, change-impact and uncertainty audits are separate import families.",
       "source": "./",
       "strict": false,
       "skills": [
@@ -90,6 +91,15 @@
         "./skills/szl-experiment-replay",
         "./skills/szl-figure-data-contract",
         "./skills/szl-measurement-harmonizer"
+      ]
+    },
+    {
+      "name": "szl-science-rare-disease-replay-skills",
+      "description": "One synthetic-only offline rare-disease evidence timeline replay with pinned HPO/ClinVar-shaped snapshots and source/provenance ablations. Always HOLD; no diagnosis, model use, network or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-rare-disease-evidence-replay"
       ]
     },
     {

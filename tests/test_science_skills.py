@@ -289,6 +289,7 @@ class PackagingTests(unittest.TestCase):
             market = json.loads((ROOT / ".claude-plugin/marketplace.json").read_bytes())
             expected = {pathlib.PurePosixPath(path).name for plugin in market["plugins"]
                         if plugin["name"] in {"szl-science-skills", "szl-science-design-skills", "szl-science-replay-skills",
+                                              "szl-science-rare-disease-replay-skills",
                                               "szl-paper-evidence-skills", "szl-science-assay-skills",
                                               "szl-science-multiplicity-skills", "szl-science-change-impact-skills",
                                               "szl-science-uncertainty-skills"}
@@ -361,6 +362,20 @@ class PackagingTests(unittest.TestCase):
                         )
                         self.assertEqual(replay.returncode, 0, replay.stderr)
                         self.assertEqual(json.loads(replay.stdout)["status"], "MATCH")
+                        continue
+                    if report["skill"] == "szl-rare-disease-evidence-replay":
+                        runner = str(unpacked / "scripts" / "replay.py")
+                        self.assertTrue((unpacked / "references" / "contract.md").is_file())
+                        replay = subprocess.run(
+                            [sys.executable, "-I", "-B", runner, "--root", str(unpacked),
+                             "--manifest", "assets/manifest.json", "--output", "rare-replay-report.json"],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(replay.returncode, 0, replay.stderr)
+                        parsed = json.loads(replay.stdout)
+                        self.assertEqual((parsed["status"], parsed["readiness"], parsed["qualification"]),
+                                         ("DECLARED_ONLY", "HOLD", "NOT_EVALUATED"))
+                        self.assertEqual(parsed, json.loads((unpacked / "rare-replay-report.json").read_text(encoding="utf-8")))
                         continue
                     if report["skill"] == "szl-figure-data-contract":
                         runner = str(unpacked / "scripts" / "run.py")

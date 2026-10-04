@@ -1,0 +1,15 @@
+{
+  "schema": "szl.rare-disease-evidence-map.v1",
+  "synthetic": true,
+  "exercise_id": "SYNTH-EXERCISE:DIVERGENCE-AND-GAPS",
+  "sources": {
+    "hpo": {
+      "release": "SYNTHETIC-HPO-1",
+      "sha256": "bdd86aa0ac4b44321c453ce0e3b94b06d5fdb6e4c22c8e3a6d589533956034bf"
+    },
+    "clinvar": {
+      "release": "SYNTHETIC-CLINVAR-1",
+      "sha256": "f8012249de7d81949554e0abd3b953880af90dacfc3f22c6aa8bdc4d446d0924"
+    }
+  }
+}
