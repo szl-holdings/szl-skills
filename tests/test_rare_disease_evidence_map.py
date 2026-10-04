@@ -9,6 +9,7 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 import unittest.mock as mock
 
@@ -184,6 +185,54 @@ class EvidenceMapTests(unittest.TestCase):
             path.write_bytes(b" " * (256 * 1024 + 1))
             with self.assertRaisesRegex(EvidenceMapError, "exceeds 256 KiB"):
                 read_input(path)
+
+    def windows_metadata(self, *, ctime, birthtime=100):
+        value = (ASSETS / "example-manifest.json").lstat()
+        fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns")
+        return SimpleNamespace(**{field: getattr(value, field) for field in fields},
+                               st_ctime_ns=ctime, st_birthtime_ns=birthtime)
+
+    def test_windows_distinct_creation_and_change_clocks_are_accepted(self):
+        path = ASSETS / "example-manifest.json"
+        expected = path.read_bytes()
+        path_metadata = self.windows_metadata(ctime=100)
+        descriptor_metadata = self.windows_metadata(ctime=200)
+        with mock.patch.object(kernel.sys, "platform", "win32"), \
+             mock.patch.object(pathlib.Path, "lstat", return_value=path_metadata), \
+             mock.patch.object(kernel.os, "fstat", return_value=descriptor_metadata):
+            self.assertEqual(read_input(path), expected)
+
+    def test_windows_descriptor_change_clock_mutation_is_rejected(self):
+        path = ASSETS / "example-manifest.json"
+        path_metadata = self.windows_metadata(ctime=100)
+        descriptors = [self.windows_metadata(ctime=200), self.windows_metadata(ctime=201)]
+        with mock.patch.object(kernel.sys, "platform", "win32"), \
+             mock.patch.object(pathlib.Path, "lstat", return_value=path_metadata), \
+             mock.patch.object(kernel.os, "fstat", side_effect=descriptors):
+            with self.assertRaisesRegex(EvidenceMapError, "changed during read"):
+                read_input(path)
+
+    def test_windows_path_creation_clock_mutation_is_rejected(self):
+        path = ASSETS / "example-manifest.json"
+        paths = [self.windows_metadata(ctime=100), self.windows_metadata(ctime=101)]
+        descriptor_metadata = self.windows_metadata(ctime=200)
+        with mock.patch.object(kernel.sys, "platform", "win32"), \
+             mock.patch.object(pathlib.Path, "lstat", side_effect=paths), \
+             mock.patch.object(kernel.os, "fstat", return_value=descriptor_metadata):
+            with self.assertRaisesRegex(EvidenceMapError, "changed during read"):
+                read_input(path)
+
+    def test_windows_creation_clock_mismatch_is_rejected_before_read(self):
+        path = ASSETS / "example-manifest.json"
+        path_metadata = self.windows_metadata(ctime=100)
+        descriptor_metadata = self.windows_metadata(ctime=200, birthtime=101)
+        with mock.patch.object(kernel.sys, "platform", "win32"), \
+             mock.patch.object(pathlib.Path, "lstat", return_value=path_metadata), \
+             mock.patch.object(kernel.os, "fstat", return_value=descriptor_metadata), \
+             mock.patch.object(kernel.os, "read") as reads:
+            with self.assertRaisesRegex(EvidenceMapError, "changed before read"):
+                read_input(path)
+            reads.assert_not_called()
 
     def test_replaced_regular_file_is_rejected_before_any_bytes_are_read(self):
         with tempfile.TemporaryDirectory() as folder:
