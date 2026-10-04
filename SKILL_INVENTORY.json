@@ -2,14 +2,15 @@
   "schema": "szl.source-skill-inventory.v1",
   "scope": "source-tree",
   "counts": {
-    "total": 38,
+    "total": 40,
     "by_plugin": {
-      "szl-evidence-skills": 2,
+      "szl-evidence-skills": 3,
       "szl-paper-evidence-skills": 1,
       "szl-science-assay-skills": 1,
       "szl-science-change-impact-skills": 1,
       "szl-science-design-skills": 1,
       "szl-science-multiplicity-skills": 1,
+      "szl-science-rare-disease-replay-skills": 1,
       "szl-science-replay-skills": 3,
       "szl-science-skills": 27,
       "szl-science-uncertainty-skills": 1
@@ -18,6 +19,7 @@
   "plugins": {
     "szl-evidence-skills": [
       "szl-governed-decision",
+      "szl-rare-disease-evidence-map",
       "szl-typesafe-ai"
     ],
     "szl-paper-evidence-skills": [
@@ -34,6 +36,9 @@
     ],
     "szl-science-multiplicity-skills": [
       "szl-multiplicity-audit"
+    ],
+    "szl-science-rare-disease-replay-skills": [
+      "szl-rare-disease-evidence-replay"
     ],
     "szl-science-replay-skills": [
       "szl-experiment-replay",

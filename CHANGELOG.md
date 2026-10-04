@@ -2,6 +2,16 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
+- Add szl-rare-disease-evidence-map as a separate synthetic-only evidence skill. It
+  retains exact source-byte bindings, distinct SCV/RCV/VCV scopes, missing links and
+  divergent opaque tokens, with permanent HOLD readiness and no clinical-use claim.
+- Add szl-rare-disease-evidence-replay as its own bounded import family. It replays
+  pinned synthetic case and HPO/ClinVar-shaped declarations at a cutoff, with
+  source/provenance ablations and permanent HOLD readiness. It does not diagnose,
+  rank disease, evaluate a model or qualify clinical use.
+- Current source inventory is forty skills: thirty-seven science tools and three
+  evidence skills. Both synthetic rare-disease tools and measurement harmonization
+  are unreleased source additions; the fixed v0.5.0-rc.3 assets are unchanged.
 - Add offline measurement harmonization with declared specimen ID maps, source hashes and
   affine unit conversions. Ambiguous or incomplete joins retain no usable rows; the result
   does not establish identity, calibration or scientific agreement. Package it with the
