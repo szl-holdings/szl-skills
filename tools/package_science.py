@@ -46,6 +46,31 @@ def package_skills(destination, revision=None, manifest=False):
                 for skill in plugin["skills"]]
     if len(selected) != len(set(selected)):
         raise ValueError("Duplicate skill across science families")
+    local_contents = {}
+    if revision is None:
+        # Validate every local skill before creating any archive. Local edits to
+        # tracked resources are allowed, but unrelated files must never leak.
+        for relative in selected:
+            skill = ROOT / relative
+            prefix = skill.relative_to(ROOT).as_posix() + "/"
+            tracked = subprocess.run(
+                ["git", "ls-files", "--cached", "-z", "--", prefix],
+                cwd=ROOT, env=GIT_ENV, check=True, capture_output=True,
+            ).stdout
+            tracked_paths = {os.fsdecode(path) for path in tracked.split(b"\0") if path}
+            entries = tuple(skill.rglob("*"))
+            if any(path.is_symlink() for path in entries):
+                raise ValueError(f"Symlinked skill resource in {relative}")
+            members = sorted(path for path in entries
+                             if path.is_file() and "__pycache__" not in path.parts)
+            member_paths = {path.relative_to(ROOT).as_posix() for path in members}
+            if member_paths - tracked_paths:
+                raise ValueError(f"Untracked skill resources in {relative}")
+            if tracked_paths - member_paths:
+                raise ValueError(f"Missing tracked skill resources in {relative}")
+            local_contents[relative] = {
+                path.relative_to(skill).as_posix(): path.read_bytes() for path in members
+            }
     destination.mkdir(parents=True, exist_ok=True)
     reports = []
     for relative in selected:
@@ -61,10 +86,7 @@ def package_skills(destination, revision=None, manifest=False):
                     raise ValueError("Only tracked regular skill files may be packaged")
                 contents[path[len(prefix):]] = git_bytes(revision, path)
         else:
-            members = sorted(p for p in skill.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
-            if any(not p.is_file() or p.is_symlink() for p in members):
-                raise ValueError("Missing or symlinked skill resource")
-            contents = {p.relative_to(skill).as_posix(): p.read_bytes() for p in members}
+            contents = local_contents[relative]
         if "SKILL.md" not in contents:
             raise ValueError("Missing skill entrypoint")
         for name in ("LICENSE", "NOTICE"):
