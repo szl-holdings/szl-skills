@@ -52,6 +52,8 @@ def package_skills(destination, revision=None, manifest=False):
         # tracked resources are allowed, but unrelated files must never leak.
         for relative in selected:
             skill = ROOT / relative
+            if (ROOT / "skills").is_symlink() or skill.is_symlink():
+                raise ValueError(f"Symlinked skill resource in {relative}")
             prefix = skill.relative_to(ROOT).as_posix() + "/"
             tracked = subprocess.run(
                 ["git", "ls-files", "--cached", "-z", "--", prefix],
@@ -68,9 +70,12 @@ def package_skills(destination, revision=None, manifest=False):
                 raise ValueError(f"Untracked skill resources in {relative}")
             if tracked_paths - member_paths:
                 raise ValueError(f"Missing tracked skill resources in {relative}")
-            local_contents[relative] = {
+            contents = {
                 path.relative_to(skill).as_posix(): path.read_bytes() for path in members
             }
+            if "SKILL.md" not in contents:
+                raise ValueError(f"Missing skill entrypoint in {relative}")
+            local_contents[relative] = contents
     destination.mkdir(parents=True, exist_ok=True)
     reports = []
     for relative in selected:
