@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 NAMES = ["szl-research-anatomy", "szl-math-claim-check", "szl-dataset-readiness",
@@ -265,6 +266,40 @@ class CapsuleTests(unittest.TestCase):
 
 
 class PackagingTests(unittest.TestCase):
+    def test_local_package_rejects_symlinked_skill_root(self):
+        package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
+        original_is_symlink = pathlib.Path.is_symlink
+        for symlink in (ROOT / "skills", ROOT / "skills" / "szl-paper-evidence-audit"):
+            with self.subTest(symlink=symlink), tempfile.TemporaryDirectory() as temp:
+                destination = pathlib.Path(temp) / "archives"
+
+                def is_symlink(path):
+                    return path == symlink or original_is_symlink(path)
+
+                with mock.patch.object(pathlib.Path, "is_symlink", is_symlink):
+                    with self.assertRaisesRegex(ValueError, "Symlinked skill resource"):
+                        package["package_skills"](destination)
+                self.assertFalse(destination.exists())
+
+    def test_local_package_rejects_late_missing_entrypoint(self):
+        package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
+        market_path = ROOT / ".claude-plugin" / "marketplace.json"
+        original_read_bytes = pathlib.Path.read_bytes
+        market = json.loads(original_read_bytes(market_path))
+        market["plugins"][-1]["skills"].append("./skills/szl-missing-entrypoint-test")
+
+        def read_bytes(path):
+            if path == market_path:
+                return json.dumps(market).encode("utf-8")
+            return original_read_bytes(path)
+
+        with tempfile.TemporaryDirectory() as temp:
+            destination = pathlib.Path(temp) / "archives"
+            with mock.patch.object(pathlib.Path, "read_bytes", read_bytes):
+                with self.assertRaisesRegex(ValueError, "Missing skill entrypoint"):
+                    package["package_skills"](destination)
+            self.assertFalse(destination.exists())
+
     def test_local_package_rejects_untracked_resource_before_any_archive(self):
         package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
         # This is the last selected skill, so earlier archives must not survive.
