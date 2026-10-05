@@ -265,6 +265,18 @@ class CapsuleTests(unittest.TestCase):
 
 
 class PackagingTests(unittest.TestCase):
+    def test_local_package_rejects_untracked_resource_before_any_archive(self):
+        package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
+        # This is the last selected skill, so earlier archives must not survive.
+        skill = ROOT / "skills" / "szl-paper-evidence-audit"
+        with tempfile.TemporaryDirectory(prefix=".package-untracked-", dir=skill) as private_dir:
+            (pathlib.Path(private_dir) / ".env").write_text("synthetic test only", encoding="utf-8")
+            with tempfile.TemporaryDirectory() as temp:
+                destination = pathlib.Path(temp) / "archives"
+                with self.assertRaisesRegex(ValueError, "Untracked skill resources"):
+                    package["package_skills"](destination)
+                self.assertFalse(destination.exists())
+
     def test_release_packages_match_immutable_git_blobs_and_are_deterministic(self):
         package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
         import zipfile
