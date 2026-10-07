@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Offline paired-cluster audit; 0 conditional, 1 descriptive only, 2 invalid input."""
+"""Offline paired-cluster audit; 0 conditional or plan complete, 1 descriptive or held, 2 invalid input."""
 import argparse
 import hashlib
 import json
 import pathlib
 import sys
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+HERE = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(HERE))
 from kernel import MAX_BYTES, read_json, szl_clustered_replication
+from ablation import ABLATION_SCHEMA, szl_cluster_ablation
 
 
 def main():
@@ -21,15 +23,20 @@ def main():
             raise ValueError("Input must be a regular non-symlink file")
         with args.input.open("rb") as handle:
             raw = handle.read(MAX_BYTES + 1)
-        report = szl_clustered_replication(read_json(raw), args.expected_plan_sha256)
+        document = read_json(raw)
+        plan = document.get("plan") if isinstance(document, dict) else None
+        ablation = isinstance(plan, dict) and plan.get("schema") == ABLATION_SCHEMA
+        report = (szl_cluster_ablation if ablation else szl_clustered_replication)(document, args.expected_plan_sha256)
+        if ablation:
+            report["ablation_implementation_sha256"] = hashlib.sha256((HERE / "ablation.py").read_bytes()).hexdigest()
         report["input_raw_sha256"] = hashlib.sha256(raw).hexdigest()
-        report["implementation_sha256"] = hashlib.sha256(
-            (pathlib.Path(__file__).resolve().parents[1] / "kernel.py").read_bytes()).hexdigest()
+        report["implementation_sha256"] = hashlib.sha256((HERE / "kernel.py").read_bytes()).hexdigest()
     except (OSError, ValueError, UnicodeError, RecursionError) as error:
         report = {"status": "INPUT_ERROR", "error_type": type(error).__name__,
                   "reason": "Unable to read bounded valid experiment JSON", "conditional_exact_test": None}
     print(json.dumps(report, indent=2, allow_nan=False))
-    return {"CONDITIONAL_CLUSTER_RESULT": 0, "DESCRIPTIVE_ONLY": 1, "INPUT_ERROR": 2}[report["status"]]
+    code = {"CONDITIONAL_CLUSTER_RESULT": 0, "PLAN_COMPLETE": 0, "ANALYZED": 0, "INPUT_ERROR": 2}.get(report["status"], 1)
+    return max(code, 1) if report.get("inference_blockers") else code
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 ---
 name: szl-clustered-replication
-description: "Audit paired model, assay or pipeline losses when many observations belong to a few independent donors, plates, sites or training runs. Report observational versus experimental counts, equal-cluster effects, a conditional exact cluster sign-flip test and leave-one-cluster sensitivity. Use for pseudoreplication or a result that may depend on one experimental unit."
+description: "Audit paired model, assay or pipeline losses when many observations belong to a few independent donors, plates, sites or training runs. Report observational versus experimental counts, equal-cluster effects, a conditional exact cluster sign-flip test and leave-one-cluster sensitivity. Use for pseudoreplication, a result that may depend on one experimental unit, or clustered ablation arms."
 license: Apache-2.0
 ---
 
@@ -32,6 +32,23 @@ For each result, report the number and meaning of experimental units, the within
 the declared sign-flip basis, the conditional p value when available, and all leave-one-unit
 findings. Sensitivity checks are descriptive; they are not additional independent replications
 or a reason to remove a donor. Keep the complete table and disclose missing observations.
+
+## Ablation plans
+
+`szl.clustered-ablation.v1` (`references/contract.md`) plans factors, a `full` arm and arms that
+remove explicit factor sets. Without rows it reports PLAN_COMPLETE or PLAN_INCOMPLETE; with rows,
+HOLD if a planned arm or case is missing, else ANALYZED per arm plus raw arm p values for
+szl-multiplicity-audit. PLAN_SHA256 is in `assets/ablation-lock.json`.
+
+```bash
+python scripts/run.py assets/ablation-incomplete.json
+python scripts/run.py assets/ablation-example.json --expected-plan-sha256 PLAN_SHA256
+```
+
+### What it does not do
+
+It does not adjust p values, verify what an arm changed, estimate interactions, rank factors or
+establish a mechanism. Origin: `references/provenance.md`.
 
 ## Boundaries and services
 

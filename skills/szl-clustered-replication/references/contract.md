@@ -60,3 +60,21 @@ Methodological sources, summarized rather than copied:
 This is an original implementation of this restricted contract. No source code from those papers
 is included. Local synthetic tests establish behavior of the calculation, not agent efficacy,
 scientific validity, biological mechanism or general superiority over statistical packages.
+
+## Ablation contract (`szl.clustered-ablation.v1`)
+
+Input is `{plan}` (planner only) or `{plan, rows}`. The plan is the v1 plan without
+`expected_cases`, plus `factors` (1-15) and `arms` (2-16) of
+`{id, removes, multi_factor_declared, expected_cases}`, with distinct identifiers of at most 64
+characters. Arm `full` removes nothing; other arms remove declared factors. The v1 audit checks
+shared fields and each arm's cases. PLAN_INCOMPLETE lists FACTOR_NEVER_ABLATED, DUPLICATE_ARM
+(removed set equal to an earlier arm or `full`), UNDECLARED_MULTI_FACTOR_DIFFERENCE (2+ factors,
+undeclared) and CASE_SETS_DIFFER (`{id, cluster}` set unlike `full`).
+
+Rows are `{id, cluster, arm, unit, loss}`, one per planned arm/case (at most 10,000); others are
+INPUT_ERROR. Incomplete plans are not analyzed; missing pairs give HOLD without statistics.
+Otherwise each arm's unchanged v1 report (`baseline_loss` = arm, `candidate_loss` = full; bound
+only if the plan digest matched) is in `arms[].audit`, and `multiplicity_handoff` lists raw arm
+p values as exact decimal strings or null, unadjusted. Arm p values share `full`, so they are not
+independent. CLI exit: 0 PLAN_COMPLETE or conditional ANALYZED, 2 INPUT_ERROR, else 1. Arms share
+the declared assumptions; arm configurations are not inspected.

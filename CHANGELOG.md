@@ -27,6 +27,12 @@
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.
+- Add `szl.clustered-ablation.v1` to szl-clustered-replication. The planner flags factors
+  never ablated, duplicate arms, undeclared multi-factor removals and differing case sets
+  (PLAN_INCOMPLETE). The analyzer runs the unchanged paired-cluster audit per arm against
+  `full`, returns HOLD for any missing arm or case, and hands raw arm p values to
+  szl-multiplicity-audit without adjusting them. `kernel.py`, `fixture-lock.json` and the v1
+  example reports are byte-identical; synthetic fixtures do not establish scientific validity.
 
 ## 0.5.0-rc.3
 
