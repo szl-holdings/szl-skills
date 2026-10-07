@@ -1,6 +1,6 @@
 ---
 name: szl-cross-implementation-check
-description: "Compares two independent implementations of the same analysis (R vs Python, student vs postdoc, old vs refactored pipeline, paper table vs re-run) quantity by quantity under declared tolerances and reports CONSISTENT / DIVERGENT / INCOMPARABLE. Use when the user wants to confirm a re-implementation reproduces the original numbers, reconcile two sets of results, or check a port before trusting it. Not for deciding which implementation is correct."
+description: "Compares two independent implementations of the same analysis (R vs Python, student vs postdoc, old vs refactored pipeline, paper table vs re-run) quantity by quantity under declared tolerances and reports CONSISTENT / DIVERGENT / INCOMPARABLE; a stability mode reports STABLE / UNSTABLE across perturbed runs of one computation. Use when the user wants to confirm a re-implementation reproduces the original numbers, reconcile two sets of results, or check a port before trusting it. Not for deciding which implementation is correct."
 license: Apache-2.0
 ---
 
@@ -51,10 +51,21 @@ two implementations differ in the variance estimator, not the model. Exit 0 when
 `results` may be nested; keys are flattened to dotted paths. Numbers are compared with
 `|a-b| <= max(atol, rtol*max(|a|,|b|))`; strings and booleans must match exactly; anything
 reported by one side only, non-finite or non-numeric is INCOMPARABLE. If both sides declare
-`input_sha256` and they differ, the overall verdict cannot be CONSISTENT.
+`input_sha256` and they differ, the overall verdict cannot be CONSISTENT; if only one side does,
+it is INCOMPARABLE (INPUT_BINDING_INCOMPLETE). Invalid or unknown per-quantity overrides and
+colliding flattened keys are ERROR (exit 2), as are duplicate JSON keys and NaN/Infinity.
+
+## Stability mode
+
+`python scripts/run.py assets/stability-unstable.json`: three or more runs on one input digest,
+each under a distinct `perturbation` (precision, threads, summation order, seed). Per quantity,
+in exact fractions: spread, agreed significant digits, sign consistency, cancellation; STABLE if
+the runs agree to `required_digits`. Here the naive float32 variance flips sign (UNSTABLE);
+`assets/stability-stable.json` passes. See `references/contract.md`.
 
 ## What it does not do
 
 It does not run either implementation, does not know which one is right, and does not pick
 tolerances for you: declare them from the precision you actually need, and record why.
-Agreement is evidence that two codebases agree on this input, nothing more.
+Agreement is evidence that two codebases agree on this input, nothing more. Stability mode does
+not rerun anything or cover undeclared perturbations, and STABLE is not accuracy.

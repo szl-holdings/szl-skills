@@ -1,0 +1,7 @@
+{"schema": "szl.cross-implementation.stability.v1", "required_digits": 5, "runs": [
+ {"input_sha256": "3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855e", "perturbation": {"precision": "float64", "threads": 1, "seed": 1},
+  "results": {"n": 100000, "mean": 0.4999871203, "sd": 0.2887012264}},
+ {"input_sha256": "3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855e", "perturbation": {"precision": "float64", "threads": 8, "seed": 2},
+  "results": {"n": 100000, "mean": 0.4999871203, "sd": 0.2887012265}},
+ {"input_sha256": "3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855e", "perturbation": {"precision": "float32", "threads": 8, "seed": 2},
+  "results": {"n": 100000, "mean": 0.4999871, "sd": 0.28870124}}]}
