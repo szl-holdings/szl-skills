@@ -1,0 +1,4 @@
+{"receipt_schema": "szl.session-receipt.v2", "project": "SYNTHETIC dose-response reanalysis",
+ "actor": {"kind": "agent", "name": "Claude (Claude Science)"},
+ "inputs": ["data/raw.csv"], "code": ["analysis.py"], "outputs": ["results/summary.csv"],
+ "commands": ["python analysis.py"], "environment": {"python": "3.12.1"}}

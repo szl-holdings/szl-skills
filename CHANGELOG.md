@@ -27,6 +27,11 @@
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.
+- Harden szl-session-receipt as a restore verifier: canonical relative POSIX paths with
+  symlink and reparse-point refusal (ERROR PATH_OUTSIDE_ROOT), a per-file cap (ERROR
+  FILE_TOO_LARGE), EMPTY_RECEIPT instead of MATCH for a receipt with no files, `verify --scan`
+  reporting EXTRA_FILES_PRESENT, and an opt-in v2 receipt with a path-bound `root_sha256_v2`.
+  v1 example receipts stay byte-identical; a MATCH still says nothing about correctness.
 
 ## 0.5.0-rc.3
 

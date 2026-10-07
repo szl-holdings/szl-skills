@@ -36,6 +36,15 @@ the paragraph reads:
 > numpy 2.1.0, pandas 2.2.3. The receipt is unsigned; integrity can be re-verified by re-hashing the
 > listed files, authenticity is not established.
 
+## Restore check and path-bound root
+
+`verify --scan` also reports `EXTRA_FILES_PRESENT` for unrecorded entries beside recorded files. A
+receipt with no files verifies as `EMPTY_RECEIPT`, never MATCH. Adding
+`"receipt_schema": "szl.session-receipt.v2"` (`assets/example-v2.json`) records `root_sha256_v2`,
+which binds role, path and digest; v1 `root_sha256` is unchanged. Escaping or noncanonical paths,
+symlinks and reparse points give ERROR `PATH_OUTSIDE_ROOT` (`assets/negative-drive-path.json`);
+files above `--max-file-bytes` (256 MiB default) give ERROR `FILE_TOO_LARGE`.
+
 ## Manifest
 
 ```json
@@ -54,4 +63,6 @@ produces a DSSE signature when `szl-receipt-dsse` is installed; otherwise the re
 
 A MATCH means the files are byte-identical to the recorded ones. It does not mean the analysis is
 correct, that the recorded commands were the only ones run, or that the declared environment was
-real. It does not capture files you did not list. Details: `references/contract.md`.
+real. It does not capture files you did not list; `--scan` does not recurse or hash extras and may
+flag a differently cased directory on case-insensitive filesystems. Symlinks are refused, not followed;
+`root_sha256_v2` is a digest, not a signature. Details: `references/contract.md`, `references/provenance.md`.

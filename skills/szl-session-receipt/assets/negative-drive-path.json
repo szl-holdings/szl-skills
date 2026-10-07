@@ -1,0 +1,2 @@
+{"receipt_schema": "szl.session-receipt.v2", "project": "SYNTHETIC negative fixture",
+ "inputs": ["C:/data/raw.csv"], "notes": "Drive-absolute path: ERROR PATH_OUTSIDE_ROOT on every host; never read."}
