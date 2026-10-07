@@ -1,0 +1,3 @@
+{"schema": "szl.mutation-coverage-report.v1", "status": "SCORED", "baseline_flagged": false, "coverage": "6/10",
+ "caught": ["duplicate_rows", "scale_column", "swap_columns", "inject_missing", "type_confusion", "truncate"],
+ "missed": ["drop_rows", "shuffle_labels", "precision_drift", "reorder_rows"], "not_tested": []}

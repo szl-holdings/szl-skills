@@ -22,6 +22,7 @@ Markdown. Stdlib only, offline; it never re-runs a check.
 ```bash
 python scripts/run.py assets/project --config assets/review-config.json --output REVIEW.md
 python scripts/run.py assets/project --extra reports/evidence-gate.json --extra reports/session-receipt.json
+python scripts/run.py assets/status-probe --extra mutation-scored.json --extra cross-incomparable.json --extra gate-abstain.json
 ```
 
 The bundled synthetic project renders `Verdict: REVIEW_REQUIRED` with a five-row check table
@@ -29,6 +30,15 @@ The bundled synthetic project renders `Verdict: REVIEW_REQUIRED` with a five-row
 the capsule digest over 16 files, and three quoted unresolved findings such as
 `issues (3): ["EXACT_FEATURE_DUPLICATES", "CROSS_SPLIT_FEATURE_LEAKAGE", "CROSS_SPLIT_GROUP_LEAKAGE"]`.
 Exit 0 whenever the pack rendered; 2 on an unreadable project.
+
+## Statuses that stay open
+
+A standalone report is unresolved when its status is a known non-pass name (ABSTAIN, INCOMPARABLE,
+NO_OUTCOMES_RECORDED, HOLD, BLOCKED, UNKNOWN, REFUSED, DIVERGED and the rest of the set in
+`references/contract.md`) or when it carries finding fields such as `missed`, `not_tested` or
+`incomparable`. A mutation report SCORED 6/10 is listed through its four missed variants. The
+`assets/status-probe/` reports are the negative fixture (third command: three unresolved) and, with
+`--extra cross-consistent.json` alone, the positive one.
 
 ## The declared aggregate
 
@@ -46,4 +56,6 @@ verdict. It is an aggregation rule the reviewer chose, not a validated quality s
 
 It does not re-run checks, verify scientific truth, read checks that were never run, or approve
 publication. Reports whose bytes no longer match the run summary are flagged, not repaired.
+It does not interpret a status it does not know: an unlisted status without finding fields is
+shown in the table but not listed as unresolved.
 The input layout it expects is described in `references/contract.md`.

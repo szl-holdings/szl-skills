@@ -1,0 +1,2 @@
+{"schema": "szl.evidence-gate-report.v1", "status": "ABSTAIN",
+ "counts": {"PASS": 2, "FAIL": 1, "ABSTAIN": 1, "ERROR": 0}, "required_failures": []}

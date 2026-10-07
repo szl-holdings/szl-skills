@@ -32,6 +32,12 @@ from pathlib import Path
 
 SCHEMA = "szl.reviewer-pack.v1"
 _RUN_DIR = re.compile(r"^(\d{8}T\d{12}Z)-[0-9a-f]{12}$")
+# Standalone-report statuses that are never a pass: listed as unresolved even without finding fields.
+UNRESOLVED_STATUSES = frozenset((
+    "FAIL", "DIVERGENT", "MISMATCH", "MISSING", "RECEIPT_TAMPERED", "ERROR", "BASELINE_FLAGGED",
+    "ABSTAIN", "FAIL_OPTIONAL_ONLY", "INCOMPARABLE", "NO_OUTCOMES_RECORDED", "RECORDED_WITH_MISSING_FILES",
+    "BASELINE_NOT_TESTED", "EMPTY_RECEIPT", "EXTRA_FILES_PRESENT", "UNSTABLE", "PLAN_INCOMPLETE", "HOLD",
+    "BLOCKED", "UNKNOWN", "PARITY_ISSUES", "EXTRA_MEMBERS", "INCOMPLETE", "REFUSED", "DIVERGED", "STALE"))
 
 
 def szl_canonical(value) -> str:
@@ -69,13 +75,13 @@ def _latest_run(root: Path):
 
 def _findings_of(report: dict) -> list:
     out = []
-    for key in ("issues", "findings", "failures", "mismatch_indexes", "missing", "required_failures"):
+    for key in ("issues", "findings", "failures", "mismatch_indexes", "missing", "required_failures", "missed", "not_tested"):
         v = report.get(key)
         if isinstance(v, list) and v:
             out.append({"field": key, "value": v[:10], "count": len(v)})
         elif isinstance(v, dict) and v:
             out.append({"field": key, "value": dict(list(v.items())[:10]), "count": len(v)})
-    for key in ("counterexample_count", "invalid_outputs", "mismatches", "divergent"):
+    for key in ("counterexample_count", "invalid_outputs", "mismatches", "divergent", "incomparable"):
         v = report.get(key)
         if isinstance(v, int) and v > 0:
             out.append({"field": key, "value": v, "count": v})
@@ -136,7 +142,7 @@ def szl_build_pack(root, extra_reports=None, config=None) -> dict:
             pack["unresolved"].append({"source": c["id"], "status": c["status"], "details": c["details"],
                                        "digest_match": c["digest_match"]})
     for e in pack["extra"]:
-        if e["status"] in ("FAIL", "DIVERGENT", "MISMATCH", "MISSING", "RECEIPT_TAMPERED", "ERROR", "BASELINE_FLAGGED") or e["details"]:
+        if e["status"] in UNRESOLVED_STATUSES or e["details"]:
             pack["unresolved"].append({"source": e["path"], "status": e["status"], "details": e["details"]})
     # declared aggregate
     scores_cfg = config.get("scores", {})
