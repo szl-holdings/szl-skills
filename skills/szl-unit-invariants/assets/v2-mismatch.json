@@ -1,0 +1,14 @@
+{
+  "schema": "szl.unit-invariants.v2",
+  "quantities": [
+    {"id": "force", "unit": "N", "dimension": [1,1,-2,0,0,0,0], "values": ["2"], "range_si": null},
+    {"id": "distance", "unit": "m", "dimension": [1,0,0,0,0,0,0], "values": ["3"], "range_si": null},
+    {"id": "work", "unit": "N", "dimension": [1,1,-2,0,0,0,0], "values": ["6"], "range_si": null},
+    {"id": "dose-ug", "unit": "ug", "dimension": [0,1,0,0,0,0,0], "values": ["250"], "range_si": null},
+    {"id": "dose-mg", "unit": "mg", "dimension": [0,1,0,0,0,0,0], "values": ["250"], "range_si": null}
+  ],
+  "invariants": [
+    {"id": "work-definition", "operation": "product", "operands": ["force", "distance"], "result": "work", "atol_si": "0", "rtol": "0"},
+    {"id": "dose-transcribed", "operation": "equal", "operands": ["dose-ug"], "result": "dose-mg", "atol_si": "0", "rtol": "0"}
+  ]
+}

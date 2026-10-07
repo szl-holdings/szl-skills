@@ -1,12 +1,12 @@
 ---
 name: szl-unit-invariants
-description: "Checks declared SI dimensions, allowlisted unit conversions, expected ranges and fixed pointwise invariants (equal, sum, difference, product, ratio) over selected measurement or simulation columns, flagging incompatible quantities, scale errors of 1000x and broken conservation checks. Use when merging instrument exports with different units, validating simulation output against conservation laws, or when a reviewer asks how unit errors were ruled out. Not an uncertainty-propagation or symbolic tool."
+description: "Checks declared SI dimensions, allowlisted unit conversions, expected ranges and fixed pointwise invariants (equal, sum, difference, product, ratio; v2 adds power and compound units) over selected measurement or simulation columns, flagging incompatible quantities, scale errors of 1000x and broken conservation checks. Use when merging instrument exports with different units, validating simulation output against conservation laws, or when a reviewer asks how unit errors were ruled out. Not an uncertainty-propagation or symbolic tool."
 license: Apache-2.0
 ---
 
 # Unit invariants
 
-A µg column read as mg survives every statistical test and ruins the paper. Declare what each column
+A ug column read as mg survives every statistical test and ruins the paper. Declare what each column
 is supposed to be and let the helper check dimensions, ranges and the relations that must hold
 pointwise. Python 3.9+, stdlib, offline, decimal arithmetic at 50 significant digits.
 
@@ -27,6 +27,10 @@ The invented example (a duration, a length in cm and a speed check) returns
 and SI-normalized values. Introduce a cm/m mix-up and the report carries `SCALE_MISMATCH` or
 `RANGE_VIOLATION` with the exact factor.
 
+Schema v2 adds strict compound units (`ug`, `mol/L`, `kg*m^2/s^2`) and a `power` invariant:
+`assets/v2-example.json` passes E = m*c^2 in J and kg*m^2/s^2; `assets/v2-mismatch.json` exits 1 with
+`DIMENSION_MISMATCH` (N where J is computed) and `SCALE_MISMATCH` (ug read as mg). v1 is unchanged.
+
 ## Declaring checks
 
 Select a bounded set of columns; declare unit, SI dimension, expected range and prespecified
@@ -38,8 +42,9 @@ Preserve original values: a corrected declaration is a new audit, not evidence t
 
 ## What it does not do
 
-Offset units (Celsius), logarithmic units, implicit broadcasting, arbitrary formulas and units absent
-from the table are rejected. Success means the declared checks pass on supplied values; observed units,
-physical laws and scientific conclusions are not verified, and finite decimal arithmetic does not replace
-uncertainty propagation or a symbolic proof. Limits: 1 MiB input, 1000 quantities and invariants,
-10,000 samples. Provenance: `references/provenance.md`.
+Offset units (Celsius), logarithmic units (dB, pH), implicit broadcasting, arbitrary formulas and units
+absent from the table or the v2 grammar are rejected. The v2 grammar has no parentheses, no `µ` (write
+`u`), no `min` or `h`, and does not resolve ambiguous slashes such as `J/kg*K`. Success means the
+declared checks pass on supplied values; observed units, physical laws and scientific conclusions are
+not verified, and finite decimal arithmetic does not replace uncertainty propagation or a symbolic proof.
+Limits: 1 MiB input, 1000 quantities and invariants, 10,000 samples. Provenance: `references/provenance.md`.

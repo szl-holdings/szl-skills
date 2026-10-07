@@ -27,6 +27,10 @@
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.
+- Add schema szl.unit-invariants.v2 to szl-unit-invariants: a strict unit grammar over
+  allowlisted SI symbols and n/u/m/c/k/M prefixes (`*`, one `/`, integer exponents) with
+  exact power-of-ten scales, plus an integer `power` invariant. Offset and logarithmic units
+  stay rejected and v1 reports are byte-identical. Only declared checks are evaluated.
 
 ## 0.5.0-rc.3
 

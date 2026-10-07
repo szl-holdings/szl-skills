@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Modified 2026-09-30: exact JSON decimal validation and type-preserving input binding.
+# Modified 2026-10-06: v2 strict unit-expression grammar and integer power invariant.
 """Finite SI normalization and declared numerical invariants, with no expression eval or I/O."""
 import decimal
 import hashlib
@@ -33,6 +34,11 @@ SZL_UNITS = {
     "J": ([2, 1, -2, 0, 0, 0, 0], "1"),
     "W": ([2, 1, -3, 0, 0, 0, 0], "1")
 }
+# v2 grammar: base symbols (power-of-ten scales) and SI prefix exponents.
+SZL_UNIT_BASES = dict({name: SZL_UNITS[name] for name in "m g s A K mol cd N Pa J W Hz".split()},
+                      L=([3, 0, 0, 0, 0, 0, 0], "0.001"), V=([2, 1, -3, -1, 0, 0, 0], "1"),
+                      C=([0, 0, 1, 1, 0, 0, 0], "1"), ohm=([2, 1, -3, -2, 0, 0, 0], "1"))
+SZL_UNIT_PREFIXES = {"n": -9, "u": -6, "m": -3, "c": -2, "k": 3, "M": 6}
 
 
 def szl_unit_number(value, label):
@@ -73,11 +79,44 @@ def szl_unit_keys(value, required, label):
         raise ValueError(label + " has missing or unknown fields")
 
 
+def szl_unit_parse_expression(text):
+    """Parse a v2 unit such as kg*m^2/s^2 into (SI dimension, exact power-of-ten scale); see contract."""
+    if not isinstance(text, str) or not 1 <= len(text) <= 64:
+        raise ValueError("unit expression must be a 1..64 character string")
+    parts = text.split("/")
+    if len(parts) > 2 or (len(parts) == 2 and "*" in parts[1]):
+        raise ValueError("one '/' may precede only one final factor")
+    dimension, power = [0] * 7, 0
+    for side, part in enumerate(parts):
+        factors = part.split("*")
+        if len(factors) > 8:
+            raise ValueError("at most 8 unit factors are supported")
+        for factor in factors:
+            if factor == "1" and side == 0 and len(factors) == 1:
+                continue
+            match = re.fullmatch(r"([A-Za-z]{1,4})(?:\^(-?[1-8]))?", factor)
+            symbol = match.group(1) if match else ""
+            if symbol in SZL_UNIT_BASES:
+                scale, base = 0, SZL_UNIT_BASES[symbol]
+            elif symbol[:1] in SZL_UNIT_PREFIXES and symbol[1:] in SZL_UNIT_BASES:
+                scale, base = SZL_UNIT_PREFIXES[symbol[0]], SZL_UNIT_BASES[symbol[1:]]
+            else:
+                raise ValueError("Unsupported unit factor; offset/logarithmic/contextual units are excluded")
+            exponent = int(match.group(2) or 1) * (-1 if side else 1)
+            dimension = [total + value * exponent for total, value in zip(dimension, base[0])]
+            power += (scale + decimal.Decimal(base[1]).adjusted()) * exponent
+    if any(not -8 <= value <= 8 for value in dimension) or not -36 <= power <= 36:
+        raise ValueError("composed unit needs SI exponents in -8..8 and scale 1e-36..1e36")
+    return dimension, "1e" + str(power)
+
+
 def szl_audit_unit_invariants(record):
     """Check a restricted unit/dimension contract and fixed, pointwise SI invariants."""
     szl_unit_keys(record, ("schema", "quantities", "invariants"), "record")
-    if record["schema"] != "szl.unit-invariants.v1":
-        raise ValueError("Expected szl.unit-invariants.v1")
+    schemas = ("szl.unit-invariants.v1", "szl.unit-invariants.v2")
+    if record["schema"] not in schemas:
+        raise ValueError("Expected szl.unit-invariants.v1 or .v2")
+    version = schemas.index(record["schema"]) + 1
     quantities, invariants = record["quantities"], record["invariants"]
     if not isinstance(quantities, list) or not 1 <= len(quantities) <= 1000:
         raise ValueError("quantities must contain 1..1000 entries")
@@ -92,8 +131,12 @@ def szl_audit_unit_invariants(record):
             if key in index:
                 raise ValueError("Duplicate quantity id")
             unit = quantity["unit"]
-            if not isinstance(unit, str) or unit not in SZL_UNITS:
+            if version == 2:
+                actual_dimension, factor = szl_unit_parse_expression(unit)
+            elif not isinstance(unit, str) or unit not in SZL_UNITS:
                 raise ValueError("Unsupported unit; offset/logarithmic/contextual units are excluded")
+            else:
+                actual_dimension, factor = SZL_UNITS[unit]
             dimension = quantity["dimension"]
             if not isinstance(dimension, list) or len(dimension) != 7 or any(type(value) is not int or not -8 <= value <= 8 for value in dimension):
                 raise ValueError("dimension needs seven integer SI exponents in -8..8")
@@ -103,7 +146,6 @@ def szl_audit_unit_invariants(record):
             total_values += len(values)
             if total_values > 10000:
                 raise ValueError("At most 10000 total quantity samples are supported")
-            actual_dimension, factor = SZL_UNITS[unit]
             normalized = [szl_unit_number(value, "sample") * decimal.Decimal(factor) for value in values]
             dimension_match = dimension == actual_dimension
             if not dimension_match:
@@ -121,22 +163,28 @@ def szl_audit_unit_invariants(record):
             index[key] = {"dimension": actual_dimension, "values": normalized}
             reports.append({"id": key, "unit": unit, "si_dimension": list(actual_dimension),
                             "declared_dimension_match": dimension_match, "values_si": [szl_unit_format(value) for value in normalized]})
+            if version == 2:
+                reports[-1]["si_scale"] = szl_unit_format(decimal.Decimal(factor))
         invariant_ids, invariant_reports, total_cases = set(), [], 0
         for invariant in invariants:
-            szl_unit_keys(invariant, ("id", "operation", "operands", "result", "atol_si", "rtol"), "invariant")
+            power = version == 2 and isinstance(invariant, dict) and invariant.get("operation") == "power"
+            szl_unit_keys(invariant, ("id", "operation", "operands", "result", "atol_si", "rtol") + (("exponent",) if power else ()), "invariant")
             key = szl_unit_id(invariant["id"], "invariant id")
             if key in invariant_ids:
                 raise ValueError("Duplicate invariant id")
             invariant_ids.add(key)
             operation, operands, result_id = invariant["operation"], invariant["operands"], invariant["result"]
-            if not isinstance(operation, str) or operation not in ("equal", "sum", "difference", "product", "ratio"):
+            if not isinstance(operation, str) or operation not in ("equal", "sum", "difference", "product", "ratio") + (("power",) if power else ()):
                 raise ValueError("Unsupported invariant operation; arbitrary expressions are forbidden")
             if not isinstance(operands, list) or not 1 <= len(operands) <= 100 or any(not isinstance(item, str) or item not in index for item in operands):
                 raise ValueError("operands must reference 1..100 known quantities")
             if not isinstance(result_id, str) or result_id not in index:
                 raise ValueError("result must reference a known quantity")
-            if (operation == "equal" and len(operands) != 1) or (operation == "sum" and len(operands) < 2) or (operation in ("difference", "product", "ratio") and len(operands) != 2):
+            if (operation in ("equal", "power") and len(operands) != 1) or (operation == "sum" and len(operands) < 2) or (operation in ("difference", "product", "ratio") and len(operands) != 2):
                 raise ValueError("Wrong operand count for invariant operation")
+            exponent = invariant["exponent"] if power else 1
+            if type(exponent) is not int or not -8 <= exponent <= 8 or exponent == 0:
+                raise ValueError("power exponent must be a nonzero integer in -8..8")
             atol, rtol = szl_unit_number(invariant["atol_si"], "atol_si"), szl_unit_number(invariant["rtol"], "rtol")
             if atol < 0 or not 0 <= rtol <= 1:
                 raise ValueError("atol_si must be nonnegative and rtol must be in 0..1")
@@ -146,6 +194,9 @@ def szl_audit_unit_invariants(record):
                 dimensional = all(item == expected_dimension for item in dims)
             elif operation == "product":
                 expected_dimension = [left + right for left, right in zip(dims[0], dims[1])]
+                dimensional = True
+            elif power:
+                expected_dimension = [value * exponent for value in dims[0]]
                 dimensional = True
             else:
                 expected_dimension = [left - right for left, right in zip(dims[0], dims[1])]
@@ -157,6 +208,8 @@ def szl_audit_unit_invariants(record):
                 raise ValueError("At most 10000 total invariant cases are supported")
             report = {"id": key, "operation": operation, "result": result_id, "status": "AGREEMENT_ON_DECLARED_CASES", "cases_checked": 0,
                       "mismatch_count": 0, "undefined_count": 0, "scale_mismatch_count": 0, "failures": []}
+            if power:
+                report["exponent"] = exponent
             if not dimensional:
                 report["status"] = "DIMENSION_MISMATCH"
                 findings.append({"code": "DIMENSION_MISMATCH", "quantity": None, "invariant": key, "indexes": [], "count": 1})
@@ -168,7 +221,7 @@ def szl_audit_unit_invariants(record):
                 for position in range(lengths[0]):
                     inputs = [index[item]["values"][position] for item in operands]
                     actual = index[result_id]["values"][position]
-                    if operation == "ratio" and inputs[1] == 0:
+                    if (operation == "ratio" and inputs[1] == 0) or (power and exponent < 0 and inputs[0] == 0):
                         undefined.append(position)
                         continue
                     if operation == "equal":
@@ -179,6 +232,13 @@ def szl_audit_unit_invariants(record):
                         expected = inputs[0] - inputs[1]
                     elif operation == "product":
                         expected = inputs[0] * inputs[1]
+                    elif power:
+                        if inputs[0] and (abs(inputs[0].adjusted()) + 1) * abs(exponent) > 250:
+                            raise ValueError("power case exceeds magnitude 1e250")
+                        expected = decimal.Decimal(1)
+                        for _ in range(abs(exponent)):
+                            expected *= inputs[0]
+                        expected = 1 / expected if exponent < 0 else expected
                     else:
                         expected = inputs[0] / inputs[1]
                     report["cases_checked"] += 1
@@ -207,7 +267,7 @@ def szl_audit_unit_invariants(record):
         reports.sort(key=lambda item: item["id"])
         invariant_reports.sort(key=lambda item: item["id"])
         digest = hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False, default=szl_unit_json_default).encode("utf-8")).hexdigest()
-        return {"schema": "szl.unit-invariants-report.v1", "status": "REVIEW_REQUIRED" if findings else "PASS_DECLARED_CHECKS",
+        return {"schema": "szl.unit-invariants-report.v" + str(version), "status": "REVIEW_REQUIRED" if findings else "PASS_DECLARED_CHECKS",
                 "input_sha256": digest, "input_digest_encoding": "canonical_json_with_decimal_tags.v1",
                 "quantities": reports, "invariants": invariant_reports, "findings": findings,
                 "finding_count": len(findings), "arithmetic_precision_decimal_digits": 50, "observed_units_verified": False,

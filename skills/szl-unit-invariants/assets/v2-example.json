@@ -1,0 +1,15 @@
+{
+  "schema": "szl.unit-invariants.v2",
+  "quantities": [
+    {"id": "mass", "unit": "g", "dimension": [0,1,0,0,0,0,0], "values": ["2"], "range_si": null},
+    {"id": "c", "unit": "m/s", "dimension": [1,0,-1,0,0,0,0], "values": ["299792458"], "range_si": null},
+    {"id": "c2", "unit": "m^2/s^2", "dimension": [2,0,-2,0,0,0,0], "values": ["89875517873681764"], "range_si": null},
+    {"id": "energy-j", "unit": "J", "dimension": [2,1,-2,0,0,0,0], "values": ["179751035747363.528"], "range_si": null},
+    {"id": "energy-si", "unit": "kg*m^2/s^2", "dimension": [2,1,-2,0,0,0,0], "values": ["179751035747363.528"], "range_si": null}
+  ],
+  "invariants": [
+    {"id": "c-squared", "operation": "power", "operands": ["c"], "exponent": 2, "result": "c2", "atol_si": "0", "rtol": "0"},
+    {"id": "rest-energy", "operation": "product", "operands": ["mass", "c2"], "result": "energy-j", "atol_si": "0", "rtol": "0"},
+    {"id": "joule-is-base", "operation": "equal", "operands": ["energy-j"], "result": "energy-si", "atol_si": "0", "rtol": "0"}
+  ]
+}
