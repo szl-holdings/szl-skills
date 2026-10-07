@@ -11,10 +11,13 @@ import json
 import os
 import re
 import stat
+from datetime import datetime
 from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path, PurePosixPath
 
 SCHEMA = "szl.measurement-harmonizer.v1"
+SCHEMA_V2 = "szl.measurement-harmonizer.v2"
+STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 DECIMAL = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,2})?\Z")
 MAX_FILE = 1024 * 1024
@@ -60,10 +63,11 @@ def _unique_strings(value: object, *, minimum: int, maximum: int) -> list[str]:
     return items
 
 
-def _validate(manifest: object) -> tuple[list[dict], list[str], str, dict[str, tuple[Decimal, Decimal]]]:
-    if not isinstance(manifest, dict) or set(manifest) != {"schema", "sources", "expected_ids", "target_unit", "conversions"}:
+def _validate(manifest: object, schema: str = SCHEMA) -> tuple[list[dict], list[str], str, dict[str, tuple[Decimal, Decimal]]]:
+    v2 = {"as_of", "max_age_days", "missing_tokens", "max_missing_fraction"} if schema == SCHEMA_V2 else set()
+    if not isinstance(manifest, dict) or set(manifest) != {"schema", "sources", "expected_ids", "target_unit", "conversions"} | v2:
         raise AuditError("INVALID_MANIFEST_FIELDS")
-    if manifest["schema"] != SCHEMA:
+    if manifest["schema"] != schema:
         raise AuditError("INVALID_SCHEMA")
     expected = _unique_strings(manifest["expected_ids"], minimum=1, maximum=MAX_ROWS)
     target = _text(manifest["target_unit"], limit=32)
@@ -75,7 +79,8 @@ def _validate(manifest: object) -> tuple[list[dict], list[str], str, dict[str, t
     units = {target}
     checked: list[dict] = []
     for source in sources:
-        if not isinstance(source, dict) or set(source) != {"id", "path", "sha256", "id_column", "value_column", "unit", "id_map"}:
+        if not isinstance(source, dict) or set(source) != {"id", "path", "sha256", "id_column", "value_column", "unit",
+                                                           "id_map"} | ({"provenance"} if v2 else set()):
             raise AuditError("INVALID_SOURCE_FIELDS")
         sid = _text(source["id"])
         if sid in ids:
@@ -115,6 +120,50 @@ def _validate(manifest: object) -> tuple[list[dict], list[str], str, dict[str, t
     if parsed[target] != (Decimal(1), Decimal(0)):
         raise AuditError("TARGET_NOT_IDENTITY")
     return checked, expected, target, parsed
+
+
+def _instant(value: object, field: str) -> datetime:
+    if isinstance(value, str) and STAMP.match(value):
+        try:
+            return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            pass
+    raise AuditError("INVALID_DATA_CONTRACT", field)
+
+
+def _contract(manifest: dict, sources: list[dict], expected: list[str]) -> tuple[dict, Decimal]:
+    """Check v2 declarations. Ages use declared instants only, never the host clock."""
+    as_of = _instant(manifest["as_of"], "as_of")
+    days, tokens = manifest["max_age_days"], manifest["missing_tokens"]
+    if type(days) is not int or not 0 <= days <= 36500:
+        raise AuditError("INVALID_DATA_CONTRACT", "max_age_days")
+    if not isinstance(tokens, list) or len(tokens) > 8 or any(
+            not isinstance(token, str) or len(token) > 32 or token.strip() != token or DECIMAL.match(token)
+            or any(ord(char) < 32 for char in token) for token in tokens) or len(set(tokens)) != len(tokens):
+        raise AuditError("INVALID_DATA_CONTRACT", "missing_tokens")
+    try:
+        fraction = _decimal(manifest["max_missing_fraction"])
+    except AuditError:
+        fraction = Decimal(-1)
+    if not 0 <= fraction <= 1:
+        raise AuditError("INVALID_DATA_CONTRACT", "max_missing_fraction")
+    declared, ages = {}, {}
+    for source in sources:
+        sid, item = source["id"], source["provenance"]
+        if not isinstance(item, dict) or set(item) != {"origin", "collected_at", "rights_declaration", "instrument"}:
+            raise AuditError("INVALID_SOURCE_FIELDS", sid)
+        for key in ("origin", "rights_declaration", "instrument"):
+            _text(item[key], limit=200)
+        ages[sid] = int((as_of - _instant(item["collected_at"], sid + ".collected_at")).total_seconds())
+        if ages[sid] < 0:
+            raise AuditError("INVALID_DATA_CONTRACT", sid + ".collected_at")
+        declared[sid] = dict(item)
+    return {"schema_checked": True, "provenance_declared": declared,
+            "staleness": {"as_of": manifest["as_of"], "max_age_days": days, "age_seconds": ages,
+                          "stale": [sid for sid in ages if ages[sid] > days * 86400]},
+            "missingness": {"missing_tokens": list(tokens), "max_missing_fraction": manifest["max_missing_fraction"],
+                            "per_source": dict.fromkeys(ages, "NOT_EVALUATED"),
+                            "per_specimen": dict.fromkeys(expected, 0), "exceeded": []}}, fraction
 
 
 def _safe_file(root: Path, relative: str) -> Path:
@@ -173,15 +222,26 @@ def _rows(content: bytes, source: dict) -> list[tuple[int, str, str]]:
 
 def harmonize(manifest: object, root: str | Path) -> dict:
     """Read selected files only; return no usable rows when an input is incomplete."""
-    report = {"schema": SCHEMA + ".report", "status": "BLOCKED", "findings": [], "rows": [],
+    schema = SCHEMA_V2 if isinstance(manifest, dict) and manifest.get("schema") == SCHEMA_V2 else SCHEMA
+    report = {"schema": schema + ".report", "status": "BLOCKED", "findings": [], "rows": [],
               "input_sha256": {}, "mapping_authority": "DECLARED_ONLY", "scientific_validity": "NOT_EVALUATED",
               "network": "NOT_USED", "execution": "NOT_RUN"}
+    contract, tokens, fraction = None, set(), Decimal(1)
+    if schema == SCHEMA_V2:
+        report["data_contract"] = {"schema_checked": False, "provenance_declared": "NOT_EVALUATED",
+                                   "staleness": "NOT_EVALUATED", "missingness": "NOT_EVALUATED"}
     try:
         base = Path(root)
         if not base.is_dir() or base.is_symlink() or getattr(base.lstat(), "st_file_attributes", 0) & REPARSE_POINT:
             raise AuditError("UNSAFE_ROOT")
         base = base.resolve(strict=True)
-        sources, expected, target, conversions = _validate(manifest)
+        sources, expected, target, conversions = _validate(manifest, schema)
+        if schema == SCHEMA_V2:
+            contract, fraction = _contract(manifest, sources, expected)
+            report["data_contract"], tokens = contract, set(manifest["missing_tokens"])
+            for sid in contract["staleness"]["stale"]:
+                report["findings"].append({"source": sid, "code": "STALE", "detail": "age %ds > %d days" % (
+                    contract["staleness"]["age_seconds"][sid], manifest["max_age_days"])})
         staged = []
         unavailable = False
         seen_locations: set[str] = set()
@@ -207,6 +267,7 @@ def harmonize(manifest: object, root: str | Path) -> dict:
                 observed: set[str] = set()
                 canonical_seen: set[str] = set()
                 scale, offset = conversions[source["unit"]]
+                missed: list[str] = []
                 for number, raw_id, raw_value in rows:
                     _text(raw_id)
                     if raw_id in observed:
@@ -216,18 +277,31 @@ def harmonize(manifest: object, root: str | Path) -> dict:
                         raise AuditError("UNMAPPED_ID", f"{sid}:{number}")
                     canonical_id = source["id_map"][raw_id]
                     canonical_seen.add(canonical_id)
-                    value = _decimal(raw_value)
-                    with localcontext() as context:
-                        context.prec = 50
-                        normalized = value * scale + offset
+                    if raw_value in tokens:
+                        missed.append(canonical_id)
+                        text = None
+                    else:
+                        value = _decimal(raw_value)
+                        with localcontext() as context:
+                            context.prec = 50
+                            normalized = value * scale + offset
+                        text = format(normalized, "f")
                     staged.append({"source": sid, "row": number, "observed_id": raw_id,
                                    "canonical_id": canonical_id, "raw_value": raw_value,
-                                   "raw_unit": source["unit"], "normalized_value": format(normalized, "f"),
+                                   "raw_unit": source["unit"], "normalized_value": text,
                                    "target_unit": target})
+                if contract:
+                    missingness = contract["missingness"]
+                    missingness["per_source"][sid] = {"missing": len(missed), "rows": len(rows)}
+                    for canonical_id in missed:
+                        missingness["per_specimen"][canonical_id] += 1
                 if observed != set(source["id_map"]):
                     raise AuditError("UNUSED_ID_MAP", sid)
                 if canonical_seen != set(expected):
                     raise AuditError("MISSING_EXPECTED_ID", sid)
+                if contract and len(missed) > fraction * len(rows):
+                    missingness["exceeded"].append(sid)
+                    raise AuditError("MISSINGNESS_EXCEEDED", "%s:%d/%d" % (sid, len(missed), len(rows)))
             except AuditError as exc:
                 report["findings"].append({"source": sid, "code": exc.code, "detail": exc.detail})
                 unavailable |= exc.code == "MISSING_FILE"

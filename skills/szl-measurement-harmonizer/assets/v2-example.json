@@ -1,0 +1,16 @@
+{"schema": "szl.measurement-harmonizer.v2",
+ "expected_ids": ["specimen-1", "specimen-2"], "target_unit": "K",
+ "conversions": {"K": {"scale": "1", "offset": "0"}, "degC": {"scale": "1", "offset": "273.15"}},
+ "as_of": "2026-09-30T00:00:00Z", "max_age_days": 30,
+ "missing_tokens": ["", "NA"], "max_missing_fraction": "0.5",
+ "sources": [
+  {"id": "lab-a", "path": "lab-a.csv", "unit": "degC", "id_column": "specimen", "value_column": "celsius",
+   "sha256": "4969a7f720619287e0f52a52b74e6064ae9125391a70408f63df41c952a7da58",
+   "id_map": {"A-1": "specimen-1", "A-2": "specimen-2"},
+   "provenance": {"origin": "invented lab A", "collected_at": "2026-09-20T09:00:00Z",
+    "rights_declaration": "synthetic, Apache-2.0", "instrument": "invented probe A"}},
+  {"id": "lab-c", "path": "v2-lab-c.csv", "unit": "K", "id_column": "sample", "value_column": "kelvin",
+   "sha256": "76657b025a1ba908d8395808cc2a9a11e31a6c92ab82f9bf101602728e1a86de",
+   "id_map": {"C1": "specimen-1", "C2": "specimen-2"},
+   "provenance": {"origin": "invented lab C", "collected_at": "2026-09-25T14:30:00Z",
+    "rights_declaration": "synthetic, Apache-2.0", "instrument": "invented probe C"}}]}

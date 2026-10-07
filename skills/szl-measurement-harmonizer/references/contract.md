@@ -35,3 +35,25 @@ root; it does not overwrite an existing report.
 
 The report is an unsigned local observation. SHA-256 binds the bytes read to the manifest,
 but does not establish source authenticity, custody, or a defensible scientific conclusion.
+
+## Version 2 data contract
+
+`szl.measurement-harmonizer.v2` takes the v1 fields plus exactly `as_of`, `max_age_days`,
+`missing_tokens` and `max_missing_fraction`; each source adds exactly `provenance` with
+`origin`, `collected_at`, `rights_declaration` and `instrument` (text up to 200 characters,
+echoed as unverified declarations). Other `schema` values follow v1 unchanged.
+
+`as_of` and `collected_at` are `YYYY-MM-DDTHH:MM:SSZ` UTC instants; `max_age_days` is an
+integer 0-36500. Age is `as_of - collected_at` in whole seconds, never the host clock; above
+`max_age_days` days gives `STALE`. `missing_tokens` lists 0-8 distinct exact value-cell
+strings (`""` allowed; no edge whitespace, control or decimal-looking tokens). A matching
+cell keeps `raw_value`, gets `normalized_value: null` and is never imputed; other
+non-decimal cells still block. `max_missing_fraction` is a decimal string in [0, 1]; a
+source whose missing cells exceed that fraction of its rows gives `MISSINGNESS_EXCEEDED`.
+
+Both findings block (`BLOCKED`, exit 2, empty `rows`). Malformed declarations, including
+`collected_at` after `as_of`, give `INVALID_DATA_CONTRACT` (detail names the field),
+`INVALID_SOURCE_FIELDS` or `INVALID_TEXT`. The report adds `data_contract`: `schema_checked`,
+`provenance_declared`, `staleness` (`age_seconds`, `stale`) and `missingness` (`per_source`
+missing/rows, `per_specimen` sources missing it, `exceeded`); parts not computed, and
+sources not read, are `NOT_EVALUATED`. Unit dimensions belong to `szl-unit-invariants`.

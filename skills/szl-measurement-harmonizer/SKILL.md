@@ -38,7 +38,26 @@ the manifest, or an existing report.
 
 Read [the contract](references/contract.md) for bounds and status meanings.
 
+## Version 2 data contract
+
+Schema `szl.measurement-harmonizer.v2` adds per-source `provenance` and manifest `as_of`,
+`max_age_days`, `missing_tokens` and `max_missing_fraction`; v1 is unchanged.
+
+```bash
+python -B scripts/run.py assets/v2-example.json --root assets --output v2-report.json
+python -B scripts/run.py assets/v2-blocked.json --root assets --output v2-blocked-report.json
+```
+
+Expect `HARMONIZED` with an `NA` cell kept as null, then `BLOCKED` with `STALE` (declared
+`collected_at` to `as_of`; no host clock) and `MISSINGNESS_EXCEEDED`. `data_contract` records
+declarations, ages and missing counts. Check units with `szl-unit-invariants`. See
+[provenance](references/provenance.md).
+
+## What it does not do
+
 This does **not** infer identity from names, detect swapped labels, validate the declared
 unit conversion against a standard, check instrument calibration, propagate uncertainty,
 run a statistical comparison, or establish scientific agreement. Its `HARMONIZED` status means
 only that the selected bytes matched the declared hashes and mapped under the declarations.
+Version 2 never imputes, drops, or interpolates missing cells, and does not verify declared
+provenance, rights, or collection times.
