@@ -1,0 +1,9 @@
+{"schema":"szl.benchmark-parity/v1",
+ "held_out":{"split":"test","row_ids_sha256":"655457c722c93ba2ca27d04be587fbf2e4b94ae45b3f276e259756d28eedbe90"},
+ "training_splits":["train"],"compute_unit":"cpu-hour",
+ "rows":[{"id":"tr-1","split":"train"},{"id":"tr-2","split":"train"},{"id":"te-1","split":"test"},{"id":"te-2","split":"test"}],
+ "systems":[
+  {"id":"baseline-ridge","role":"baseline","evaluation_row_ids_sha256":"655457c722c93ba2ca27d04be587fbf2e4b94ae45b3f276e259756d28eedbe90","tuning_trials":20,"compute_budget":2,"seed_count":3,"scorer_sha256":"6389de761ca847e42c790ecd4632fbe5e6164fa04cf09f55b3e68b51fcd7e793",
+   "transforms":[{"id":"scale","fit_row_ids":["tr-1","tr-2"],"fit_split_ids":["train"],"allowed_fit_splits":["train"]}]},
+  {"id":"candidate-gbm","role":"candidate","evaluation_row_ids_sha256":"655457c722c93ba2ca27d04be587fbf2e4b94ae45b3f276e259756d28eedbe90","tuning_trials":20,"compute_budget":2,"seed_count":3,"scorer_sha256":"6389de761ca847e42c790ecd4632fbe5e6164fa04cf09f55b3e68b51fcd7e793",
+   "transforms":[]}]}

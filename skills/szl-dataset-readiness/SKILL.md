@@ -1,6 +1,6 @@
 ---
 name: szl-dataset-readiness
-description: "Audits a tabular dataset before training or evaluation for exact duplicate rows across train/test, the same subject, patient, cell line or sensor appearing in both splits, labels observed after the prediction time, and preprocessing fitted on held-out rows, all bound to actual row IDs. Use when the user is about to split data, asks 'is my test set clean', reports suspiciously high held-out accuracy, or a reviewer asks about leakage. Not a data-cleaning or imputation tool; it does not approve scientific suitability or data rights."
+description: "Audits a tabular dataset before training or evaluation for exact duplicate rows across train/test, the same subject, patient, cell line or sensor appearing in both splits, labels observed after the prediction time, and preprocessing fitted on held-out rows, all bound to actual row IDs. Use when the user is about to split data, asks 'is my test set clean', reports suspiciously high held-out accuracy, a reviewer asks about leakage, or compared systems need benchmark parity. Not a data-cleaning or imputation tool; it does not approve scientific suitability or data rights."
 license: Apache-2.0
 ---
 
@@ -42,9 +42,17 @@ when preparing that manifest or interpreting missing evidence.
 The helper never samples silently, never imputes missing timestamps, and never infers timezone or
 column meaning. Metadata records the source revision and license as declared without verifying them.
 
+## Benchmark parity
+
+`python scripts/run.py --parity assets/parity-example.json` (`parity.py`) compares systems' declared
+held-out rows, baseline, budgets, seeds, scorer and fit scope: `PARITY_OK`, `PARITY_ISSUES` (see
+`assets/parity-issues.json`) or `UNKNOWN` when evidence is absent. The spec is in `references/contract.md`;
+byte-bound A/B inputs belong to `szl-paired-science`.
+
 ## What it does not do
 
 `NO_CHECKED_ISSUES` applies only to the supplied checks and selected rows; readiness remains `REVIEW`
 until a human decides. Semantic near-duplicates, causal leakage through derived features, label
 validity and population suitability are outside its reach and need separate investigation. Digests
 are not anonymization. No network, model calls, training, upload or performance claim follows.
+`PARITY_OK` covers declared digests, counts and fit manifests; systems are never rerun or rescored.

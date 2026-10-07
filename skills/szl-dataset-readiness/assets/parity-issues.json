@@ -1,0 +1,10 @@
+{"schema":"szl.benchmark-parity/v1",
+ "held_out":{"split":"test","row_ids_sha256":"655457c722c93ba2ca27d04be587fbf2e4b94ae45b3f276e259756d28eedbe90"},
+ "training_splits":["train"],"compute_unit":"cpu-hour",
+ "rows":[{"id":"tr-1","split":"train"},{"id":"tr-2","split":"train"},{"id":"te-1","split":"test"},{"id":"te-2","split":"test"}],
+ "declared_asymmetries":{"compute_budget":"Synthetic: compute difference disclosed in the write-up"},
+ "systems":[
+  {"id":"baseline-ridge","role":"baseline","evaluation_row_ids_sha256":"655457c722c93ba2ca27d04be587fbf2e4b94ae45b3f276e259756d28eedbe90","tuning_trials":20,"compute_budget":2,"seed_count":3,"scorer_sha256":"6389de761ca847e42c790ecd4632fbe5e6164fa04cf09f55b3e68b51fcd7e793",
+   "transforms":[]},
+  {"id":"candidate-gbm","role":"candidate","evaluation_row_ids_sha256":"6befeec91b050f459b597676f981d4b98e1b851e7d05df4c08dcc8b733d77637","tuning_trials":100,"compute_budget":10,"seed_count":1,"scorer_sha256":"58329aa371ceb79cc0641bb91131ea194ea1a57616d0a3d8a85e7e0dd3711479",
+   "transforms":[{"id":"scale","fit_row_ids":["tr-1","te-1"],"fit_split_ids":["train","test"],"allowed_fit_splits":["train","test"]}]}]}

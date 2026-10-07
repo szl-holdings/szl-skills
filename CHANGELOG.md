@@ -27,6 +27,12 @@
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.
+- Add an opt-in benchmark parity audit to szl-dataset-readiness (`parity.py`,
+  `scripts/run.py --parity SPEC`, schema `szl.benchmark-parity/v1`). It compares declared
+  held-out row digests, baseline presence, tuning and compute budgets (`BUDGET_ASYMMETRY`
+  unless declared), seed counts, scorer digests and training-only fit scope through the
+  existing kernel rules. Missing evidence is `UNKNOWN`, never `PARITY_OK`. The mirrored
+  kernel and existing example reports are unchanged; no system is rerun or rescored.
 
 ## 0.5.0-rc.3
 

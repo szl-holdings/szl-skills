@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Portable offline CLI; every skill contains its own identical copy."""
+"""Portable offline CLI shared with sibling skills; only this copy adds --parity SPEC."""
 import argparse
 import json
 import pathlib
@@ -20,13 +20,16 @@ def unique_keys(pairs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", type=pathlib.Path)
+    parser.add_argument("input", type=pathlib.Path, nargs="?")
     parser.add_argument("--output", type=pathlib.Path)
     parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path("."))
+    parser.add_argument("--parity", type=pathlib.Path, metavar="SPEC")
     args = parser.parse_args()
+    if (args.input is None) == (args.parity is None):
+        parser.error("give an input table or --parity SPEC")
     skill = pathlib.Path(__file__).resolve().parents[1]
     try:
-        with args.input.open("rb") as source:
+        with (args.parity or args.input).open("rb") as source:
             raw = source.read(8 * 1024 * 1024 + 1)
         if len(raw) > 8 * 1024 * 1024:
             raise ValueError("Input exceeds 8 MiB; select a bounded table explicitly")
@@ -51,7 +54,9 @@ def main():
             return 0
         names = {"szl-research-anatomy": "szl_anatomy_assess", "szl-math-claim-check": "szl_check_math_cases",
                  "szl-dataset-readiness": "szl_audit_dataset", "szl-model-evaluation": "szl_evaluate_predictions"}
-        if skill_name in names:
+        if args.parity is not None:
+            report = runpy.run_path(str(skill / "parity.py"))["szl_audit_benchmark_parity"](payload)
+        elif skill_name in names:
             report = functions[names[skill_name]](**payload)
         elif skill_name == "szl-kernel-comparison":
             report = functions["szl_compare_kernel_runs"](payload)
@@ -71,7 +76,7 @@ def main():
         return 0
     except (ValueError, TypeError, KeyError, OSError, RecursionError, OverflowError) as error:
         print("Skill input/execution error: " + str(error), file=sys.stderr)
-        return 1
+        return 1 if args.parity is None else 2
 
 
 if __name__ == "__main__":
