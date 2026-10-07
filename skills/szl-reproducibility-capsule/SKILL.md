@@ -1,6 +1,6 @@
 ---
 name: szl-reproducibility-capsule
-description: "Creates an exact-byte manifest (path, size, SHA-256) for the explicitly selected files of an experiment, verifies them later as changed / missing / unsafe, and validates a bounded replay declaration (inputs, source, environment, plan, outputs) without executing anything. Use when handing an analysis to a collaborator, archiving a result, preparing a replication or when the user asks 'did anything change since the run'. Not a container, not a signature, and it does not reproduce the experiment."
+description: "Creates an exact-byte manifest (path, size, SHA-256) for the explicitly selected files of an experiment, verifies them later as changed / missing / unsafe, and validates a bounded replay declaration (inputs, source, environment, plan, outputs) without executing anything. Can also pack a verified capsule into a deterministic ZIP and unpack-verify it. Use when handing an analysis to a collaborator, archiving a result, preparing a replication or when the user asks 'did anything change since the run'. Not a container, not a signature, and it does not reproduce the experiment."
 license: Apache-2.0
 ---
 
@@ -41,9 +41,21 @@ unsigned self-digest cannot detect replacement of the whole manifest. `authentic
 even when every byte matches; real signing needs a key and a verifier (see szl-session-receipt for the
 optional signing path).
 
+## Pack and unpack-verify
+
+```bash
+python scripts/pack.py pack assets/pack-match.json --root . --output capsule.zip
+python scripts/pack.py unpack-verify capsule.zip --dest restored
+```
+
+Pack writes a deterministic ZIP only for a MATCH capsule (`assets/pack-mismatch.json` is refused).
+Unpack-verify refuses unsafe archives, extracts into a new directory and reports `MATCH`,
+`MISMATCH`, `EXTRA_MEMBERS` or `REFUSED`. See `references/contracts.md`.
+
 ## What it does not do
 
 Never executes argv or source, installs dependencies, launches processes, applies numerical
 comparisons to outputs, or inspects file contents for secrets (credential-name guards look at names).
 Limits: 128 files, 8 MiB per file, 32 MiB total. It cannot prove source safety, enforce a sandbox or
 verify preregistration. Hashes are not signatures; readiness is not reproduction.
+A ZIP is not a signature or sandbox; unpack-verify never executes member contents.

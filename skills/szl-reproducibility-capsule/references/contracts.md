@@ -12,8 +12,8 @@ Common credential/private configuration path names are excluded. These guards ar
 not a secret scanner; inspect selected file content and metadata before sharing.
 
 At most 128 files, 8 MiB each and 32 MiB retained total are accepted. Hashing is streaming,
-bounded and checks file identity/size/modification time before and after reading. No
-directory sweep or file packaging occurs. Metadata must be finite JSON, at most 64 KiB
+bounded and checks file identity/size/modification time before and after reading. The
+kernel neither sweeps nor packages (see below). Metadata must be finite JSON, at most 64 KiB
 and at most 32 nesting levels; common credential field names are refused.
 Use a quiescent, trusted project root. Portable path/identity checks do not provide
 race-proof filesystem confinement against a malicious concurrent path replacement;
@@ -68,6 +68,26 @@ Missing/changed/unsafe bytes make it false. No replay field gives false/`NOT_SPE
 Execution, sandbox capability denial and tolerance application remain respectively
 `NOT_RUN`, `DECLARED_ONLY`, `NOT_RUN`; scientific performance stays `NOT_MEASURED`.
 A human must review sensitive scientific use, executable source and licensing separately.
+
+## Deterministic pack and unpack-verify
+
+`scripts/pack.py pack CAPSULE.json --root R --output OUT.zip` reads strict JSON (at most 1 MiB;
+duplicate keys, NaN/Infinity or a non-object exit 2), refuses unless `szl_verify_capsule` is
+`MATCH`, and re-reads each file through the same path walk against its manifest size and SHA-256.
+Paths must be Windows-portable and case-distinct; `capsule.json` is reserved. Members are sorted,
+dated 1980-01-01, `create_system` 3, mode 0644 and `ZIP_STORED`, plus sorted-key `capsule.json`;
+the output is created exclusively. Identical bytes were measured on CPython 3.12 (Windows, Linux).
+
+`unpack-verify OUT.zip --dest NEW_DIR` reads at most 34 MiB and, before creating anything,
+refuses an existing destination; names that are absolute, traversing, backslashed, drive-qualified,
+noncanonical, credential-like, unportable, altered by decoding or duplicated (also ignoring case);
+encrypted, symlink, directory or oversize members (8 MiB, `capsule.json` 1 MiB, 33 MiB total,
+129 members); and a missing, non-strict (exit 2) or invalid capsule. A self-digest disagreement
+is `MISMATCH` without extraction. Declared members are extracted exclusively and re-verified:
+`MISMATCH` (changed or missing), `EXTRA_MEMBERS` (undeclared members, listed, never extracted)
+or `MATCH`. Later failures are `REFUSED` with `destination_created: true`. Exit 0 `MATCH`,
+1 other, 2 usage or strict-JSON error. A self-consistent replacement archive is undetectable
+without an independently retained digest.
 
 ## Acceptance and provenance
 

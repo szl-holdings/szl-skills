@@ -27,6 +27,11 @@
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.
+- Add `scripts/pack.py` to szl-reproducibility-capsule: pack a capsule that verifies MATCH
+  into a deterministic stored ZIP with an embedded capsule.json, and unpack-verify one into
+  a new directory as MATCH, MISMATCH, EXTRA_MEMBERS or REFUSED (unsafe names and oversize
+  members are refused before writing). `kernel.py` and the workbench mirror are unchanged;
+  a ZIP is not a signature and nothing is executed.
 
 ## 0.5.0-rc.3
 
