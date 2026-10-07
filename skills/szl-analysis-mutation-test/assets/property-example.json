@@ -1,0 +1,6 @@
+{"label_column": "outcome", "id_column": "sample", "columns": ["dose_mg"], "require_variant_binding": true,
+ "mutations": ["scale_column_inverse", "negate_column", "extreme_value", "conflicting_duplicate_id",
+               "all_missing_column", "single_row"],
+ "rows": [{"sample": "S01", "dose_mg": 10, "response": 0.21, "outcome": 0},
+          {"sample": "S02", "dose_mg": 20, "response": 0.35, "outcome": 0},
+          {"sample": "S03", "dose_mg": 40, "response": 0.58, "outcome": 1}]}

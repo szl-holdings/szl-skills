@@ -47,9 +47,22 @@ for a given `seed`.
 
 If `baseline_flagged` is true the checks reject the untouched data and the score is reported as
 `BASELINE_FLAGGED` instead of a coverage count, because detection numbers would be meaningless.
+A `SCORED` report needs `baseline_flagged: false`; missing or non-boolean gives `BASELINE_NOT_TESTED`,
+because a QC that rejects everything would otherwise score full coverage
+(`assets/outcomes-no-baseline.json`). With `"require_variant_binding": true` (dataset or outcomes),
+an outcome without `variant_sha256` is `NOT_TESTED`.
+
+## Property and boundary classes (opt-in)
+
+Run only when named in `mutations`, so default plans and digests are unchanged: `scale_column_inverse`
+(x0.001), `negate_column`, `extreme_value` (largest finite double), `conflicting_duplicate_id` (needs
+`id_column`), `all_missing_column`, `single_row`. Targets: `columns`, else the first numeric column
+that is not the label or id. Plans become `szl.mutation-plan.v2`; see `assets/property-example.json`.
 
 ## What it does not do
 
 It does not execute your pipeline, does not clean or repair data, does not estimate real-world error
 rates, and the coverage count is not a quality score. Semantic errors (a plausible but wrong label on
-one sample) are outside its reach by design. Details: `references/contract.md`.
+one sample) are outside its reach by design. The property classes are fixed corruptions, not a
+property-based testing framework (no search or shrinking). Details: `references/contract.md`;
+provenance: `references/provenance.md`.

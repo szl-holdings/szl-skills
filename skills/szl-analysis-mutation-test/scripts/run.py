@@ -6,13 +6,28 @@
   python scripts/run.py score variants/plan.json OUTCOMES.json [--output report.json]
       OUTCOMES.json: {"baseline_flagged": false, "variants": {"scale_column": {"flagged": true, "check": "range-check"}, ...}}
 
-Exit 0 = phase ran (read "status"/"coverage"), 2 = error."""
-import argparse, json, pathlib, sys
+Exit 0 = phase ran (read "status"/"coverage"), 2 = error (incl. bad JSON, duplicate keys, NaN/Infinity)."""
+import argparse, json, math, pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from kernel import szl_generate_mutations, szl_score_mutations  # noqa: E402
 
+def _pairs(items):
+    d = {}
+    for k, v in items:
+        if k in d:
+            raise ValueError("duplicate JSON key %r" % k)
+        d[k] = v
+    return d
+
+def _float(text):  # also receives NaN/Infinity tokens
+    v = float(text)
+    if not math.isfinite(v):
+        raise ValueError("non-finite JSON number %s" % text)
+    return v
+
 def read(p):
-    return json.loads(pathlib.Path(p).read_text(encoding="utf-8"))
+    return json.loads(pathlib.Path(p).read_text(encoding="utf-8"), object_pairs_hook=_pairs,
+                      parse_float=_float, parse_constant=_float)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -20,8 +35,12 @@ def main():
     g = sub.add_parser("generate"); g.add_argument("dataset"); g.add_argument("--out-dir", required=True)
     s = sub.add_parser("score"); s.add_argument("plan"); s.add_argument("outcomes"); s.add_argument("--output", default=None)
     a = ap.parse_args()
+    try:
+        docs = [read(a.dataset)] if a.cmd == "generate" else [read(a.plan), read(a.outcomes)]
+    except (OSError, ValueError) as e:
+        print(json.dumps({"status": "ERROR", "reason": str(e)}, indent=2)); return 2
     if a.cmd == "generate":
-        plan = szl_generate_mutations(read(a.dataset))
+        plan = szl_generate_mutations(docs[0])
         if plan["status"] == "ERROR":
             print(json.dumps(plan, indent=2)); return 2
         out = pathlib.Path(a.out_dir); out.mkdir(parents=True, exist_ok=True)
@@ -33,7 +52,7 @@ def main():
         print(json.dumps({"status": "GENERATED", "out_dir": str(out), "expected_detection": plan["expected_detection"],
                           "skipped": [v["mutation"] for v in plan["variants"] if v["status"] != "GENERATED"]}, indent=2))
         return 0
-    report = szl_score_mutations(read(a.plan), read(a.outcomes))
+    report = szl_score_mutations(*docs)
     text = json.dumps(report, indent=2)
     if a.output:
         pathlib.Path(a.output).write_text(text + "\n", encoding="utf-8")

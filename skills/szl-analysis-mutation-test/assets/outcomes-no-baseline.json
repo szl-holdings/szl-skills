@@ -1,0 +1,4 @@
+{"variants": {"duplicate_rows": {"flagged": true}, "drop_rows": {"flagged": true}, "shuffle_labels": {"flagged": true},
+ "scale_column": {"flagged": true}, "swap_columns": {"flagged": true}, "inject_missing": {"flagged": true},
+ "precision_drift": {"flagged": true}, "type_confusion": {"flagged": true}, "reorder_rows": {"flagged": true},
+ "truncate": {"flagged": true}}}

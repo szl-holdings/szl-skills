@@ -11,4 +11,20 @@ A SKIPPED variant records why (no label column, no numeric column, fewer than tw
 If `variant_sha256` is given and differs from the plan's digest, the outcome is NOT_TESTED (wrong file).
 
 Report (`szl.mutation-coverage-report.v1`): `caught`, `missed`, `not_tested`, `coverage` as `caught/applicable`,
-status SCORED, BASELINE_FLAGGED or NO_OUTCOMES_RECORDED.
+status SCORED, BASELINE_FLAGGED, NO_OUTCOMES_RECORDED or BASELINE_NOT_TESTED.
+
+## Upgrade: baseline, binding, strict input, property classes
+
+- `k` (>= 0) and `seed` must be JSON integers; `mutations` a list of distinct known names ([] = default ten).
+- Opt-in classes, never default: `scale_column_inverse`, `negate_column`, `extreme_value`,
+  `conflicting_duplicate_id` (needs `id_column`), `all_missing_column`, `single_row`. `columns` and
+  `id_column` must name row keys and need one of them. Non-numeric targets SKIP; zero cells are left
+  alone (all-zero target: NO_OP).
+- Such plans, or `require_variant_binding: true`, are `szl.mutation-plan.v2` (adds
+  `require_variant_binding`, `columns`, `id_column`); every other plan stays v1, byte-identical to
+  base commit b8e259c.
+- `score` takes v1/v2 plans; ERROR on missing or duplicate variant names or a non-boolean
+  `require_variant_binding`. When the plan or outcomes require binding, an outcome lacking
+  `variant_sha256` is NOT_TESTED.
+- Status order: BASELINE_FLAGGED, NO_OUTCOMES_RECORDED, BASELINE_NOT_TESTED (`baseline_flagged` not
+  `false`; adds `reason`), SCORED. CLI: bad JSON, duplicate keys or NaN/Infinity exit 2.
