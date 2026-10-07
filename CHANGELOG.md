@@ -2,6 +2,10 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
+- Add experiment-replay v2 operations (column sum, count, median, sample variance and grouped
+  mean) in a separately pinned `scripts/engine_ops.py`. Exact Decimal and Fraction paths must
+  agree or the receipt is `INCOMPLETE` (`INTERNAL_DISAGREEMENT`); unlisted operations are
+  `REFUSED`. `scripts/engine.py`, v1 pins and v1 receipts stay byte-identical.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and

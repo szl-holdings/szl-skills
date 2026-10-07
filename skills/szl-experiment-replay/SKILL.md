@@ -1,14 +1,15 @@
 ---
 name: szl-experiment-replay
-description: "Replays a pinned, bounded CSV column mean against a frozen reference result and writes an explicit match, divergence or incomplete receipt. Use when a researcher needs to rerun a small tabular result offline and distinguish numeric disagreement from changed evidence."
+description: "Replays a pinned, bounded CSV column mean, or one allowlisted v2 column operation, against a frozen reference result and writes an explicit match, divergence or incomplete receipt. Use when a researcher needs to rerun a small tabular result offline and distinguish numeric disagreement from changed evidence."
 license: Apache-2.0
 ---
 
 # Experiment replay
 
 Use Python 3.10+ and the standard library to replay one fixed operation on local CSV data. This
-executes the skill's built-in `csv_column_mean_v1`; it does not execute a supplied script,
-shell command, notebook, plugin or arbitrary Python. It uses no network or credentials.
+executes the skill's built-in `csv_column_mean_v1` or one allowlisted v2 operation; it does not
+execute a supplied script, shell command, notebook, plugin or arbitrary Python. It uses no network
+or credentials.
 
 ## Run
 
@@ -39,6 +40,13 @@ changes but are not signatures. Receipts explicitly say `SAME_HOST_LOCAL`, `sign
 `independent_witness: false` and `scientific_claims_verified: false`. The runner does not prove
 the experiment design, data collection, author identity or another machine's reproduction.
 
+## v2 operations
+
+A v2 declaration (`assets/ops-declaration.json`) selects column sum, count, median, sample
+variance or grouped mean from `scripts/engine_ops.py`, pinned separately. Exact Decimal and
+Fraction paths must agree, else `INCOMPLETE`. `assets/ops-unsupported.json` is refused. See
+`references/contract.md`.
+
 ## Bounds and relationship to other skills
 
 Input CSV: at most 256 KiB, 10,000 rows, 64 columns; reference JSON: at most 4 KiB. Paths are
@@ -52,5 +60,10 @@ the CLI or attach this skill. Keep host registration and task evaluation `NOT_VE
 that control plane supplies a gate, readback and pilot evidence.
 
 Use `szl-reproducibility-capsule` to inventory broader source, environment and analysis plan
-files. Its replay declaration remains inert; this skill independently executes only the fixed
-CSV mean operation. For publication, arrange independent retention and a separate witness.
+files. Its replay declaration remains inert; this skill independently executes only its fixed
+CSV operations. For publication, arrange independent retention and a separate witness.
+
+## What it does not do
+
+It does not run unlisted operations, round results or choose tolerances. Path agreement is a
+same-host software check, not independent replication; v1 pins are never upgraded to v2.

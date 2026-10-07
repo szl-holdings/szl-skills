@@ -144,9 +144,12 @@ class ExperimentReplayTests(unittest.TestCase):
         files = resources["szl-experiment-replay"]
         self.assertEqual(set(files), {"SKILL.md", "LICENSE", "NOTICE", "scripts/run.py",
                                       "scripts/engine.py", "assets/declaration.json",
-                                      "assets/synthetic.csv", "assets/expected.json"})
+                                      "assets/synthetic.csv", "assets/expected.json",
+                                      "scripts/engine_ops.py", "references/contract.md",
+                                      "references/provenance.md", "assets/ops-declaration.json",
+                                      "assets/ops-expected.json", "assets/ops-unsupported.json"})
         self.assertNotIn("kernel.py", files)
-        for relative in ("scripts/run.py", "scripts/engine.py"):
+        for relative in ("scripts/run.py", "scripts/engine.py", "scripts/engine_ops.py"):
             with self.subTest(resource=relative):
                 ast.parse(files[relative], filename=relative)
         figure_files = resources["szl-figure-data-contract"]

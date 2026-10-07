@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Prepare and replay an offline, pinned CSV column mean experiment."""
+"""Prepare and replay an offline, pinned CSV column operation."""
 
 import argparse
 import json
@@ -10,6 +10,16 @@ import sys
 
 # This loads trusted package code before the engine's post-load drift comparison.
 ENGINE = runpy.run_path(str(pathlib.Path(__file__).resolve().parent / "engine.py"))
+V2 = ("szl.experiment-replay.declaration.v2", "szl.experiment-replay.pin.v2")
+
+
+def _engine(document):  # v2 documents use the separately pinned engine_ops.py
+    if not isinstance(document, dict) or document.get("schema") not in V2:
+        return ENGINE
+    try:
+        return runpy.run_path(str(pathlib.Path(__file__).resolve().parent / "engine_ops.py"))
+    except Exception as error:  # exit 2, never 1 (DIVERGED)
+        raise ValueError("engine_ops.py failed to load") from error
 
 
 def main(argv=None):
@@ -19,7 +29,7 @@ def main(argv=None):
     make.add_argument("declaration", help="declaration JSON path relative to --root")
     make.add_argument("--root", required=True)
     make.add_argument("--output", required=True, help="new pin JSON path relative to --root")
-    run = sub.add_parser("replay", help="run the fixed CSV mean and retain a receipt")
+    run = sub.add_parser("replay", help="run the pinned fixed operation and retain a receipt")
     run.add_argument("pin", help="pin JSON path relative to --root")
     run.add_argument("--root", required=True)
     run.add_argument("--receipt", required=True, help="new receipt JSON path relative to --root")
@@ -28,7 +38,7 @@ def main(argv=None):
         if args.command == "prepare":
             payload = ENGINE["_read_json"](ENGINE["read_file"](
                 args.root, args.declaration, ENGINE["MAX_JSON"]))
-            result = ENGINE["prepare"](args.root, payload)
+            result = _engine(payload)["prepare"](args.root, payload)
             ENGINE["write_new_json"](args.root, args.output, result)
             print(json.dumps({"status": "PINNED", "pin_sha256": result["pin_sha256"], "output": args.output}, sort_keys=True))
             return 0
@@ -45,7 +55,7 @@ def main(argv=None):
             except (ValueError, TypeError, UnicodeError, OverflowError, RecursionError):
                 result = ENGINE["_receipt"](None, "REFUSED", "INVALID_PIN")
             else:
-                result = ENGINE["replay"](args.root, pin)
+                result = _engine(pin)["replay"](args.root, pin)
         ENGINE["write_new_json"](args.root, args.receipt, result)
         print(json.dumps({"status": result["status"], "reason": result["reason"], "receipt": args.receipt,
                           "receipt_sha256": result["receipt_sha256"]}, sort_keys=True))
