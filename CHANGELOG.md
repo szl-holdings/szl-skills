@@ -27,6 +27,13 @@
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.
+- szl-evidence-gate fails closed on input: no claims is ABSTAIN NO_CLAIMS_DECLARED (not PASS),
+  repeated claim ids are ERROR DUPLICATE_CLAIM_ID, non-boolean `required` is ERROR
+  REQUIRED_NOT_BOOLEAN, resolved paths outside the root are ERROR PATH_OUTSIDE_ROOT, artifacts over
+  32 MiB are ERROR ARTIFACT_TOO_LARGE, and the CLI rejects duplicate JSON keys and NaN/Infinity.
+  Opt-in `strict_numeric_binding` adds per-claim `numeric_binding` (v2 report) and turns unbound
+  claim numbers into ABSTAIN NUMBERS_NOT_BOUND. Exact token matching only; it does not recompute
+  values. The existing example report is unchanged.
 
 ## 0.5.0-rc.3
 

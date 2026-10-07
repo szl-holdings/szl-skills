@@ -43,19 +43,43 @@ declared), and the optional energy claim FAILs with `MISSING_ARTIFACT`. The exit
 claim is labelled `PRESENCE_ONLY_NO_DIGESTS_DECLARED`. `required: false` keeps a failing claim out of the
 aggregate FAIL. Paths are relative to `--root` (default: the claims file's directory) and may not escape it.
 
+Input checks fail closed: no claims is ABSTAIN `NO_CLAIMS_DECLARED`; repeated claim ids are report ERROR
+`DUPLICATE_CLAIM_ID`; a non-boolean `required`, a resolved path (symlinks included) outside the root, or
+an artifact over 32 MiB is ERROR `REQUIRED_NOT_BOOLEAN`, `PATH_OUTSIDE_ROOT` or `ARTIFACT_TOO_LARGE`.
+The CLI exits 2 on duplicate JSON keys or NaN/Infinity.
+
+## Numeric binding (opt-in)
+
+Add `"strict_numeric_binding": true` (`false`: report only), as in `assets/strict-example.json`:
+
+```bash
+python scripts/run.py assets/strict-example.json
+```
+
+Each claim gets `numeric_binding` `{numbers_in_text, bound, unbound}` (schema v2). A claim
+number is bound only by a passing item's `values` (decimal strings, each a whole token in the artifact)
+or a `must_contain` snippet token that is a whole token in the artifact. Strict mode turns a PASS claim
+with unbound numbers into ABSTAIN `NUMBERS_NOT_BOUND`: here the seed-11 claim binds `11` and `0.912`,
+the digest-only mean claim leaves `0.912` unbound.
+
 ## Reading the result
 
 | Status | Meaning |
 |---|---|
 | PASS | every declared artifact present, digests and text match |
 | FAIL | an artifact is missing, its bytes differ, or a required snippet is absent |
-| ABSTAIN | the claim declares no evidence, so there is nothing to check |
-| ERROR | the claim or evidence record is malformed |
+| ABSTAIN | the claim declares no evidence (or, strict, has an unbound number) |
+| ERROR | the claim or evidence record is malformed or refused |
 
-The aggregate is FAIL if any required claim fails, otherwise ABSTAIN if any claim abstains, otherwise PASS.
+The aggregate is FAIL if any required claim fails, otherwise ABSTAIN if any claim abstains or none
+exist, otherwise PASS.
 
 ## What it does not do
 
 It does not read the claim text for meaning, does not open PDFs or notebooks, does not recompute
 numbers, and does not decide whether the artifact actually supports the sentence. A PASS says the
-evidence exists and is intact; a human still has to read it. Contract: `references/contract.md`.
+evidence exists and is intact; a human still has to read it. Numeric binding is exact token matching
+(`0.9120` does not bind `0.912`); units, rounding and arithmetic are not checked, so a bound number can
+still be the wrong value or row. Identifiers such as `R07` or `SHA-256` and dotted versions are not
+read as numbers.
+Contract: `references/contract.md`; provenance: `references/provenance.md`.

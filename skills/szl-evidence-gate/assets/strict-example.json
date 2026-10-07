@@ -1,0 +1,10 @@
+{
+  "subject": "SYNTHETIC strict numeric binding example",
+  "strict_numeric_binding": true,
+  "claims": [
+    {"id": "seed-11-accuracy", "text": "Seed 11 held-out accuracy is 0.912",
+     "evidence": [{"path": "artifacts/held_out_metrics.csv", "sha256": "4853f43c459a2ee7ab8ba3ec1769dce97534cf8068a4d9b2f240de88eb74f180", "values": ["11", "0.912"]}]},
+    {"id": "mean-accuracy", "text": "Mean held-out accuracy across three seeds is 0.912",
+     "evidence": [{"path": "artifacts/held_out_metrics.csv", "sha256": "4853f43c459a2ee7ab8ba3ec1769dce97534cf8068a4d9b2f240de88eb74f180"}]}
+  ]
+}
