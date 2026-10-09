@@ -121,6 +121,15 @@
       ]
     },
     {
+      "name": "szl-science-reporting-skills",
+      "description": "One offline reporting-guideline map for the frozen PRISMA 2020, CONSORT 2025, and combined STROBE 2007 item ids. Locators are not visual confirmation. reporting_compliance stays NOT_EVALUATED. No manuscript download or credentials.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/szl-reporting-guideline-audit"
+      ]
+    },
+    {
       "name": "szl-paper-evidence-skills",
       "description": "One offline PDF evidence locator skill: pin original and extracted bytes, match complete table-cell or figure-caption text, and require human visual review. No credentials required.",
       "source": "./",

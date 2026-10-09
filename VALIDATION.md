@@ -5,22 +5,23 @@ historical evidence, not measurements of the expanded v0.5.0-rc.1 prerelease or 
 For the later six-upgrade, four-audit candidate and its notice follow-up, see
 [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That candidate routed fourteen packages:
 twelve science skills selected by its installer and two separate evidence skills.
-Current source routing is forty total packages: twenty-seven core science tools, one
+Current source routing is forty-one total packages: twenty-seven core science tools, one
 separate tool each for design, synthetic rare-disease evidence replay, paper evidence, assay,
-multiplicity, change impact and uncertainty lineage, three existing replay tools, and three
-evidence skills excluded from the curated installer (including the synthetic-only
-rare-disease evidence map). This count is not a new behavioral acceptance result.
+multiplicity, change impact, uncertainty lineage and reporting-guideline audit, three existing
+replay tools, and three evidence skills excluded from the curated installer (including the
+synthetic-only rare-disease evidence map). This count is not a new behavioral acceptance result.
 The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL.md files
 and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These
 historical evidence sets establish neither application import nor measured agent efficacy.
 
-The aggregate `skills/` source budget is 1,025,000 bytes, increased from 1,000,000
-for the two separate synthetic rare-disease tools. Their regression tests live in the
-repository test suite. This integrated source contains 1,021,530 skill-resource bytes,
-leaving 3,470 bytes of aggregate headroom. The existing SDK limits remain 200,000 bytes
-per skill, 1,000,000 bytes per staging batch and eight batches. The aggregate repository
-budget is not an application import limit or a release claim. Native selfcheck fixtures
-exercise the exact aggregate boundary and reject one byte over it; no size check is disabled.
+The aggregate `skills/` source budget is 1,050,000 bytes. It moved from 1,000,000 to
+1,025,000 for the two synthetic rare-disease tools, then to 1,050,000 for the
+reporting-guideline family. Regression tests live in the repository test suite. This
+integrated source contains 1,042,966 skill-resource bytes, leaving 7,034 bytes of
+aggregate headroom. The SDK limits remain 200,000 bytes per skill, 1,000,000 bytes per
+staging batch and eight batches. The aggregate repository budget is not an application
+import limit or a release claim. Native selfcheck fixtures exercise the exact aggregate
+boundary and reject one byte over it; no size check is disabled.
 
 ## Checks
 

@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE_LIMIT = 1_025_000
+SOURCE_LIMIT = 1_050_000
 
 
 class SourceSizeBudgetTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class SourceSizeBudgetTests(unittest.TestCase):
     def test_one_byte_over_aggregate_source_limit_fails(self):
         result = self.check_size(SOURCE_LIMIT + 1)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("skills/ is 1025001 bytes (limit 1,025,000)", result.stdout)
+        self.assertIn("skills/ is 1050001 bytes (limit 1,050,000)", result.stdout)
         self.assertIn("selfcheck: FAIL", result.stdout)
 
     def test_installer_skill_and_batch_limits_are_unchanged(self):

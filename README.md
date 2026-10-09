@@ -1,18 +1,19 @@
 # SZL Skills
 
 Executable checks that make scientific claims carry their evidence. This source tree
-contains forty skills for Claude Science, Claude Code and claude.ai: thirty-seven science
+contains forty-one skills for Claude Science, Claude Code and claude.ai: thirty-eight science
 tools and three evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have nine import families: twenty-seven core checks, one prospective experiment
+The science tools have ten import families: twenty-seven core checks, one prospective experiment
 draft, three bounded replay checks, one separate synthetic rare-disease evidence replay,
 one paper evidence audit, one declared assay-run audit,
-one multiplicity audit, one research change-impact check and one uncertainty-lineage check. The SDK stages the complete selection
+one multiplicity audit, one research change-impact check, one uncertainty-lineage check and
+one reporting-guideline map. The SDK stages the complete selection
 in at most eight batches of at most 1 MB each, with a 200 KB limit per skill including its license
-and notice. These are local staging bounds, not measured application import limits. All nine
+and notice. These are local staging bounds, not measured application import limits. All ten
 families can attach to the same specialist. The stable v0.4.0 tag retains its original
 twenty-three-tool science scope.
 
