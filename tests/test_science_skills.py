@@ -339,7 +339,7 @@ class PackagingTests(unittest.TestCase):
                                               "szl-science-rare-disease-replay-skills",
                                               "szl-paper-evidence-skills", "szl-science-assay-skills",
                                               "szl-science-multiplicity-skills", "szl-science-change-impact-skills",
-                                              "szl-science-uncertainty-skills"}
+                                              "szl-science-uncertainty-skills", "szl-science-reporting-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
@@ -455,6 +455,20 @@ class PackagingTests(unittest.TestCase):
                         self.assertAlmostEqual(result["targets"][0]["variance"], 0.31)
                         self.assertEqual(result["input_sha256"], hashlib.sha256(
                             (unpacked / "assets" / "example.json").read_bytes()).hexdigest())
+                        self.assertFalse((unpacked / "kernel.py").exists())
+                        continue
+                    if report["skill"] == "szl-reporting-guideline-audit":
+                        checked = subprocess.run(
+                            [sys.executable, "-I", "-B", str(unpacked / "scripts" / "run.py"),
+                             str(unpacked / "assets" / "example.json")],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                        mapped = json.loads(checked.stdout)
+                        self.assertEqual(mapped["status"], "MAP_COMPLETE")
+                        self.assertEqual(mapped["reporting_compliance"], "NOT_EVALUATED")
+                        self.assertEqual(mapped["visual_confirmation"], "NOT_PERFORMED")
+                        self.assertEqual(len(mapped["items"]), 42)
                         self.assertFalse((unpacked / "kernel.py").exists())
                         continue
                     if report["skill"] == "szl-measurement-harmonizer":

@@ -15,12 +15,12 @@ szl-reviewer-pack, szl-refutation-ledger, szl-retrieval-eval,
 szl-quantization-check, szl-repo-pin, szl-result-fragility, szl-clustered-replication,
 szl-outcome-preservation, szl-release-continuity, szl-skill-update-review.
 
-This source tree selects twenty-seven core science tools from forty total packages;
+This source tree selects twenty-seven core science tools from forty-one total packages;
 the three evidence skills are excluded, including synthetic rare-disease evidence mapping.
 Separate design-, rare-disease-replay-, paper-, assay-,
-multiplicity-, change-impact- and uncertainty-family installs can attach one tool each. The
+multiplicity-, change-impact-, uncertainty- and reporting-family installs can attach one tool each. The
 replay family attaches experiment replay, figure data contract and measurement harmonizer.
-Together these give thirty-seven science tools across nine science families. The fixed
+Together these give thirty-eight science tools across ten science families. The fixed
 v0.5.0-rc.3 source has thirty-five science tools and two evidence skills; measurement
 harmonizer and both rare-disease tools remain unreleased source additions. The earlier
 v0.5.0-rc.2 tag has twenty-eight science tools and two evidence skills. The stable v0.4.0

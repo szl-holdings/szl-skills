@@ -116,6 +116,9 @@ def build(root):
     uncertainty = set(installer_names(root, "UNCERTAINTY_NAMES", required=False))
     if uncertainty != set(grouped.get("szl-science-uncertainty-skills", [])) or uncertainty & (selected | design | replay | rare_replay | paper | assay | change | multiplicity):
         raise ValueError("installer/uncertainty catalog mismatch")
+    reporting = set(installer_names(root, "REPORTING_NAMES", required=False))
+    if reporting != set(grouped.get("szl-science-reporting-skills", [])) or reporting & (selected | design | replay | rare_replay | paper | assay | change | multiplicity | uncertainty):
+        raise ValueError("installer/reporting catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",

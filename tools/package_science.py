@@ -42,7 +42,7 @@ def package_skills(destination, revision=None, manifest=False):
                                        "szl-science-rare-disease-replay-skills",
                                        "szl-paper-evidence-skills", "szl-science-assay-skills",
                                        "szl-science-multiplicity-skills", "szl-science-change-impact-skills",
-                                       "szl-science-uncertainty-skills"}
+                                       "szl-science-uncertainty-skills", "szl-science-reporting-skills"}
                 for skill in plugin["skills"]]
     if len(selected) != len(set(selected)):
         raise ValueError("Duplicate skill across science families")

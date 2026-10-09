@@ -6,7 +6,7 @@ import skill_inventory
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
 # Aggregate repository source, separate from the unchanged SDK skill/batch limits.
-MAX_SOURCE_SKILL_BYTES = 1_025_000
+MAX_SOURCE_SKILL_BYTES = 1_050_000
 SECRET = re.compile(r"(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|hf_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)")
 PERSONAL = re.compile(r"([A-Za-z]:\\Users\\[A-Za-z0-9._-]+|/home/[a-z][a-z0-9_-]*/|/Users/[A-Za-z][A-Za-z0-9._-]*/|\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+\b)")
 REF = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|sh|js|ts|json|yaml|yml|toml|txt|csv))`")
