@@ -160,13 +160,26 @@ class FindingFieldTests(unittest.TestCase):
         pack = build({"r.json": {"status": "SCORED", "missed": [], "not_tested": [], "incomparable": 0}})
         self.assertEqual(pack["status"], "NO_UNRESOLVED_CHECKED_FINDINGS")
 
-    def test_analyzed_with_inference_blockers_is_unresolved(self):
+    def test_field_level_inference_blockers_alone_make_a_pass_status_unresolved(self):
+        # Field-level check only: no kernel emits ANALYZED with blockers but empty findings.
         blockers = ["EXPECTED_PLAN_COMMITMENT_UNAVAILABLE"]
         pack = build({"a.json": {"schema": "synthetic", "status": "ANALYZED", "plan_binding": "UNBOUND",
                                  "inference_blockers": blockers}})
         self.assertEqual(pack["status"], "REVIEW_REQUIRED")
         self.assertEqual(pack["unresolved"], [{"source": "a.json", "status": "ANALYZED", "details": [
             {"field": "inference_blockers", "value": blockers, "count": 1}]}])
+
+    def test_ablation_shaped_analyzed_report_lists_findings_and_inference_blockers(self):
+        # Shape of the clustered-ablation upgrade's ANALYZED output: every inference blocker is also
+        # copied into findings with subject null, so the base kernel already listed it via findings.
+        blockers = ["EXPECTED_PLAN_COMMITMENT_UNAVAILABLE"]
+        findings = [{"finding": name, "subject": None} for name in blockers]
+        report = {"schema": "szl.clustered-ablation.v1", "status": "ANALYZED", "inference_blockers": blockers,
+                  "findings": findings}
+        (entry,) = build({"ablation.json": report})["unresolved"]
+        self.assertEqual(entry, {"source": "ablation.json", "status": "ANALYZED", "details": [
+            {"field": "findings", "value": findings, "count": 1},
+            {"field": "inference_blockers", "value": blockers, "count": 1}]})
 
     def test_readiness_hold_and_missing_status_are_unresolved(self):
         pack = build({"map.json": {"readiness": "HOLD"}, "bare.json": {"schema": "x"}})

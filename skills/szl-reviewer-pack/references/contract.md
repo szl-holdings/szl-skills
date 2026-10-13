@@ -29,10 +29,11 @@ INCOMPARABLE, NO_OUTCOMES_RECORDED, RECORDED_WITH_MISSING_FILES, BASELINE_NOT_TE
 EXTRA_FILES_PRESENT, UNSTABLE, PLAN_INCOMPLETE, HOLD, BLOCKED, UNKNOWN, PARITY_ISSUES, EXTRA_MEMBERS,
 INCOMPLETE, REFUSED, DIVERGED, STALE. UNKNOWN also covers a report with neither `status` nor `readiness`.
 Pass statuses (PASS, CONSISTENT, MATCH, RECORDED, SCORED, STABLE, PARITY_OK, ANALYZED, ...) stay resolved
-unless finding fields are present, so SCORED 6/10 is unresolved through `missed`, and a clustered report
-with an unbound plan (ANALYZED or DESCRIPTIVE_ONLY) through `inference_blockers`. The set is a list of
-known names: any other status without finding fields is shown in the table but not listed as unresolved.
-The set applies to standalone reports only; workbench checks still use the run summary's `findings` flag.
+unless finding fields are present, so SCORED 6/10 is unresolved through `missed`, and a DESCRIPTIVE_ONLY
+clustered report through `inference_blockers` (an ablation ANALYZED report also lists them in `findings`).
+The set is a list of known names: any other status without finding fields (for example BROKEN,
+INPUT_ERROR, INVALID_INPUT) is shown in the table but not listed as unresolved. The set applies to
+standalone reports only; workbench checks still use the run summary's `findings` flag.
 
 Fixtures in `assets/status-probe/` are trimmed copies of real kernel outputs. The mutation and
 evidence-gate ones come from the bundled examples of szl-analysis-mutation-test and szl-evidence-gate.
