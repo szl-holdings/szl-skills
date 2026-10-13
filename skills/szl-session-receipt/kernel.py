@@ -52,7 +52,7 @@ def _outside(relative, why="not a canonical relative POSIX path"):
 
 def _locate(root: Path, relative):
     """(path, lstat) of a contained regular file, or None (MISSING)."""
-    if not isinstance(relative, str) or "\\" in relative or ":" in relative or any(ord(c) < 32 for c in relative):
+    if not isinstance(relative, str) or "\\" in relative or ":" in relative or any(ord(c) < 32 or 0xD800 <= ord(c) < 0xE000 for c in relative):
         raise _outside(relative)
     pure = PurePosixPath(relative)
     if pure.is_absolute() or str(pure) != relative or not pure.parts or any(p.endswith((".", " ")) for p in pure.parts):
@@ -195,11 +195,12 @@ def szl_sign_session_receipt(receipt: dict, private_key_pem) -> dict:
     return receipt
 
 
-def szl_scan_extra_files(root, recorded) -> dict:
-    """Unrecorded entries directly inside each recorded path's directory (not recursive)."""
+def _scan_extra_files(root, recorded) -> dict:
+    """Unrecorded entries in the root and every directory leading to a recorded path (not recursive).
+    Private: verify passes only paths that _locate accepted."""
     root, recorded = Path(root), set(recorded)
     ancestors = {p.rsplit("/", k)[0] for p in recorded for k in range(1, p.count("/") + 1)}
-    directories = sorted({p.rpartition("/")[0] for p in recorded})
+    directories = sorted({""} | ancestors) if recorded else []
     extra = []
     for folder in directories:
         try:
@@ -243,7 +244,7 @@ def szl_verify_session_receipt(root, receipt: dict, scan: bool = False, max_file
     receipt_ok = hashlib.sha256(szl_canonical(check).encode()).hexdigest() == receipt.get("receipt_sha256")
     if schema == SCHEMA_V2:
         receipt_ok = receipt_ok and receipt.get("root_sha256_v2") == szl_root_sha256_v2(files)
-    found = szl_scan_extra_files(root, [r["path"] for r in rows if r["result"] != "ERROR"]) if scan else None
+    found = _scan_extra_files(root, [r["path"] for r in rows if r["result"] != "ERROR"]) if scan else None
     if errors:
         status = "ERROR"
     elif not receipt_ok:

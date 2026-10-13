@@ -4,10 +4,10 @@
   python scripts/run.py verify receipt.json --root PROJECT_DIR [--scan] [--max-file-bytes N]
   python scripts/run.py methods receipt.json          (prints the Methods paragraph only)
 
-record/verify exit 0 = ran (read "status"), 2 = ERROR (also duplicate JSON keys, NaN/Infinity).
---scan: EXTRA_FILES_PRESENT for unrecorded entries in the directories of recorded files.
+record/verify exit 0 = ran (read "status"), 2 = ERROR (also duplicate JSON keys, NaN/Infinity, 1e400).
+--scan: EXTRA_FILES_PRESENT for unrecorded entries in the root and directories leading to recorded files.
 --sign-key is optional and needs `pip install szl-receipt-dsse`; without it the receipt is UNSIGNED and says so."""
-import argparse, json, pathlib, sys
+import argparse, json, math, pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from kernel import MAX_FILE_BYTES, szl_make_session_receipt, szl_sign_session_receipt, szl_verify_session_receipt  # noqa: E402
 
@@ -19,8 +19,11 @@ def _pairs(pairs):
 def _constant(token):
     raise ValueError("non-finite JSON number " + token)
 
+def _float(token):
+    return float(token) if math.isfinite(float(token)) else _constant(token)
+
 def read(p):
-    return json.loads(pathlib.Path(p).read_text(encoding="utf-8"), object_pairs_hook=_pairs, parse_constant=_constant)
+    return json.loads(pathlib.Path(p).read_text(encoding="utf-8"), object_pairs_hook=_pairs, parse_constant=_constant, parse_float=_float)
 
 def main():
     ap = argparse.ArgumentParser()

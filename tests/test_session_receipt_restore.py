@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "szl-session-receipt"
@@ -111,12 +112,30 @@ class SessionReceiptRestoreTests(unittest.TestCase):
         self.assertEqual(verdict["status"], "MISMATCH")
         self.assertEqual(verdict["scan"]["extra_files"], ["data/extra.csv"])
 
+    def test_scan_lists_root_and_intermediate_directories_of_nested_paths(self):
+        nested = self.tmp / "nested"
+        (nested / "results" / "tables").mkdir(parents=True)
+        (nested / "results" / "tables" / "t1.csv").write_text("t\n", encoding="utf-8")
+        receipt = self.k.szl_make_session_receipt(nested, {"outputs": ["results/tables/t1.csv"]})
+        verdict = self.k.szl_verify_session_receipt(nested, receipt, scan=True)
+        self.assertEqual(verdict["status"], "MATCH")
+        self.assertEqual(verdict["scan"], {"directories": [".", "results", "results/tables"], "extra_files": []})
+        (nested / "results" / "injected.py").write_text("x = 1\n", encoding="utf-8")
+        (nested / "stray.txt").write_text("s\n", encoding="utf-8")
+        verdict = self.k.szl_verify_session_receipt(nested, receipt, scan=True)
+        self.assertEqual(verdict["status"], "EXTRA_FILES_PRESENT")
+        self.assertEqual(verdict["scan"]["extra_files"], ["stray.txt", "results/injected.py"])
+        # The example project with only a nested output recorded: the unrecorded root entries show up.
+        receipt = self.k.szl_make_session_receipt(self.project, {"outputs": ["results/summary.csv"]})
+        verdict = self.k.szl_verify_session_receipt(self.project, receipt, scan=True)
+        self.assertEqual(verdict["scan"]["extra_files"], ["analysis.py", "data/"])
+
     # -- path containment ---------------------------------------------------------------------------
     def test_drive_absolute_and_noncanonical_paths_are_refused_on_every_host(self):
         bad = ["C:/data/raw.csv", "C:data/raw.csv", "c:\\data\\raw.csv", "\\\\server\\share\\raw.csv",
                "/etc/hostname", "data\\raw.csv", "../kernel.py", "data/../data/raw.csv", "./data/raw.csv",
                "data//raw.csv", "data/raw.csv/", ".", "", "data/raw.csv:stream", "data/raw.csv.", "data/raw.csv ",
-               "data/\x00raw.csv"]
+               "data/\x00raw.csv", "data/\ud800.csv"]
         for path in bad:
             with self.subTest(path=path):
                 r = self.k.szl_make_session_receipt(self.project, {"inputs": [path]})
@@ -145,6 +164,21 @@ class SessionReceiptRestoreTests(unittest.TestCase):
         code, out = cli("record", SKILL / "assets" / "negative-drive-path.json", "--root", self.project)
         self.assertEqual(code, 2)
         self.assertEqual(json.loads(out)["reason"], "PATH_OUTSIDE_ROOT")
+
+    def test_file_replaced_after_containment_check_is_refused(self):
+        real = self.k._locate
+
+        def replace_after_check(root, relative):
+            found = real(root, relative)
+            fresh = found[0].with_name("fresh.tmp")  # created first, so it cannot reuse the old inode
+            fresh.write_text("swapped\n", encoding="utf-8")
+            os.replace(fresh, found[0])
+            return found
+
+        with mock.patch.object(self.k, "_locate", replace_after_check):
+            r = self.k.szl_make_session_receipt(self.project, {"inputs": ["data/raw.csv"]})
+        self.assertEqual((r["status"], r["reason"]), ("ERROR", "PATH_OUTSIDE_ROOT"))
+        self.assertIn("changed after the containment check", r["detail"])
 
     def test_symlinks_are_refused_not_followed(self):
         outside = self.tmp / "outside.csv"
@@ -216,6 +250,19 @@ class SessionReceiptRestoreTests(unittest.TestCase):
         receipt["root_sha256_v2"] = "0" * 64
         self.assertEqual(self.k.szl_verify_session_receipt(self.project, receipt)["status"], "RECEIPT_TAMPERED")
 
+    def test_v2_root_is_recomputed_even_when_receipt_digest_is_rederived(self):
+        unsigned = ("receipt_sha256", "signature", "methods_paragraph", "status", "scope")
+        for edit in ("root", "row"):
+            with self.subTest(edit=edit):
+                receipt = self.k.szl_make_session_receipt(self.project, asset("example-v2.json"))
+                if edit == "root":
+                    receipt["root_sha256_v2"] = "0" * 64
+                else:
+                    receipt["files"]["inputs"][0]["sha256"] = "0" * 64
+                receipt["receipt_sha256"] = canonical_digest({k: v for k, v in receipt.items() if k not in unsigned})
+                verdict = self.k.szl_verify_session_receipt(self.project, receipt)
+                self.assertEqual((verdict["status"], verdict["receipt_digest_intact"]), ("RECEIPT_TAMPERED", False))
+
     def test_content_swap_between_paths_changes_v2_root_but_not_v1(self):
         (self.project / "a.csv").write_text("alpha\n", encoding="utf-8")
         (self.project / "b.csv").write_text("beta\n", encoding="utf-8")
@@ -238,8 +285,11 @@ class SessionReceiptRestoreTests(unittest.TestCase):
         nan.write_text('{"inputs": ["data/raw.csv"], "environment": {"x": NaN}}', encoding="utf-8")
         inf = self.tmp / "inf.json"
         inf.write_text('{"schema": "szl.session-receipt.v1", "files": {}, "x": -Infinity}', encoding="utf-8")
+        big = self.tmp / "big.json"  # float("1e400") is inf; record used to write a receipt verify refuses
+        big.write_text('{"inputs": ["data/raw.csv"], "environment": {"x": 1e400}}', encoding="utf-8")
         for args in (("record", dup, "--root", self.project), ("record", nan, "--root", self.project),
-                     ("verify", dup, "--root", self.project), ("verify", inf, "--root", self.project), ("methods", nan)):
+                     ("record", big, "--root", self.project), ("verify", dup, "--root", self.project),
+                     ("verify", inf, "--root", self.project), ("methods", nan)):
             with self.subTest(args=args[:2]):
                 code, out = cli(*args)
                 self.assertEqual((code, json.loads(out)["status"]), (2, "ERROR"))
