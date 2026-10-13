@@ -131,6 +131,13 @@ def _instant(value: object, field: str) -> datetime:
     raise AuditError("INVALID_DATA_CONTRACT", field)
 
 
+def _finite(token: str) -> bool:
+    try:
+        return Decimal(token).is_finite()
+    except InvalidOperation:
+        return False
+
+
 def _contract(manifest: dict, sources: list[dict], expected: list[str]) -> tuple[dict, Decimal]:
     """Check v2 declarations. Ages use declared instants only, never the host clock."""
     as_of = _instant(manifest["as_of"], "as_of")
@@ -138,8 +145,8 @@ def _contract(manifest: dict, sources: list[dict], expected: list[str]) -> tuple
     if type(days) is not int or not 0 <= days <= 36500:
         raise AuditError("INVALID_DATA_CONTRACT", "max_age_days")
     if not isinstance(tokens, list) or len(tokens) > 8 or any(
-            not isinstance(token, str) or len(token) > 32 or token.strip() != token or DECIMAL.match(token)
-            or any(ord(char) < 32 for char in token) for token in tokens) or len(set(tokens)) != len(tokens):
+            not isinstance(token, str) or len(token) > 32 or token.strip() != token or not token.isprintable()
+            or _finite(token) for token in tokens) or len(set(tokens)) != len(tokens):
         raise AuditError("INVALID_DATA_CONTRACT", "missing_tokens")
     try:
         fraction = _decimal(manifest["max_missing_fraction"])
@@ -295,16 +302,19 @@ def harmonize(manifest: object, root: str | Path) -> dict:
                     missingness["per_source"][sid] = {"missing": len(missed), "rows": len(rows)}
                     for canonical_id in missed:
                         missingness["per_specimen"][canonical_id] += 1
+                    if len(missed) > fraction * len(rows):
+                        missingness["exceeded"].append(sid)
+                        raise AuditError("MISSINGNESS_EXCEEDED", "%s:%d/%d" % (sid, len(missed), len(rows)))
                 if observed != set(source["id_map"]):
                     raise AuditError("UNUSED_ID_MAP", sid)
                 if canonical_seen != set(expected):
                     raise AuditError("MISSING_EXPECTED_ID", sid)
-                if contract and len(missed) > fraction * len(rows):
-                    missingness["exceeded"].append(sid)
-                    raise AuditError("MISSINGNESS_EXCEEDED", "%s:%d/%d" % (sid, len(missed), len(rows)))
             except AuditError as exc:
                 report["findings"].append({"source": sid, "code": exc.code, "detail": exc.detail})
                 unavailable |= exc.code == "MISSING_FILE"
+        if contract and "NOT_EVALUATED" in contract["missingness"]["per_source"].values():
+            # Cross-source aggregates are unknown, not zero, while any source is unread or unparsed.
+            contract["missingness"].update(per_specimen="NOT_EVALUATED", exceeded="NOT_EVALUATED")
         if report["findings"]:
             report["status"] = "UNAVAILABLE" if unavailable and all(
                 item["code"] == "MISSING_FILE" for item in report["findings"]) else "BLOCKED"

@@ -208,8 +208,40 @@ class MeasurementContractV2Tests(unittest.TestCase):
         report = self.harmonize_v2(lambda m: m["sources"][1].update(sha256="0" * 64))
         self.assert_blocked(report, "DIGEST_MISMATCH")
         missingness = report["data_contract"]["missingness"]
-        self.assertEqual(missingness["per_source"]["lab-c"], "NOT_EVALUATED")
-        self.assertEqual(missingness["per_specimen"], {"specimen-1": 0, "specimen-2": 0})
+        self.assertEqual(missingness["per_source"], {"lab-a": {"missing": 0, "rows": 2}, "lab-c": "NOT_EVALUATED"})
+        # The unread lab-c bytes contain NA for specimen-2, so zero counts would be false.
+        self.assertEqual((missingness["per_specimen"], missingness["exceeded"]), ("NOT_EVALUATED", "NOT_EVALUATED"))
+
+    def lab_c(self, content, id_map):
+        def change(manifest):
+            manifest["sources"][1].update(path="c.csv", sha256=hashlib.sha256(content).hexdigest(), id_map=id_map)
+        return self.harmonize_v2(change, {"c.csv": content})
+
+    def test_aggregates_are_not_evaluated_unless_every_source_was_parsed(self):
+        unparsed = {
+            "UNAVAILABLE": self.harmonize_v2(lambda m: m["sources"][1].update(path="absent.csv")),
+            "INVALID_DECIMAL": self.lab_c(b"sample,kelvin\nC2,NA\nC1,abc\n", {"C1": "specimen-1", "C2": "specimen-2"}),
+        }
+        for name, report in unparsed.items():
+            with self.subTest(name=name):
+                self.assertEqual(report["rows"], [])
+                self.assertIn(name, (report["status"], *codes(report)))
+                missingness = report["data_contract"]["missingness"]
+                self.assertEqual(missingness["per_source"]["lab-c"], "NOT_EVALUATED")
+                self.assertEqual(missingness["per_source"]["lab-a"], {"missing": 0, "rows": 2})
+                self.assertEqual((missingness["per_specimen"], missingness["exceeded"]),
+                                 ("NOT_EVALUATED", "NOT_EVALUATED"))
+
+    def test_missing_fraction_is_checked_before_id_map_coverage(self):
+        over = self.lab_c(b"sample,kelvin\nC2,NA\n", {"C2": "specimen-2"})
+        self.assertEqual([(item["source"], item["code"], item["detail"]) for item in over["findings"]],
+                         [("lab-c", "MISSINGNESS_EXCEEDED", "lab-c:1/1")])
+        self.assertEqual(over["data_contract"]["missingness"]["exceeded"], ["lab-c"])
+        self.assertEqual(over["data_contract"]["missingness"]["per_specimen"], {"specimen-1": 0, "specimen-2": 1})
+        within = self.lab_c(b"sample,kelvin\nC1,298.15\n", {"C1": "specimen-1"})
+        self.assertEqual(codes(within), ["MISSING_EXPECTED_ID"])
+        self.assertEqual(within["data_contract"]["missingness"]["per_source"]["lab-c"], {"missing": 0, "rows": 1})
+        self.assertEqual(within["data_contract"]["missingness"]["exceeded"], [])
 
     def test_missing_file_is_unavailable_only_without_staleness(self):
         missing = self.harmonize_v2(lambda m: m["sources"][1].update(path="absent.csv"))
@@ -246,6 +278,15 @@ class MeasurementContractV2Tests(unittest.TestCase):
             (lambda m: m.update(missing_tokens=[{"NA": 1}]), "INVALID_DATA_CONTRACT", "missing_tokens"),
             (lambda m: m.update(missing_tokens=["t%d" % i for i in range(9)]), "INVALID_DATA_CONTRACT",
              "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["N" * 33]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["N\x00A"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["N\x7fA"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["N\x85A"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["N\u200bA"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["1e100"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["\uff11"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(max_age_days=36501), "INVALID_DATA_CONTRACT", "max_age_days"),
+            (provenance(origin="x" * 201), "INVALID_TEXT", ""),
             (lambda m: m.update(max_missing_fraction="1.5"), "INVALID_DATA_CONTRACT", "max_missing_fraction"),
             (lambda m: m.update(max_missing_fraction="-0.1"), "INVALID_DATA_CONTRACT", "max_missing_fraction"),
             (lambda m: m.update(max_missing_fraction=0.5), "INVALID_DATA_CONTRACT", "max_missing_fraction"),
@@ -266,6 +307,18 @@ class MeasurementContractV2Tests(unittest.TestCase):
                 self.assertEqual([(item["code"], item["detail"]) for item in report["findings"]], [(code, detail)])
                 self.assertEqual(report["data_contract"], NOT_EVALUATED_CONTRACT)
                 self.assertEqual(report["input_sha256"], {})
+
+    def test_declaration_upper_bounds_are_accepted(self):
+        cases = {
+            "max_age_days": lambda m: m.update(max_age_days=36500),
+            "missing_tokens": lambda m: m.update(missing_tokens=["NA", "N" * 32, "NaN", "n/a", "not recorded"]),
+            "provenance": lambda m: m["sources"][1]["provenance"].update(origin="x" * 200),
+        }
+        for name, change in cases.items():
+            with self.subTest(name=name):
+                report = self.harmonize_v2(change)
+                self.assertEqual((report["status"], report["findings"]), ("HARMONIZED", []))
+                self.assertIs(report["data_contract"]["schema_checked"], True)
 
     def test_cli_rejects_duplicate_keys_and_nonfinite_constants_in_v2_manifest(self):
         text = (ASSETS / "v2-example.json").read_text(encoding="utf-8")
