@@ -431,6 +431,25 @@ class CliStrictJsonTests(unittest.TestCase):
         for depth in (600, 100000):  # 600 fails while copying rows, 100000 while reading
             self.check_rejected('{"rows": [{"a": 1, "b": %s%s}, {"a": 2, "b": 3}]}' % ("[" * depth, "]" * depth))
 
+    def test_report_too_deep_to_serialise_exits_2(self):
+        deep = "[" * 1200 + "]" * 1200  # reads and scores; the indented report encoder recurses too deep
+        self.check_rejected('{"baseline_flagged": false, "variants": {"drop_rows": {"flagged": true, "check": %s}}}'
+                            % deep, "score")
+
+    def test_unwritable_output_paths_exit_2(self):
+        with tempfile.TemporaryDirectory() as d:
+            taken = pathlib.Path(d) / "taken"
+            taken.write_text("", encoding="utf-8")
+            gen = run_cli("generate", SKILL / "assets" / "example.json", "--out-dir", pathlib.Path(d) / "v")
+            self.assertEqual(gen.returncode, 0, gen.stderr)
+            for args in (("generate", SKILL / "assets" / "example.json", "--out-dir", taken),
+                         ("score", pathlib.Path(d) / "v" / "plan.json", SKILL / "assets" / "outcomes-example.json",
+                          "--output", d)):
+                p = run_cli(*args)
+                self.assertEqual(p.returncode, 2, (args, p.stdout, p.stderr))
+                self.assertEqual(json.loads(p.stdout)["status"], "ERROR")
+                self.assertNotIn(b"Traceback", p.stderr)
+
     def test_missing_file_exits_2(self):
         with tempfile.TemporaryDirectory() as d:
             p = run_cli("generate", pathlib.Path(d) / "absent.json", "--out-dir", d)

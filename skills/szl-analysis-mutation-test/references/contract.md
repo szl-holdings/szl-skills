@@ -31,4 +31,7 @@ status SCORED, BASELINE_FLAGGED, NO_OUTCOMES_RECORDED or BASELINE_NOT_TESTED.
   `variant_sha256` is NOT_TESTED.
 - Status order: BASELINE_FLAGGED, NO_OUTCOMES_RECORDED, BASELINE_NOT_TESTED (`baseline_flagged` not
   `false`; adds `reason`), SCORED. A SCORED report with coverage `0/0` tested nothing.
-- CLI: bad JSON, duplicate keys, NaN/Infinity or input nested too deeply exit 2.
+- CLI: bad JSON, duplicate keys, NaN/Infinity, input or report nested too deeply, an unreadable
+  input or an unwritable output exit 2 with a JSON ERROR. Kept from base (exit 1, traceback):
+  `precision_drift` on an integer beyond the double range; a hand-edited plan variant without
+  `status` or `sha256`.

@@ -30,8 +30,10 @@
 - Tighten szl-analysis-mutation-test: a SCORED report needs an explicit `baseline_flagged: false`
   (missing gives BASELINE_NOT_TESTED, so an always-reject QC no longer scores full coverage). Add
   optional `require_variant_binding`, strict integer `k`/`seed`, duplicate-name rejection, a strict
-  CLI JSON reader and six opt-in property/boundary classes outside the default list. Default plans,
-  digests and the shipped example report are unchanged; coverage is still not a quality score.
+  CLI JSON reader (duplicate keys, NaN/Infinity and non-finite numbers such as `1e400` were accepted
+  with exit 0 and now exit 2) and six opt-in property/boundary classes outside the default list.
+  Default plans, digests and the shipped example report are unchanged; coverage is still not a
+  quality score.
 
 ## 0.5.0-rc.3
 
