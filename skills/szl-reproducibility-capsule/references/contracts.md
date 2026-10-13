@@ -84,8 +84,8 @@ names, segments over 255 UTF-8 bytes), distinct ignoring case, and no file named
 `capsule.json` is reserved. `unpack-verify OUT.zip --dest NEW_DIR` reads at most 34 MiB and, before
 creating anything, refuses an existing destination; names that break the rule or change in decoding;
 encrypted, unsupported, symlink, directory, oversize (8 MiB, `capsule.json` 1 MiB, 33 MiB total, 129
-members) or unreadable members; and a missing, non-strict (exit 2) or invalid capsule. A
-self-digest disagreement is `MISMATCH` without extraction. Declared members are extracted
+members) or unreadable declared members; and a missing, non-strict (exit 2) or invalid capsule.
+A self-digest disagreement is `MISMATCH` without extraction. Declared members are extracted
 exclusively and re-verified: `MISMATCH`, `EXTRA_MEMBERS` (undeclared, listed, never extracted) or
 `MATCH`. Later failures are `REFUSED` with `destination_created: true`. Exit 0 `MATCH`, 1 other,
 2 usage or strict JSON; reports are ASCII.

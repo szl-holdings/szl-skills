@@ -386,6 +386,21 @@ class CapsulePackTests(unittest.TestCase):
                   compression=zipfile.ZIP_DEFLATED)
         self.assertLess((self.base / "total.zip").stat().st_size, MIB)
         self.assert_refused_before_writing(self.base / "total.zip", "total", "Oversize")
+        # The total bound itself: exactly 33 MiB (capsule.json and declared files counted) is not
+        # refused for size, one byte more is refused before writing.
+        fill = 33 * MIB - 4 * len(zeros) - sum(len(data) for _, data in members)
+        self.assertTrue(0 < fill < len(zeros))
+        for label, size in (("total-at-limit", fill), ("total-over", fill + 1)):
+            big = [("big/%d.bin" % index, zeros) for index in range(4)] + [("big/fill.bin", bytes(size))]
+            write_zip(self.base / (label + ".zip"), members + big, compression=zipfile.ZIP_DEFLATED)
+            with zipfile.ZipFile(self.base / (label + ".zip")) as opened:
+                self.assertEqual(sum(info.file_size for info in opened.infolist()), 33 * MIB + size - fill)
+        code, report, dest = self.unpack(self.base / "total-at-limit.zip", "total-at-limit")
+        self.assertEqual((code, report["status"], report.get("extra_members")),
+                         (1, "EXTRA_MEMBERS", ["big/0.bin", "big/1.bin", "big/2.bin", "big/3.bin", "big/fill.bin"]), report)
+        self.assertEqual(report["verification"]["integrity"], "MATCH")
+        self.assertFalse((dest / "big").exists())
+        self.assert_refused_before_writing(self.base / "total-over.zip", "total-over", "Oversize")
         with open(self.base / "huge.zip", "wb") as handle:
             handle.truncate(34 * MIB + 1)
         report = self.assert_refused_before_writing(self.base / "huge.zip", "huge", "Archive exceeds 34 MiB")
