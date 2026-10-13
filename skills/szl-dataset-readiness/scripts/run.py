@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
+# Modified 2026-10-06: add the --parity SPEC benchmark-parity mode.
 """Portable offline CLI shared with sibling skills; only this copy adds --parity SPEC."""
 import argparse
 import json

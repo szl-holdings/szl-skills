@@ -76,13 +76,15 @@ unresolved fit rows, ambiguous time, duplicate ids, and invalid typed values.
 Added 2026-10-06; `kernel.py` is unchanged. `parity.py` provides `szl_audit_benchmark_parity(spec)`;
 `scripts/run.py --parity SPEC` exits 0 for a completed audit, 2 for a rejected spec, duplicate key or
 nonfinite number. Fields, others rejected: `systems`, 2-64 objects with unique `id`, `role` `baseline`
-or `candidate`, and optional `evaluation_row_ids_sha256`, `tuning_trials` (int >= 0), `compute_budget`
-(number >= 0 in the spec's `compute_unit`), `seed_count` (int >= 1), `scorer_sha256` and `transforms`
-(as above, `[]` for none); `held_out` `{split, row_ids_sha256}` outside `training_splits`; `{id, split}`
-`rows` resolving fit row ids; `declared_asymmetries`, reasons keyed by `tuning_trials` or `compute_budget`.
+or `candidate`, and optional `evaluation_row_ids_sha256`, `tuning_trials` (int 0..10^9), `compute_budget`
+(number >= 0 in the spec's `compute_unit`), `seed_count` (int 1..10^9), `scorer_sha256` and `transforms`
+(as above, `[]` for none); `training_splits`, 1-32 unique names; `held_out` `{split, row_ids_sha256}`
+outside `training_splits`; at most 100000 `{id, split}` `rows` resolving fit row ids;
+`declared_asymmetries`, reasons keyed by `tuning_trials` or `compute_budget`.
 
 Findings: `EVALUATION_ROWS_MISMATCH`, `NO_BASELINE`, undeclared `BUDGET_ASYMMETRY`, `SEED_COUNT_MISMATCH`,
-`SCORER_MISMATCH` and per-system kernel preprocessing findings. Any absent evidence, `compute_unit`
+`SCORER_MISMATCH` and per-system kernel preprocessing findings; a transform allowing the held-out split
+is `PREPROCESSING_FIT_SCOPE_LEAKAGE` even without `training_splits`. Any absent evidence, `compute_unit`
 included, is missing evidence. Each check and the report is `PARITY_ISSUES` with a finding, else
 `UNKNOWN` with missing evidence, else `PARITY_OK`; declared asymmetries stay listed. Digests are
 compared, not recomputed (fixtures hash sorted ids as compact JSON); `szl-paired-science` binds A/B

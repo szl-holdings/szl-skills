@@ -89,6 +89,10 @@ def szl_audit_benchmark_parity(spec):
             "preprocessing_training_splits": train,
             "expected_transform_ids": [x["id"] for x in t if type(x) is dict and "id" in x] if type(t) is list else []
         })[0]["preprocessing"]
+        if held:
+            hit = {f["transform"] for f in found["findings"] if f["code"] == "PREPROCESSING_FIT_SCOPE_LEAKAGE"}
+            found["findings"] += [{"code": "PREPROCESSING_FIT_SCOPE_LEAKAGE", "transform": x["id"], "held_out_split": held["split"]}
+                                  for x in t if x["id"] not in hit and held["split"] in x["allowed_fit_splits"]]
         fit["findings"] += [dict(f, system=sid) for f in found["findings"]]
         fit["missing_evidence"] += [dict(m, system=sid) if type(m) is dict else {"system": sid, "missing": m}
                                     for m in found["missing_evidence"]]

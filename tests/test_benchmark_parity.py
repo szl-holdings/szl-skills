@@ -23,7 +23,7 @@ AUDIT = runpy.run_path(str(SKILL / "parity.py"))["szl_audit_benchmark_parity"]
 SYSTEM_FIELDS = ("evaluation_row_ids_sha256", "tuning_trials", "compute_budget", "seed_count",
                  "scorer_sha256", "transforms")
 # SHA-256 of the CLI stdout (newlines normalized to LF) for each pre-existing example, computed
-# with the unmodified skill at base commit b8e259c (identical skill bytes at df6d2d7).
+# with the unmodified skill at base commit b8e259c (identical skill bytes at df6d2d7 and 24a7c83).
 MAIN_REPORT_SHA256 = {
     "example.json": "3ce3fcaf45dcb36c5ca2e5446bfe7044d1c27ad62b488a38cd74751372cc74c0",
     "leakage-clean.json": "5ac759bec9cf0fd286e769e2f95731ee034c42e22e05b2189a3a72f37af1124d",
@@ -202,6 +202,47 @@ class ParityRuleTests(unittest.TestCase):
         self.assertEqual(report["checks"]["evaluation_rows"]["missing_evidence"], [{"missing": "held_out.row_ids_sha256"}])
         self.assertEqual(len(report["checks"]["evaluation_rows"]["findings"][0]["by_system"]), 2)
 
+    def test_a_finding_in_one_check_outranks_missing_evidence_in_another(self):
+        self.spec["systems"][0]["role"] = "candidate"
+        del self.spec["systems"][1]["seed_count"]
+        report = self.audit()
+        self.assertEqual((report["checks"]["baseline"]["status"], report["checks"]["seeds"]["status"]),
+                         ("PARITY_ISSUES", "UNKNOWN"))
+        self.assertEqual((report["status"], report["issues"]), ("PARITY_ISSUES", ["NO_BASELINE"]))
+
+    def test_differing_budgets_without_compute_unit_are_an_issue_with_the_unit_missing(self):
+        del self.spec["compute_unit"]
+        self.spec["systems"][1]["compute_budget"] = 5
+        report = self.audit()
+        budget = report["checks"]["budget"]
+        self.assertEqual((report["status"], budget["status"]), ("PARITY_ISSUES", "PARITY_ISSUES"))
+        self.assertEqual([f["code"] for f in budget["findings"]], ["BUDGET_ASYMMETRY"])
+        self.assertIn({"missing": "compute_unit"}, budget["missing_evidence"])
+
+    def test_budget_and_seed_bounds_are_inclusive(self):
+        for trials, compute, seeds in ((0, 0, 1), (10 ** 9, 0.0, 10 ** 9)):
+            with self.subTest(trials=trials, compute=compute, seeds=seeds):
+                spec = fixture("parity-example.json")
+                for system in spec["systems"]:
+                    system.update(tuning_trials=trials, compute_budget=compute, seed_count=seeds)
+                self.assertEqual(AUDIT(spec)["status"], "PARITY_OK")
+
+    def test_transform_allowing_the_held_out_split_leaks_even_without_training_scope(self):
+        del self.spec["training_splits"]
+        transform = self.spec["systems"][0]["transforms"][0]
+        transform.update(fit_row_ids=["te-1", "te-2"], fit_split_ids=["test"], allowed_fit_splits=["test"])
+        report = self.audit()
+        fit = report["checks"]["preprocessing"]
+        self.assertEqual((report["status"], fit["status"]), ("PARITY_ISSUES", "PARITY_ISSUES"))
+        self.assertEqual(fit["findings"], [{"code": "PREPROCESSING_FIT_SCOPE_LEAKAGE", "transform": "scale",
+                                            "held_out_split": "test", "system": "baseline-ridge"}])
+        self.assertIn({"system": "baseline-ridge", "missing": "PREPROCESSING_TRAINING_SPLITS_UNDECLARED"},
+                      fit["missing_evidence"])
+        # A kernel fit-scope finding for the same transform is not repeated.
+        transform.update(fit_row_ids=["tr-1", "tr-2"], fit_split_ids=["train"])
+        codes = [f["code"] for f in self.audit()["checks"]["preprocessing"]["findings"]]
+        self.assertEqual(codes.count("PREPROCESSING_FIT_SCOPE_LEAKAGE"), 1)
+
     def test_preprocessing_reuses_kernel_fit_scope_rules(self):
         transform = self.spec["systems"][0]["transforms"][0]
         transform["fit_row_ids"] = ["tr-1", "te-1"]
@@ -242,6 +283,12 @@ class ParityRuleTests(unittest.TestCase):
             "empty unit": mutate(lambda s: s.update(compute_unit=" ")),
             "held-out split trains": mutate(lambda s: s["training_splits"].append("test")),
             "held_out field": mutate(lambda s: s["held_out"].update(rows=4)),
+            "held-out split type": mutate(lambda s: s["held_out"].update(split=1)),
+            "held-out digest absent": mutate(lambda s: s["held_out"].pop("row_ids_sha256")),
+            "too many trials": mutate(lambda s: s["systems"][1].update(tuning_trials=10 ** 9 + 1)),
+            "too many seeds": mutate(lambda s: s["systems"][1].update(seed_count=10 ** 9 + 1)),
+            "too many rows": mutate(lambda s: s.update(rows=[{"id": "r%d" % i, "split": "train"} for i in range(100001)])),
+            "too many training splits": mutate(lambda s: s.update(training_splits=["s%d" % i for i in range(33)])),
             "row field": mutate(lambda s: s["rows"][0].update(label=1)),
             "duplicate row": mutate(lambda s: s["rows"].append({"id": "tr-1", "split": "train"})),
             "row split type": mutate(lambda s: s["rows"][0].update(split=1)),
