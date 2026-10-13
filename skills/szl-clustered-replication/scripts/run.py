@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Offline paired-cluster audit; 0 conditional or plan complete, 1 descriptive or held, 2 invalid input."""
+"""Offline paired-cluster audit; 0 conditional or unblocked plan, 1 otherwise, 2 invalid input."""
 import argparse
 import hashlib
 import json

@@ -4,11 +4,12 @@
 
 - Add `szl.clustered-ablation.v1` to szl-clustered-replication. The planner flags factors
   never ablated, duplicate arms, undeclared multi-factor removals and differing case sets
-  (PLAN_INCOMPLETE). The analyzer runs the unchanged paired-cluster audit per arm against
-  `full`, returns HOLD for any missing arm or case, lists plan, arm and blocker findings at the
-  top level, and hands raw arm p values to szl-multiplicity-audit without adjusting them.
-  `kernel.py`, `fixture-lock.json` and the v1 example reports are byte-identical; synthetic
-  fixtures do not establish scientific validity.
+  (PLAN_INCOMPLETE), and lists inference blockers the plan alone determines. The analyzer
+  runs the unchanged paired-cluster audit per arm against `full`, returns HOLD for any
+  missing arm or case, lists plan, arm and blocker findings at the top level, and hands raw
+  arm p values to szl-multiplicity-audit without adjusting them. `kernel.py`,
+  `fixture-lock.json` and the v1 example reports are byte-identical; synthetic fixtures do
+  not establish scientific validity.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and

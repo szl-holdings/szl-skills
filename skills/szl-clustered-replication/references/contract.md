@@ -64,17 +64,18 @@ scientific validity, biological mechanism or general superiority over statistica
 ## Ablation contract (`szl.clustered-ablation.v1`)
 
 Input is `{plan}` or `{plan, rows}`: the v1 plan without `expected_cases`, plus `factors` (1-15)
-and `arms` (2-16) of `{id, removes, multi_factor_declared, expected_cases}`; identifiers are
-distinct, at most 64 characters. Arm `full` removes nothing; others remove declared factors. The
-v1 audit checks shared fields and each arm's cases; all arms plan at most 10,000 rows.
-PLAN_INCOMPLETE lists FACTOR_NEVER_ABLATED, DUPLICATE_ARM (removed set of an earlier arm or
-`full`), UNDECLARED_MULTI_FACTOR_DIFFERENCE (2+ factors) and CASE_SETS_DIFFER (vs `full`).
+and `arms` (2-16) of `{id, removes, multi_factor_declared, expected_cases}`. Factor and arm ids
+are distinct, at most 64 characters. Arm `full` removes nothing; others remove declared factors.
+The v1 audit checks shared fields and each arm's cases; arms plan at most 10,000 rows in total.
+PLAN_INCOMPLETE lists FACTOR_NEVER_ABLATED, DUPLICATE_ARM (same removed set),
+UNDECLARED_MULTI_FACTOR_DIFFERENCE and CASE_SETS_DIFFER (vs `full`). Plan `inference_blockers`
+are listed even if PLAN_COMPLETE.
 
-Rows are `{id, cluster, arm, unit, loss}`, one per planned arm/case; others are INPUT_ERROR.
-Incomplete plans are not analyzed; missing pairs give HOLD without statistics. Else
-`arms[].audit` holds each arm's v1 report (`baseline_loss` = arm, `candidate_loss` = full; bound
-only if the digest matched) and `multiplicity_handoff` lists raw arm p values as exact decimals
-or null. Nothing is adjusted: arm p values share `full` (not independent) and per-arm alpha
-booleans ignore the family. `findings` holds plan findings, arm v1 findings (`subject` = arm)
-and shared blockers (`subject` null). Exit 0 PLAN_COMPLETE or conditional ANALYZED, 2
-INPUT_ERROR, else 1. Arm changes, plan timing and independence are not verified.
+Rows `{id, cluster, arm, unit, loss}` cover each planned arm/case once, else INPUT_ERROR.
+Incomplete plans are not analyzed; missing pairs give HOLD. Else `arms[].audit` holds each arm's
+v1 report (`baseline_loss` = arm, `candidate_loss` = full; bound only if the digest matched) and
+`multiplicity_handoff` has raw arm p values as exact decimals or null. Nothing is adjusted: arm p
+values share `full` (dependent) and per-arm alpha booleans ignore the family. `findings` lists
+plan, arm (`subject` = arm) and blocker (`subject` null) findings. Exit 0 PLAN_COMPLETE or
+ANALYZED without blockers, 2 INPUT_ERROR, else 1. The CLI reads at most 2 MiB: use compact JSON
+(same digest) or Python.

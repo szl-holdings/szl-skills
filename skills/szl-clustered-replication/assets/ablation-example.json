@@ -1,9 +1,9 @@
 {
-"plan":{"schema":"szl.clustered-ablation.v1","experimental_unit":"donor","observational_unit":"cell","unit":"loss","factors":["augmentation","pretraining"],
+"plan":{"schema":"szl.clustered-ablation.v1","experimental_unit":"donor","observational_unit":"cell","unit":"loss","factors":["aug","pretrain"],
 "arms":[
 {"id":"full","removes":[],"multi_factor_declared":false,"expected_cases":[{"id":"A1","cluster":"A"},{"id":"A2","cluster":"A"},{"id":"B1","cluster":"B"},{"id":"C1","cluster":"C"}]},
-{"id":"no-aug","removes":["augmentation"],"multi_factor_declared":false,"expected_cases":[{"id":"A1","cluster":"A"},{"id":"A2","cluster":"A"},{"id":"B1","cluster":"B"},{"id":"C1","cluster":"C"}]},
-{"id":"no-pretrain","removes":["pretraining"],"multi_factor_declared":false,"expected_cases":[{"id":"A1","cluster":"A"},{"id":"A2","cluster":"A"},{"id":"B1","cluster":"B"},{"id":"C1","cluster":"C"}]}],
+{"id":"no-aug","removes":["aug"],"multi_factor_declared":false,"expected_cases":[{"id":"A1","cluster":"A"},{"id":"A2","cluster":"A"},{"id":"B1","cluster":"B"},{"id":"C1","cluster":"C"}]},
+{"id":"no-pretrain","removes":["pretrain"],"multi_factor_declared":false,"expected_cases":[{"id":"A1","cluster":"A"},{"id":"A2","cluster":"A"},{"id":"B1","cluster":"B"},{"id":"C1","cluster":"C"}]}],
 "reported_n":4,"independent_clusters_declared":true,"sign_flip_basis":"symmetric_cluster_differences","min_clusters":3,"alpha":0.05,"minimum_improvement":0.5},
 "rows":[
 {"id":"A1","cluster":"A","arm":"full","unit":"loss","loss":10},

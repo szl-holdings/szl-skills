@@ -1,8 +1,7 @@
 {
-"plan":{"schema":"szl.clustered-ablation.v1","experimental_unit":"donor","observational_unit":"cell","unit":"loss","factors":["augmentation","pretraining","dropout"],
+"plan":{"schema":"szl.clustered-ablation.v1","experimental_unit":"donor","observational_unit":"cell","unit":"loss","factors":["aug","pretrain","dropout"],
 "arms":[
 {"id":"full","removes":[],"multi_factor_declared":false,"expected_cases":[{"id":"A1","cluster":"A"}]},
-{"id":"full-rerun","removes":[],"multi_factor_declared":false,"expected_cases":[{"id":"A1","cluster":"A"}]},
-{"id":"no-aug-pretrain","removes":["augmentation","pretraining"],"multi_factor_declared":false,"expected_cases":[{"id":"B1","cluster":"B"}]}],
+{"id":"no-both","removes":["aug","pretrain"],"multi_factor_declared":false,"expected_cases":[{"id":"B1","cluster":"B"}]}],
 "reported_n":2,"independent_clusters_declared":true,"sign_flip_basis":"symmetric_cluster_differences","min_clusters":2,"alpha":0.05,"minimum_improvement":0.5}
 }

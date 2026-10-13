@@ -42,7 +42,7 @@ MAIN_KERNEL = [
     ("example.json", True, "bb97be2fa917270529d218864df07f2c6a3ea9c3d72210270580f48a6918195c"),
     ("fixture-lock.json", False, "e2470d5be0f3005173de8d5bb58e73cc53a77728407488a994bfc873d068e064"),
 ]
-FIXTURE_PLAN_SHA256 = "759f8ff746ebd3df19a148b2dd9c4cbcb59c6e542dd42fe7a151bb06e18a1b85"
+FIXTURE_PLAN_SHA256 = "c3664110ebeab5d556fd83e5824bf9446fd7268e463667a9dc43dc5a317cc18b"
 
 
 def lock():
@@ -60,9 +60,9 @@ def ablate(document, bound=True):
 def clean(clusters=16):
     """One case per cluster and a constant full-system gain: no v1 findings in any arm."""
     cases = [{"id": "c%d" % i, "cluster": "k%d" % i} for i in range(clusters)]
-    plan = dict(example()["plan"], min_clusters=2, reported_n=clusters, factors=["augmentation"],
+    plan = dict(example()["plan"], min_clusters=2, reported_n=clusters, factors=["aug"],
                 arms=[{"id": name, "removes": removes, "multi_factor_declared": False, "expected_cases": cases}
-                      for name, removes in (("full", []), ("no-aug", ["augmentation"]))])
+                      for name, removes in (("full", []), ("no-aug", ["aug"]))])
     rows = [dict(c, arm=arm, unit="loss", loss=loss) for c in cases for arm, loss in (("full", 1), ("no-aug", 2))]
     return {"plan": plan, "rows": rows}
 
@@ -123,10 +123,30 @@ class AblationPlannerTests(unittest.TestCase):
         report = A["szl_cluster_ablation"](K["read_json"](INCOMPLETE.read_bytes()))
         self.assertEqual(report["status"], "PLAN_INCOMPLETE")
         self.assertEqual(report["findings"], [
-            {"finding": "DUPLICATE_ARM", "subject": "full-rerun", "same_as": "full"},
-            {"finding": "UNDECLARED_MULTI_FACTOR_DIFFERENCE", "subject": "no-aug-pretrain"},
-            {"finding": "CASE_SETS_DIFFER", "subject": "no-aug-pretrain"},
-            {"finding": "FACTOR_NEVER_ABLATED", "subject": "dropout"}])
+            {"finding": "UNDECLARED_MULTI_FACTOR_DIFFERENCE", "subject": "no-both"},
+            {"finding": "CASE_SETS_DIFFER", "subject": "no-both"},
+            {"finding": "FACTOR_NEVER_ABLATED", "subject": "dropout"},
+            # `full` plans one cluster against min_clusters 2.
+            {"finding": "TOO_FEW_DECLARED_EXPERIMENTAL_UNITS", "subject": None}])
+        self.assertEqual(report["inference_blockers"], ["TOO_FEW_DECLARED_EXPERIMENTAL_UNITS"])
+
+    def test_plan_only_report_lists_plan_determined_blockers(self):
+        cases = [("independent_clusters_declared", False, "INDEPENDENT_CLUSTER_ASSUMPTION_UNDECLARED"),
+                 ("sign_flip_basis", "undeclared", "SIGN_FLIP_ASSUMPTION_UNDECLARED"),
+                 ("min_clusters", 4, "TOO_FEW_DECLARED_EXPERIMENTAL_UNITS")]
+        for key, value, blocker in cases:
+            with self.subTest(blocker=blocker):
+                document = example()
+                document["plan"][key] = value
+                for digest in (None, K["canonical_sha256"](document["plan"])):
+                    report = A["szl_cluster_ablation"]({"plan": document["plan"]}, digest)
+                    # Design is complete; a later analysis could only be descriptive.
+                    self.assertEqual((report["status"], report["inference_blockers"]), ("PLAN_COMPLETE", [blocker]))
+                    self.assertEqual(report["findings"], [{"finding": blocker, "subject": None}])
+                document["rows"].pop()
+                report = ablate(document)
+                self.assertEqual((report["status"], report["inference_blockers"]), ("HOLD", [blocker]))
+                self.assertEqual(report["findings"], [{"finding": blocker, "subject": None}])
 
     def test_each_gap_is_flagged_on_its_own(self):
         def findings(change):
@@ -139,7 +159,7 @@ class AblationPlannerTests(unittest.TestCase):
                          [{"finding": "FACTOR_NEVER_ABLATED", "subject": "dropout"}])
         self.assertEqual(findings(lambda p: p["arms"].append(dict(p["arms"][1], id="no-aug-again"))),
                          [{"finding": "DUPLICATE_ARM", "subject": "no-aug-again", "same_as": "no-aug"}])
-        self.assertEqual(findings(lambda p: p["arms"][2]["removes"].append("augmentation")),
+        self.assertEqual(findings(lambda p: p["arms"][2]["removes"].append("aug")),
                          [{"finding": "UNDECLARED_MULTI_FACTOR_DIFFERENCE", "subject": "no-pretrain"}])
         self.assertEqual(findings(lambda p: p["arms"][2]["expected_cases"].pop()),
                          [{"finding": "CASE_SETS_DIFFER", "subject": "no-pretrain"}])
@@ -148,7 +168,7 @@ class AblationPlannerTests(unittest.TestCase):
 
     def test_declared_multi_factor_arm_and_arm_order_are_accepted(self):
         plan = example()["plan"]
-        plan["arms"].append(dict(plan["arms"][1], id="no-both", removes=["augmentation", "pretraining"],
+        plan["arms"].append(dict(plan["arms"][1], id="no-both", removes=["aug", "pretrain"],
                                  multi_factor_declared=True))
         plan["arms"].reverse()
         self.assertEqual(A["szl_cluster_ablation"]({"plan": plan})["status"], "PLAN_COMPLETE")
@@ -160,7 +180,7 @@ class AblationPlannerTests(unittest.TestCase):
                          [{"finding": "DUPLICATE_ARM", "subject": "baseline-copy", "same_as": "full"}])
         plan = example()["plan"]
         plan["arms"] = [plan["arms"][0], dict(plan["arms"][1], id="no-both", multi_factor_declared=True,
-                                              removes=["augmentation", "pretraining"])]
+                                              removes=["aug", "pretrain"])]
         # A factor removed only jointly has been ablated; its separate effect is not identified.
         self.assertEqual(A["szl_cluster_ablation"]({"plan": plan})["status"], "PLAN_COMPLETE")
 
@@ -176,17 +196,17 @@ class AblationPlannerTests(unittest.TestCase):
             lambda p: p.update(alpha=0),
             lambda p: p.update(sign_flip_basis="bootstrap"),
             lambda p: p.update(factors=[]),
-            lambda p: p.update(factors=["augmentation", "augmentation"]),
+            lambda p: p.update(factors=["aug", "aug"]),
             lambda p: p.update(factors=["f%d" % i for i in range(16)]),
             lambda p: p.update(factors=["x" * 65]),
             lambda p: p.update(arms=p["arms"][:1]),
             lambda p: p.update(arms=[dict(p["arms"][1], id="a%d" % i) for i in range(17)]),
             lambda p: p["arms"].pop(0),
-            lambda p: p["arms"][0].update(removes=["augmentation"]),
+            lambda p: p["arms"][0].update(removes=["aug"]),
             lambda p: p["arms"][1].update(id="full"),
             lambda p: p["arms"][1].update(removes=["undeclared"]),
-            lambda p: p["arms"][1].update(removes=["augmentation", "augmentation"]),
-            lambda p: p["arms"][1].update(removes="augmentation"),
+            lambda p: p["arms"][1].update(removes=["aug", "aug"]),
+            lambda p: p["arms"][1].update(removes="aug"),
             lambda p: p["arms"][1].update(multi_factor_declared="false"),
             lambda p: p["arms"][1].update(expected_cases=[]),
             lambda p: p["arms"][1].update(expected_cases="A1"),
@@ -196,7 +216,7 @@ class AblationPlannerTests(unittest.TestCase):
             lambda p: p["arms"][1].update(id={"x": 1}),
             # Otherwise valid 65-character ids: szl-multiplicity-audit accepts at most 64.
             lambda p: p["arms"][1].update(id="a" * 65),
-            lambda p: (p.update(factors=["augmentation", "f" * 65]), p["arms"][2].update(removes=["f" * 65])),
+            lambda p: (p.update(factors=["aug", "f" * 65]), p["arms"][2].update(removes=["f" * 65])),
         ]
         for index, change in enumerate(changes):
             with self.subTest(change=index):
@@ -215,7 +235,7 @@ class AblationPlannerTests(unittest.TestCase):
             with self.subTest(per_arm=per_arm):
                 cases = [{"id": "c%d" % i, "cluster": "k%d" % (i % 3)} for i in range(per_arm)]
                 plan = example()["plan"]
-                plan.update(factors=["augmentation"], arms=plan["arms"][:2])
+                plan.update(factors=["aug"], arms=plan["arms"][:2])
                 for arm in plan["arms"]:
                     arm["expected_cases"] = cases
                 report = A["szl_cluster_ablation"]({"plan": plan})
@@ -280,11 +300,13 @@ class AblationAnalyzerTests(unittest.TestCase):
                                     ("min_clusters", 4, "TOO_FEW_DECLARED_EXPERIMENTAL_UNITS")]:
             document = example()
             document["plan"][key] = value
-            report = ablate(document)
-            self.assertEqual(report["status"], "ANALYZED")
-            self.assertIn(blocker, report["inference_blockers"])
-            self.assertTrue(all(arm["audit"]["conditional_exact_test"] is None for arm in report["arms"]))
-            self.assertIn({"finding": blocker, "subject": None}, report["findings"])
+            for bound, blockers in ((True, [blocker]), (False, ["EXPECTED_PLAN_COMMITMENT_UNAVAILABLE", blocker])):
+                report = ablate(document, bound)
+                self.assertEqual((report["status"], report["inference_blockers"]), ("ANALYZED", blockers))
+                self.assertTrue(all(arm["audit"]["conditional_exact_test"] is None for arm in report["arms"]))
+                # Each blocker is listed once, whether the planner or the analysis found it.
+                listed = [item["finding"] for item in report["findings"] if item["subject"] is None]
+                self.assertEqual(sorted(listed), sorted(blockers))
 
     def test_missing_case_or_arm_holds_without_statistics(self):
         document = example()
@@ -292,7 +314,7 @@ class AblationAnalyzerTests(unittest.TestCase):
         report = ablate(document)
         self.assertEqual(report["status"], "HOLD")
         self.assertEqual(report["missing"], [{"arm": "no-aug", "id": "A2"}])
-        self.assertEqual((report["arms"], report["multiplicity_handoff"], report["inference_blockers"]), ([], None, None))
+        self.assertEqual((report["arms"], report["multiplicity_handoff"], report["inference_blockers"]), ([], None, []))
         document = example()
         document["rows"] = [row for row in document["rows"] if row["arm"] != "no-pretrain"]
         report = ablate(document)
@@ -388,7 +410,10 @@ class AblationAnalyzerTests(unittest.TestCase):
     def test_reviewer_pack_sees_plan_arm_hold_and_blocker_findings(self):
         held = example()
         held["rows"].pop()
+        undeclared = dict(example()["plan"], sign_flip_basis="undeclared")
         reports = [("bound", ablate(example()), "REVIEW_REQUIRED"),
+                   ("plan-blocked", A["szl_cluster_ablation"]({"plan": undeclared}), "REVIEW_REQUIRED"),
+                   ("plan-clean", A["szl_cluster_ablation"]({"plan": example()["plan"]}), "NO_UNRESOLVED_CHECKED_FINDINGS"),
                    ("incomplete", A["szl_cluster_ablation"](K["read_json"](INCOMPLETE.read_bytes())), "REVIEW_REQUIRED"),
                    ("held", ablate(held), "REVIEW_REQUIRED"),
                    ("clean-unbound", ablate(clean(), bound=False), "REVIEW_REQUIRED"),
@@ -421,6 +446,10 @@ class AblationCliTests(unittest.TestCase):
             plan_only.write_text(json.dumps({"plan": example()["plan"]}), encoding="utf-8")
             code, report, _ = cli(plan_only)
             self.assertEqual((code, report["status"], report["plan_sha256"]), (0, "PLAN_COMPLETE", FIXTURE_PLAN_SHA256))
+            plan_only.write_text(json.dumps({"plan": dict(example()["plan"], min_clusters=4)}), encoding="utf-8")
+            code, report, _ = cli(plan_only)
+            self.assertEqual((code, report["status"], report["inference_blockers"]),
+                             (1, "PLAN_COMPLETE", ["TOO_FEW_DECLARED_EXPERIMENTAL_UNITS"]))
             held = example()
             held["rows"].pop()
             held_path = pathlib.Path(temp) / "held.json"

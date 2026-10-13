@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Original clustered ablation planner/analyzer over the unchanged v1 audit."""
+"""Original clustered ablation planner/analyzer over the v1 audit."""
 import pathlib
 import runpy
 from decimal import Decimal
@@ -25,7 +25,7 @@ def szl_ablation_v1(plan, cases, losses):
 
 
 def szl_cluster_ablation_plan(plan):
-    """Validate factors and arms, then flag design gaps; reads no outcomes."""
+    """Flag design gaps in factors and arms; reads no outcomes."""
     OBJ(plan, SHARED | {"schema", "factors", "arms"}, "plan")
     factors, arms = szl_ablation_ids(plan["factors"], "factors"), plan["arms"]
     if plan["schema"] != ABLATION_SCHEMA or not isinstance(arms, list) or not (
@@ -38,14 +38,16 @@ def szl_cluster_ablation_plan(plan):
         szl_ablation_ids([name], "arm id")
         if name in sets or not removed <= factors or type(arm["multi_factor_declared"]) is not bool or (
                 name == "full" and removed):
-            raise ValueError("Duplicate arm, undeclared factor, non-boolean declaration or altered full arm")
-        # A zero-loss v1 audit validates shared fields and cases.
-        AUDIT(szl_ablation_v1(plan, cases, ([0] * len(cases),) * 2), None)
+            raise ValueError("Duplicate arm, undeclared factor, non-boolean flag or altered full arm")
+        # Zero-loss v1 audit validates the arm; blockers after the first are plan-only.
+        audit = AUDIT(szl_ablation_v1(plan, cases, ([0] * len(cases),) * 2), None)
         planned += len(cases)
         if planned > K["MAX_ROWS"]:
             raise ValueError("Over 10000 planned rows")
         sets[name] = {(case["id"], case["cluster"]) for case in cases}
-        if name != "full":
+        if name == "full":
+            blockers = audit["inference_blockers"][1:]
+        else:
             if removed in seen:
                 findings.append({"finding": "DUPLICATE_ARM", "subject": name, "same_as": seen[removed]})
             if len(removed) > 1 and not arm["multi_factor_declared"]:
@@ -57,7 +59,8 @@ def szl_cluster_ablation_plan(plan):
     findings += [{"finding": "FACTOR_NEVER_ABLATED", "subject": name} for name in plan["factors"]
                  if not any(name in removed for removed in seen)]
     return {"schema": ABLATION_SCHEMA, "status": "PLAN_INCOMPLETE" if findings else "PLAN_COMPLETE",
-            "plan_sha256": DIGEST(plan), "findings": findings, **HONEST}
+            "plan_sha256": DIGEST(plan), "inference_blockers": blockers,
+            "findings": findings + [{"finding": name, "subject": None} for name in blockers], **HONEST}
 
 
 def szl_ablation_audit(document, expected):
@@ -79,19 +82,19 @@ def szl_ablation_audit(document, expected):
             raise ValueError("Unplanned, duplicate, reassigned or mismatched-unit row")
         K["szl_cluster_number"](row["loss"], "loss")
         losses[key] = row["loss"]
-    report.update(observations=len(rows), arms=[], inference_blockers=None, multiplicity_handoff=None,
+    report.update(observations=len(rows), arms=[], multiplicity_handoff=None,
                   missing=[{"arm": arm, "id": case} for arm, case in clusters if (arm, case) not in losses])
     if report["status"] == "PLAN_COMPLETE" and report["missing"]:
         report["status"] = "HOLD"
     if report["status"] != "PLAN_COMPLETE":
         return report
-    full, family = next(arm["expected_cases"] for arm in plan["arms"] if arm["id"] == "full"), []
+    full, family, report["findings"] = next(arm["expected_cases"] for arm in plan["arms"] if arm["id"] == "full"), [], []
     for arm in [arm for arm in plan["arms"] if arm["id"] != "full"]:
         # Improvement = arm loss - full loss.
         v1 = szl_ablation_v1(plan, full, [[losses[(name, case["id"])] for case in full] for name in (arm["id"], "full")])
         audit = AUDIT(v1, DIGEST(v1["plan"]) if expected else None)
         test, report["inference_blockers"] = audit["conditional_exact_test"], audit["inference_blockers"]
-        report["arms"].append({"arm": arm["id"], "removes": arm["removes"], "audit": audit})
+        report["arms"].append({"arm": arm["id"], "audit": audit})
         report["findings"] += [{"finding": name, "subject": arm["id"]} for name in audit["findings"]]
         family.append({"id": arm["id"], "p_value": test and format(Decimal(test["p_two_sided"]), "f")})
     report["findings"] += [{"finding": name, "subject": None} for name in report["inference_blockers"]]
@@ -101,7 +104,7 @@ def szl_ablation_audit(document, expected):
 
 
 def szl_cluster_ablation(document, expected_plan_sha256=None):
-    """Planner report, plus per-arm analysis when rows are present."""
+    """Plan report, plus per-arm analysis when rows are given."""
     try:
         return szl_ablation_audit(document, expected_plan_sha256)
     except (ValueError, TypeError, KeyError, OverflowError, UnicodeError, RecursionError) as error:
