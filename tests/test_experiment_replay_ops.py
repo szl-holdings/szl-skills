@@ -243,7 +243,8 @@ class ExperimentReplayOpsTests(unittest.TestCase):
         self.assertEqual(run("replay", "v1-pin.json", "--receipt", "v1-receipt.json").returncode, 0)
 
     def test_reference_values_keep_the_bounded_v1_decimal_form(self):
-        # references/contract.md: at most 18 integer and 18 fraction digits; prepare refuses results that need more.
+        # references/contract.md: a reference value has at most 18 integer and 18 fraction digits, else
+        # PINNED_CONTENT_INVALID; an exact result may exceed that form and is compared within tolerance.
         (self.root / "big.csv").write_text("measurement\n499999999999999999\n500000000000000000\n", encoding="utf-8")
         edge = self.pin("csv_column_sum_v1", {"measurement": "999999999999999999"}, data="big.csv", name="edge.json")
         self.assertEqual(OPS["replay"](self.root, edge)["status"], "MATCH")
@@ -254,6 +255,12 @@ class ExperimentReplayOpsTests(unittest.TestCase):
                                              ("fraction", "csv_column_median_v1", "2.0000000000000000000", "data.csv")):
             with self.subTest(case=name), self.assertRaisesRegex(ValueError, "PINNED_CONTENT_INVALID"):
                 self.pin(operation, {"measurement": value}, data=data, name="over-%s.json" % name)
+        for tolerance, status in (("999999999999999999", "MATCH"), ("0", "DIVERGED")):  # 19-digit exact result
+            with self.subTest(tolerance=tolerance):
+                long = self.pin("csv_column_sum_v1", {"measurement": "999999999999999999"}, tolerance=tolerance,
+                                data="over.csv", name="long-%s.json" % status)
+                receipt = OPS["replay"](self.root, long)
+                self.assertEqual((receipt["status"], receipt["results"][0]["observed"]), (status, "1999999999999999998"))
 
     def test_declaration_and_reference_strictness(self):
         (self.root / "one.csv").write_text("measurement\n2.5\n", encoding="utf-8")
