@@ -35,10 +35,10 @@ or a reason to remove a donor. Keep the complete table and disclose missing obse
 
 ## Ablation plans
 
-`szl.clustered-ablation.v1` (`references/contract.md`) plans factors, a `full` arm and arms that
-remove explicit factor sets. Without rows it reports PLAN_COMPLETE or PLAN_INCOMPLETE; with rows,
-HOLD if a planned arm or case is missing, else ANALYZED per arm plus raw arm p values for
-szl-multiplicity-audit. PLAN_SHA256 is in `assets/ablation-lock.json`.
+`szl.clustered-ablation.v1` (`references/contract.md`) audits each arm removing declared factors
+against `full`. PLAN_INCOMPLETE is never analyzed, missing rows give HOLD, and ANALYZED is
+descriptive (exit 1) unless the digest matched and assumptions are declared. PLAN_SHA256 is in
+`assets/ablation-lock.json`.
 
 ```bash
 python scripts/run.py assets/ablation-incomplete.json
@@ -47,8 +47,9 @@ python scripts/run.py assets/ablation-example.json --expected-plan-sha256 PLAN_S
 
 ### What it does not do
 
-It does not adjust p values, verify what an arm changed, estimate interactions, rank factors or
-establish a mechanism. Origin: `references/provenance.md`.
+It adjusts no p values or alpha checks (raw arm p values go to szl-multiplicity-audit), and does
+not verify arm changes, estimate interactions, rank factors or establish a mechanism. Origin:
+`references/provenance.md`.
 
 ## Boundaries and services
 

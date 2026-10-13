@@ -19,6 +19,7 @@ SKILL = ROOT / "skills" / "szl-clustered-replication"
 K = runpy.run_path(str(SKILL / "kernel.py"))
 A = runpy.run_path(str(SKILL / "ablation.py"))
 M = runpy.run_path(str(ROOT / "skills" / "szl-multiplicity-audit" / "kernel.py"))
+P = runpy.run_path(str(ROOT / "skills" / "szl-reviewer-pack" / "kernel.py"))
 RUN = [sys.executable, "-B", str(SKILL / "scripts" / "run.py")]
 EXAMPLE = SKILL / "assets" / "ablation-example.json"
 INCOMPLETE = SKILL / "assets" / "ablation-incomplete.json"
@@ -54,6 +55,16 @@ def example():
 
 def ablate(document, bound=True):
     return A["szl_cluster_ablation"](document, K["canonical_sha256"](document["plan"]) if bound else None)
+
+
+def clean(clusters=16):
+    """One case per cluster and a constant full-system gain: no v1 findings in any arm."""
+    cases = [{"id": "c%d" % i, "cluster": "k%d" % i} for i in range(clusters)]
+    plan = dict(example()["plan"], min_clusters=2, reported_n=clusters, factors=["augmentation"],
+                arms=[{"id": name, "removes": removes, "multi_factor_declared": False, "expected_cases": cases}
+                      for name, removes in (("full", []), ("no-aug", ["augmentation"]))])
+    rows = [dict(c, arm=arm, unit="loss", loss=loss) for c in cases for arm, loss in (("full", 1), ("no-aug", 2))]
+    return {"plan": plan, "rows": rows}
 
 
 def cli(path, *extra):
@@ -101,16 +112,17 @@ class AblationPlannerTests(unittest.TestCase):
     def test_example_plan_is_complete_and_lock_matches(self):
         report = A["szl_cluster_ablation"]({"plan": example()["plan"]})
         self.assertEqual(report["status"], "PLAN_COMPLETE")
-        self.assertEqual(report["plan_findings"], [])
         self.assertEqual(report["plan_sha256"], FIXTURE_PLAN_SHA256)
         retained = json.loads((SKILL / "assets" / "ablation-lock.json").read_bytes())
         self.assertEqual(retained["plan_sha256"], FIXTURE_PLAN_SHA256)
         self.assertEqual(report["plan_binding"], "UNBOUND")
+        self.assertEqual(report["findings"], [])
+        self.assertEqual((report["plan_timing_verified"], report["independence_verified"]), (False, False))
 
     def test_incomplete_fixture_flags_every_gap(self):
         report = A["szl_cluster_ablation"](K["read_json"](INCOMPLETE.read_bytes()))
         self.assertEqual(report["status"], "PLAN_INCOMPLETE")
-        self.assertEqual(report["plan_findings"], [
+        self.assertEqual(report["findings"], [
             {"finding": "DUPLICATE_ARM", "subject": "full-rerun", "same_as": "full"},
             {"finding": "UNDECLARED_MULTI_FACTOR_DIFFERENCE", "subject": "no-aug-pretrain"},
             {"finding": "CASE_SETS_DIFFER", "subject": "no-aug-pretrain"},
@@ -122,7 +134,7 @@ class AblationPlannerTests(unittest.TestCase):
             change(plan)
             report = A["szl_cluster_ablation"]({"plan": plan})
             self.assertEqual(report["status"], "PLAN_INCOMPLETE")
-            return report["plan_findings"]
+            return report["findings"]
         self.assertEqual(findings(lambda p: p["factors"].append("dropout")),
                          [{"finding": "FACTOR_NEVER_ABLATED", "subject": "dropout"}])
         self.assertEqual(findings(lambda p: p["arms"].append(dict(p["arms"][1], id="no-aug-again"))),
@@ -144,7 +156,7 @@ class AblationPlannerTests(unittest.TestCase):
     def test_empty_removal_and_joint_only_ablation(self):
         plan = example()["plan"]
         plan["arms"].insert(0, dict(plan["arms"][1], id="baseline-copy", removes=[]))
-        self.assertEqual(A["szl_cluster_ablation"]({"plan": plan})["plan_findings"],
+        self.assertEqual(A["szl_cluster_ablation"]({"plan": plan})["findings"],
                          [{"finding": "DUPLICATE_ARM", "subject": "baseline-copy", "same_as": "full"}])
         plan = example()["plan"]
         plan["arms"] = [plan["arms"][0], dict(plan["arms"][1], id="no-both", multi_factor_declared=True,
@@ -182,6 +194,9 @@ class AblationPlannerTests(unittest.TestCase):
             lambda p: p["arms"][1]["expected_cases"][0].update(note="x"),
             lambda p: p["arms"][1].pop("multi_factor_declared"),
             lambda p: p["arms"][1].update(id={"x": 1}),
+            # Otherwise valid 65-character ids: szl-multiplicity-audit accepts at most 64.
+            lambda p: p["arms"][1].update(id="a" * 65),
+            lambda p: (p.update(factors=["augmentation", "f" * 65]), p["arms"][2].update(removes=["f" * 65])),
         ]
         for index, change in enumerate(changes):
             with self.subTest(change=index):
@@ -190,6 +205,22 @@ class AblationPlannerTests(unittest.TestCase):
                 self.assertIsNone(report["multiplicity_handoff"])
         for document in (None, [], {"rows": []}, {"plan": example()["plan"], "rows": [], "x": 1}):
             self.assertEqual(A["szl_cluster_ablation"](document)["status"], "INPUT_ERROR")
+        plan = example()["plan"]
+        plan["factors"][1] = plan["arms"][2]["removes"][0] = "f" * 64
+        plan["arms"][1]["id"] = "a" * 64
+        self.assertEqual(A["szl_cluster_ablation"]({"plan": plan})["status"], "PLAN_COMPLETE")
+
+    def test_planned_rows_must_fit_the_analyzer_row_cap(self):
+        for per_arm, status in ((5000, "PLAN_COMPLETE"), (5001, "INPUT_ERROR")):
+            with self.subTest(per_arm=per_arm):
+                cases = [{"id": "c%d" % i, "cluster": "k%d" % (i % 3)} for i in range(per_arm)]
+                plan = example()["plan"]
+                plan.update(factors=["augmentation"], arms=plan["arms"][:2])
+                for arm in plan["arms"]:
+                    arm["expected_cases"] = cases
+                report = A["szl_cluster_ablation"]({"plan": plan})
+                self.assertEqual(report["status"], status)
+        self.assertEqual(report["reason"], "Over 10000 planned rows")
 
 
 class AblationAnalyzerTests(unittest.TestCase):
@@ -212,6 +243,10 @@ class AblationAnalyzerTests(unittest.TestCase):
                 self.assertEqual(audit["plan_binding"], "MATCHED_COMMITMENT")
         pretrain = report["arms"][1]["audit"]
         self.assertIn("POSITIVE_EFFECT_DEPENDS_ON_ONE_EXPERIMENTAL_UNIT", pretrain["findings"])
+        self.assertEqual(report["findings"], [{"finding": name, "subject": arm["arm"]}
+                                              for arm in report["arms"] for name in arm["audit"]["findings"]])
+        self.assertEqual(len(report["findings"]), 6)
+        self.assertEqual((report["plan_timing_verified"], report["independence_verified"]), (False, False))
         self.assertEqual(pretrain["observation_weighted_mean_improvement"], 2.5)
         self.assertEqual(report["multiplicity_handoff"], {
             "skill": "szl-multiplicity-audit", "p_values_adjusted": False,
@@ -237,6 +272,7 @@ class AblationAnalyzerTests(unittest.TestCase):
             self.assertEqual(arm["audit"]["status"], "DESCRIPTIVE_ONLY")
             self.assertIsNone(arm["audit"]["conditional_exact_test"])
         self.assertEqual([item["p_value"] for item in report["multiplicity_handoff"]["family"]], [None, None])
+        self.assertEqual(report["findings"][-1], {"finding": "EXPECTED_PLAN_COMMITMENT_UNAVAILABLE", "subject": None})
 
     def test_shared_assumption_blockers_apply_to_every_arm(self):
         for key, value, blocker in [("independent_clusters_declared", False, "INDEPENDENT_CLUSTER_ASSUMPTION_UNDECLARED"),
@@ -248,6 +284,7 @@ class AblationAnalyzerTests(unittest.TestCase):
             self.assertEqual(report["status"], "ANALYZED")
             self.assertIn(blocker, report["inference_blockers"])
             self.assertTrue(all(arm["audit"]["conditional_exact_test"] is None for arm in report["arms"]))
+            self.assertIn({"finding": blocker, "subject": None}, report["findings"])
 
     def test_missing_case_or_arm_holds_without_statistics(self):
         document = example()
@@ -262,6 +299,12 @@ class AblationAnalyzerTests(unittest.TestCase):
         self.assertEqual(report["status"], "HOLD")
         self.assertEqual(report["missing"], [{"arm": "no-pretrain", "id": i} for i in ("A1", "A2", "B1", "C1")])
         self.assertEqual(ablate({"plan": example()["plan"], "rows": []})["status"], "HOLD")
+        for value in (float("nan"), -1, "1", True):
+            with self.subTest(loss=value):
+                document = example()
+                document["rows"].pop(5)
+                document["rows"][0]["loss"] = value
+                self.assertEqual(ablate(document)["status"], "INPUT_ERROR")
 
     def test_incomplete_plan_is_never_analyzed(self):
         document = example()
@@ -297,6 +340,11 @@ class AblationAnalyzerTests(unittest.TestCase):
             with self.subTest(change=index):
                 self.assertEqual(broken(change), "INPUT_ERROR")
         self.assertEqual(ablate({"plan": example()["plan"], "rows": {}})["status"], "INPUT_ERROR")
+        document = example()
+        document["rows"] = document["rows"] * 834  # 10,008 rows: rejected before any row is read.
+        report = ablate(document)
+        self.assertEqual((report["status"], report["reason"]),
+                         ("INPUT_ERROR", "rows must be a list of at most 10000 entries"))
 
     def test_plan_commitment_mismatch_is_input_error(self):
         for digest in ("0" * 64, lock(), "", 7, FIXTURE_PLAN_SHA256.upper()):
@@ -332,15 +380,26 @@ class AblationAnalyzerTests(unittest.TestCase):
         self.assertEqual([m["p_value"] for m in family], ["0.25", "1"])
 
     def test_exact_decimal_handoff_for_small_dyadic_p_values(self):
-        cases = [{"id": "c%d" % i, "cluster": "k%d" % i} for i in range(16)]
-        plan = dict(example()["plan"], min_clusters=2, reported_n=16, factors=["augmentation"],
-                    arms=[{"id": name, "removes": removes, "multi_factor_declared": False, "expected_cases": cases}
-                          for name, removes in (("full", []), ("no-aug", ["augmentation"]))])
-        rows = [dict(c, arm=arm, unit="loss", loss=loss) for c in cases for arm, loss in (("full", 1), ("no-aug", 2))]
-        report = ablate({"plan": plan, "rows": rows})
-        self.assertEqual(report["status"], "ANALYZED")
+        report = ablate(clean())
+        self.assertEqual((report["status"], report["findings"]), ("ANALYZED", []))
         self.assertEqual(report["multiplicity_handoff"]["family"], [{"id": "no-aug", "p_value": "0.000030517578125"}])
         self.assertEqual(Fraction(report["multiplicity_handoff"]["family"][0]["p_value"]), Fraction(2, 2 ** 16))
+
+    def test_reviewer_pack_sees_plan_arm_hold_and_blocker_findings(self):
+        held = example()
+        held["rows"].pop()
+        reports = [("bound", ablate(example()), "REVIEW_REQUIRED"),
+                   ("incomplete", A["szl_cluster_ablation"](K["read_json"](INCOMPLETE.read_bytes())), "REVIEW_REQUIRED"),
+                   ("held", ablate(held), "REVIEW_REQUIRED"),
+                   ("clean-unbound", ablate(clean(), bound=False), "REVIEW_REQUIRED"),
+                   ("clean-bound", ablate(clean()), "NO_UNRESOLVED_CHECKED_FINDINGS")]
+        with tempfile.TemporaryDirectory() as temp:
+            for name, report, verdict in reports:
+                with self.subTest(report=name):
+                    (pathlib.Path(temp) / (name + ".json")).write_text(json.dumps(report), encoding="utf-8")
+                    pack = P["szl_build_pack"](temp, [name + ".json"])
+                    self.assertEqual(pack["status"], verdict)
+                    self.assertEqual(bool(pack["extra"][0]["details"]), verdict == "REVIEW_REQUIRED")
 
 
 class AblationCliTests(unittest.TestCase):
@@ -393,7 +452,7 @@ class AblationPackageTests(unittest.TestCase):
         for reference in re.findall(r"`([A-Za-z0-9_./-]+\.(?:py|json|md))`", text):
             self.assertTrue((SKILL / reference).is_file(), reference)
         provenance = (SKILL / "references" / "provenance.md").read_text(encoding="utf-8")
-        for phrase in ("Apache-2.0", "b8e259c", "No third-party code"):
+        for phrase in ("Apache-2.0", "b8e259c", "No third-party code", "synthetic"):
             self.assertIn(phrase, provenance)
         self.assertIn("## Ablation contract (`szl.clustered-ablation.v1`)",
                       (SKILL / "references" / "contract.md").read_text(encoding="utf-8"))

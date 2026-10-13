@@ -24,7 +24,7 @@ def main():
         with args.input.open("rb") as handle:
             raw = handle.read(MAX_BYTES + 1)
         document = read_json(raw)
-        plan = document.get("plan") if isinstance(document, dict) else None
+        plan = isinstance(document, dict) and document.get("plan")
         ablation = isinstance(plan, dict) and plan.get("schema") == ABLATION_SCHEMA
         report = (szl_cluster_ablation if ablation else szl_clustered_replication)(document, args.expected_plan_sha256)
         if ablation:
