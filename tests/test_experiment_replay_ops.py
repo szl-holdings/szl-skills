@@ -292,6 +292,46 @@ class ExperimentReplayOpsTests(unittest.TestCase):
                 OPS["prepare"](self.root, declaration)
         self.assertEqual(OPS["replay"](self.root, self.pin("csv_column_sum_v1", name="ok.json"))["status"], "MATCH")
 
+    def test_v2_path_applies_the_v1_csv_checks(self):
+        # engine_ops._load takes every v1 CSV rule from engine.py's _sum_column; each case breaks exactly one.
+        rows = {"exponent": "x,1e3\nx,2\n", "underscore": "x,1_000\nx,2\n", "plus sign": "x,+1\nx,2\n",
+                "leading space": "x, 1\nx,2\n", "leading zero": "x,01\nx,2\n", "NaN": "x,NaN\nx,2\n",
+                "short row": "x,1\nx\n", "long row": "x,1,9\nx,2\n", "10,001 rows": "x,1\n" * 10001}
+        cases = {name: "arm,measurement\n" + text for name, text in rows.items()}
+        cases.update({"duplicate header": "arm,measurement,measurement\nx,1,1\nx,2,2\n",
+                      "blank header name": "arm,measurement,\nx,1,\nx,2,\n",
+                      "65 columns": "arm,measurement,%s\nx,1%s\nx,2%s\n" % (",".join("c%d" % i for i in range(63)), "," * 63, "," * 63),
+                      "1,025-character field": "arm,measurement,note\nx,1,%s\nx,2,n\n" % ("n" * 1025)})
+        exact = {"csv_column_sum_v1": "3", "csv_column_count_v1": "2", "csv_column_median_v1": "1.5",
+                 "csv_column_variance_v1": "0.5", "csv_grouped_mean_v1": "1.5"}
+        root = str(self.root)
+        for turn, (operation, value) in enumerate(exact.items()):
+            (self.root / "case.csv").write_text("arm,measurement\nx,1\nx,2\n", encoding="utf-8", newline="")
+            declaration = self.declare(operation, {"x" if operation == OPS["GROUPED"] else "measurement": value},
+                                       data="case.csv", name="case.json")
+            (self.root / "case-declaration.json").write_text(json.dumps(declaration), encoding="utf-8")
+            pin = OPS["prepare"](self.root, declaration)  # control: the same shape with plain decimals matches
+            self.assertEqual(OPS["replay"](self.root, pin)["status"], "MATCH")
+            for index, (name, text) in enumerate(cases.items()):
+                raw = text.encode("utf-8")
+                (self.root / "case.csv").write_bytes(raw)
+                swapped = self.forged(pin, input=dict(pin["input"], bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()))
+                (self.root / "swapped.json").write_text(json.dumps(swapped), encoding="utf-8")
+                with self.subTest(operation=operation, case=name):
+                    with self.assertRaisesRegex(ValueError, "declaration refused: PINNED_CONTENT_INVALID"):
+                        OPS["prepare"](self.root, declaration)
+                    receipt = OPS["replay"](self.root, swapped)  # the CSV changed after pinning, with a matching digest
+                    self.assert_honest(receipt, "REFUSED", "PINNED_CONTENT_INVALID", "NOT_RUN")
+                    self.assertEqual((set(receipt), receipt["pin_sha256"]), (ENVELOPE | {"observed_hashes"}, swapped["pin_sha256"]))
+                    if index % len(exact) != turn:  # the CLI leg rotates so every case and operation reach it
+                        continue
+                    self.assertEqual(quiet(["prepare", "case-declaration.json", "--root", root, "--output", "p.json"])[0], 2)
+                    self.assertFalse((self.root / "p.json").exists())
+                    code, _ = quiet(["replay", "swapped.json", "--root", root, "--receipt", "r.json"])
+                    written = json.loads((self.root / "r.json").read_text(encoding="utf-8"))
+                    self.assertEqual((code, written["status"], written["reason"]), (2, "REFUSED", "PINNED_CONTENT_INVALID"))
+                (self.root / "r.json").unlink(missing_ok=True)
+
     def test_cli_rejects_duplicate_keys_and_non_finite_json_with_exit_2(self):
         good = json.dumps(self.declare("csv_column_sum_v1", EXPECTED["csv_column_sum_v1"]))
         documents = {"dup.json": good[:-1] + ', "column": "measurement"}',
