@@ -284,6 +284,10 @@ class MeasurementContractV2Tests(unittest.TestCase):
             (lambda m: m.update(missing_tokens=["N\x85A"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
             (lambda m: m.update(missing_tokens=["N\u200bA"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
             (lambda m: m.update(missing_tokens=["1e100"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            # Beyond libmpdec's exponent limit Decimal raises InvalidOperation; still numeric-form.
+            (lambda m: m.update(missing_tokens=["1e" + "9" * 30]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["-1_0E-" + "9" * 20]), "INVALID_DATA_CONTRACT", "missing_tokens"),
+            (lambda m: m.update(missing_tokens=["１e" + "9" * 25]), "INVALID_DATA_CONTRACT", "missing_tokens"),
             (lambda m: m.update(missing_tokens=["\uff11"]), "INVALID_DATA_CONTRACT", "missing_tokens"),
             (lambda m: m.update(max_age_days=36501), "INVALID_DATA_CONTRACT", "max_age_days"),
             (provenance(origin="x" * 201), "INVALID_TEXT", ""),
@@ -311,7 +315,8 @@ class MeasurementContractV2Tests(unittest.TestCase):
     def test_declaration_upper_bounds_are_accepted(self):
         cases = {
             "max_age_days": lambda m: m.update(max_age_days=36500),
-            "missing_tokens": lambda m: m.update(missing_tokens=["NA", "N" * 32, "NaN", "n/a", "not recorded"]),
+            "missing_tokens": lambda m: m.update(missing_tokens=["NA", "N" * 32, "NaN", "n/a", "not recorded",
+                                                                 "e5", "1e"]),
             "provenance": lambda m: m["sources"][1]["provenance"].update(origin="x" * 200),
         }
         for name, change in cases.items():

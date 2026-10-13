@@ -132,8 +132,10 @@ def _instant(value: object, field: str) -> datetime:
 
 
 def _finite(token: str) -> bool:
+    # Exponent limits vary by platform, so test the mantissa with exponent 0 (Decimal skips "_").
+    head = re.fullmatch(r"(.+)[eE]_*[+-]?[\d_]*\d[\d_]*", token)
     try:
-        return Decimal(token).is_finite()
+        return Decimal(head[1] + "e0" if head else token).is_finite()
     except InvalidOperation:
         return False
 

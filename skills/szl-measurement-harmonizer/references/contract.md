@@ -47,7 +47,8 @@ echoed as unverified declarations). Other `schema` values follow v1 unchanged.
 integer 0-36500. Age is `as_of - collected_at` in whole seconds, never the host clock; above
 `max_age_days` days gives `STALE`. `missing_tokens` lists 0-8 distinct exact value-cell
 strings of at most 32 characters (`""` allowed; no edge whitespace, no character that
-`str.isprintable` rejects, and nothing Python `Decimal` reads as finite, such as `1e100`).
+`str.isprintable` rejects, and nothing Python `Decimal` reads as finite once any exponent is
+set to 0, so `1e100` and `1e99999999999999999999` are both rejected on every platform).
 A matching cell keeps `raw_value`, gets `normalized_value: null` and is never imputed; other
 non-decimal cells still block. `max_missing_fraction` is a decimal string in [0, 1]; a
 source whose missing cells exceed that fraction of its rows gives `MISSINGNESS_EXCEEDED`.
