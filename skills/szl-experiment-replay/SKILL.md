@@ -65,5 +65,6 @@ CSV operations. For publication, arrange independent retention and a separate wi
 
 ## What it does not do
 
-It does not run unlisted operations, round results or choose tolerances. Path agreement is a
-same-host software check, not independent replication; v1 pins are never upgraded to v2.
+It does not run unlisted operations or choose tolerances. v2 results are exact; v1 displays mean
+and error to 80 significant digits, with an exact tolerance test. Path agreement is a same-host
+software check, not independent replication; v1 pins are never upgraded.

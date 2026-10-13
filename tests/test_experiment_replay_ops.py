@@ -41,6 +41,12 @@ EXPECTED = {
 }
 SHIPPED = ("synthetic.csv", "expected.json", "declaration.json", "ops-declaration.json", "ops-expected.json",
            "ops-unsupported.json")
+# Receipt keys as listed in references/contract.md.
+ENVELOPE = {"schema", "status", "reason", "execution", "pin_sha256", "evidence_scope", "signed", "independent_witness",
+            "scientific_claims_verified", "receipt_sha256"}
+RAN = ENVELOPE | {"observed_hashes", "operation", "row_count"}
+DECIDED = RAN | {"arithmetic_paths", "absolute_tolerance", "results"}
+RESULT = {"label", "row_count", "observed", "expected", "absolute_error", "within"}
 
 
 def quiet(argv):
@@ -96,6 +102,8 @@ class ExperimentReplayOpsTests(unittest.TestCase):
                 receipt = OPS["replay"](self.root, pin)
                 self.assert_honest(receipt, "MATCH", "WITHIN_TOLERANCE", "COMPLETED")
                 self.assertEqual(receipt["pin_sha256"], pin["pin_sha256"])
+                self.assertEqual(set(receipt), DECIDED)  # no top-level observed_mean, expected_mean, absolute_error
+                self.assertTrue(all(set(item) == RESULT for item in receipt["results"]))
                 self.assertEqual((receipt["operation"], receipt["row_count"], receipt["arithmetic_paths"]),
                                  (operation, 5, ["DECIMAL", "FRACTION"]))
                 self.assertEqual({item["label"]: item["observed"] for item in receipt["results"]}, values)
@@ -108,6 +116,7 @@ class ExperimentReplayOpsTests(unittest.TestCase):
             with self.subTest(operation=operation):
                 receipt = OPS["replay"](self.root, self.pin(operation, shifted))
                 self.assert_honest(receipt, "DIVERGED", "OUTSIDE_TOLERANCE", "COMPLETED")
+                self.assertEqual(set(receipt), DECIDED)
                 self.assertEqual({item["absolute_error"] for item in receipt["results"]}, {"0.001"})
                 self.assertFalse(any(item["within"] for item in receipt["results"]))
                 bounded = OPS["replay"](self.root, self.pin(operation, shifted, tolerance="0.001", name="bounded.json"))
@@ -134,13 +143,21 @@ class ExperimentReplayOpsTests(unittest.TestCase):
         self.assertEqual(OPS["_decimal_path"]("csv_column_variance_v1", texts)[0], 14)  # 3 * 21 - 7 ** 2
         self.assertEqual(OPS["_decimal_path"]("csv_column_variance_v1", texts)[1], 6)  # n * (n - 1)
         self.assertEqual(OPS["_fraction_path"]("csv_column_variance_v1", texts), Fraction(7, 3))
+        # Both formulas are exact, so values cannot tell them apart; pin each path's shape instead.
+        tree = ast.parse((SKILL / "scripts" / "engine_ops.py").read_text(encoding="utf-8"))
+        ops = {node.name: [item for item in ast.walk(node) if isinstance(item, ast.BinOp)]
+               for node in tree.body if isinstance(node, ast.FunctionDef)}
+        self.assertFalse(any(isinstance(item.op, ast.Mult) for item in ops["_fraction_path"]))  # no sum of squares
+        self.assertTrue(any(isinstance(item.op, ast.Pow) and isinstance(item.left, ast.BinOp) and isinstance(item.left.op, ast.Sub)
+                            for item in ops["_fraction_path"]))  # squared deviations from the mean
+        self.assertFalse(any(isinstance(item.op, ast.Pow) for item in ops["_decimal_path"]))
 
     def test_tampered_or_missing_evidence_is_incomplete_and_not_executed(self):
         pin = self.pin("csv_column_sum_v1")
         (self.root / "data.csv").write_text(DATA.replace("0.5", "0.6"), encoding="utf-8", newline="")
         receipt = OPS["replay"](self.root, pin)
         self.assert_honest(receipt, "INCOMPLETE", "INPUT_CHANGED", "NOT_RUN")
-        self.assertNotIn("results", receipt)
+        self.assertEqual(set(receipt), ENVELOPE | {"observed_hashes"})
         (self.root / "data.csv").write_text(DATA, encoding="utf-8", newline="")
         self.assertEqual(OPS["replay"](self.root, pin)["status"], "MATCH")
         (self.root / "ref.json").write_text(json.dumps({"schema": OPS["REFERENCE_SCHEMA"], "operation": "csv_column_sum_v1",
@@ -156,7 +173,7 @@ class ExperimentReplayOpsTests(unittest.TestCase):
             with self.subTest(path=name), mock.patch.dict(OPS["replay"].__globals__, {name: wrong}):
                 receipt = OPS["replay"](self.root, pin)
                 self.assert_honest(receipt, "INCOMPLETE", "INTERNAL_DISAGREEMENT", "COMPLETED")
-                self.assertNotIn("results", receipt)
+                self.assertEqual(set(receipt), RAN)  # no results, arithmetic_paths or absolute_tolerance
                 with self.assertRaisesRegex(ValueError, "INTERNAL_DISAGREEMENT"):
                     OPS["prepare"](self.root, self.declare("csv_column_variance_v1", EXPECTED["csv_column_variance_v1"]))
 
@@ -171,7 +188,7 @@ class ExperimentReplayOpsTests(unittest.TestCase):
             with self.subTest(operation=operation):
                 receipt = OPS["replay"](self.root, self.forged(pin, operation=operation))
                 self.assert_honest(receipt, "REFUSED", "UNSUPPORTED_OPERATION", "NOT_RUN")
-                self.assertIsNone(receipt["pin_sha256"])
+                self.assertEqual((set(receipt), receipt["pin_sha256"]), (ENVELOPE, None))
 
     def test_invalid_pins_are_refused(self):
         pin = self.pin("csv_grouped_mean_v1")
@@ -187,7 +204,7 @@ class ExperimentReplayOpsTests(unittest.TestCase):
             with self.subTest(case=name):
                 receipt = OPS["replay"](self.root, bad)
                 self.assert_honest(receipt, "REFUSED", "INVALID_PIN", "NOT_RUN")
-                self.assertIsNone(receipt["pin_sha256"])
+                self.assertEqual((set(receipt), receipt["pin_sha256"]), (ENVELOPE, None))
 
     def test_engine_or_engine_ops_drift_is_incomplete(self):
         pin = self.pin("csv_column_count_v1")
@@ -195,6 +212,7 @@ class ExperimentReplayOpsTests(unittest.TestCase):
             with self.subTest(key=key):
                 receipt = OPS["replay"](self.root, self.forged(pin, **{key: "0" * 64}))
                 self.assert_honest(receipt, "INCOMPLETE", reason, "NOT_RUN")
+                self.assertEqual(set(receipt), ENVELOPE | {key + "_observed"})
                 self.assertEqual(receipt[key + "_observed"], pin[key])
         with mock.patch.dict(OPS["replay"].__globals__, {"_ops_hash": mock.Mock(side_effect=OSError("gone"))}):
             self.assertEqual(OPS["replay"](self.root, pin)["reason"], "ENGINE_OPS_UNREADABLE")
@@ -219,11 +237,14 @@ class ExperimentReplayOpsTests(unittest.TestCase):
         for index, (name, (operation, values, extra, reason)) in enumerate(cases.items()):
             with self.subTest(case=name), self.assertRaisesRegex(ValueError, reason):
                 OPS["prepare"](self.root, self.declare(operation, values, name="case-%d.json" % index, **extra))
-        declaration = self.declare("csv_column_sum_v1", total, name="other-op.json")
-        (self.root / "other-op.json").write_text(json.dumps({"schema": OPS["REFERENCE_SCHEMA"], "operation": "csv_column_count_v1",
-                                                             "values": total}), encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "PINNED_CONTENT_INVALID"):
-            OPS["prepare"](self.root, declaration)
+        reference = {"schema": OPS["REFERENCE_SCHEMA"], "operation": "csv_column_sum_v1", "values": total}
+        wrong = {"other operation": dict(reference, operation="csv_column_count_v1"), "extra key": dict(reference, note="x"),
+                 "missing operation": {"schema": OPS["REFERENCE_SCHEMA"], "values": total}}
+        for index, (name, bad) in enumerate(wrong.items()):
+            declaration = self.declare("csv_column_sum_v1", total, name="wrong-%d.json" % index)
+            (self.root / ("wrong-%d.json" % index)).write_text(json.dumps(bad), encoding="utf-8")
+            with self.subTest(reference=name), self.assertRaisesRegex(ValueError, "PINNED_CONTENT_INVALID"):
+                OPS["prepare"](self.root, declaration)
         self.assertEqual(OPS["replay"](self.root, self.pin("csv_column_sum_v1", name="ok.json"))["status"], "MATCH")
 
     def test_cli_rejects_duplicate_keys_and_non_finite_json_with_exit_2(self):
