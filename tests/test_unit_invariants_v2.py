@@ -181,14 +181,16 @@ class ExpressionGrammarTests(unittest.TestCase):
                  ("Mm^6*km*mm", ([8, 0, 0, 0, 0, 0, 0], "1e36"), "Mm^6*km*cm"),  # scale 1e37
                  ("nm^4*cm*cm^-1", ([4, 0, 0, 0, 0, 0, 0], "1e-36"), "nm^4*mm*cm^-1"),  # scale 1e-37
                  ("m*s*m*s*m*s*m*s/m", ([3, 0, 4, 0, 0, 0, 0], "1e0"), "m*s*m*s*m*s*m*s*m/m"),  # 9 factors
-                 (long_unit, ([-2, -1, 3, 2, 0, 0, 0], "1e-3"), long_unit + "^1"))  # 66 characters
+                 (long_unit, ([-2, -1, 3, 2, 0, 0, 0], "1e-3"), long_unit + "^1"),  # 66 characters
+                 (long_unit[:-5] + "/Hz^1", ([0, 0, 1, 0, 0, 0, 0], "1e0"), long_unit[:-5] + "/Hz^-1"))  # 65
         for accepted, expected, rejected in twins:
             with self.subTest(unit=rejected):
                 self.assertEqual(PARSE(accepted), expected)
                 with self.assertRaises(ValueError):
                     PARSE(rejected)
-        with self.assertRaisesRegex(ValueError, "1..64 character"):
-            PARSE(long_unit + "^1")
+        for text in (long_unit + "^1", long_unit[:-5] + "/Hz^-1"):
+            with self.subTest(unit=text), self.assertRaisesRegex(ValueError, "1..64 character"):
+                PARSE(text)
         with self.assertRaisesRegex(ValueError, "at most 8 unit factors"):
             PARSE("m*s*m*s*m*s*m*s*m/m")
 
