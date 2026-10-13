@@ -229,6 +229,17 @@ class BindingTests(unittest.TestCase):
         self.assertEqual(report["not_tested"], ["single_row"])
         self.assertEqual(report["coverage"], "5/6")
 
+    def test_dataset_binding_on_default_classes_gives_a_v2_plan_that_enforces_it(self):
+        plan = self.k.szl_generate_mutations(dict(asset("example.json"), require_variant_binding=True))
+        self.assertEqual(plan["schema"], "szl.mutation-plan.v2")
+        self.assertIs(plan["require_variant_binding"], True)
+        self.assertEqual((plan["columns"], plan["id_column"]), (None, None))
+        self.assertEqual({v["mutation"]: v["sha256"] for v in plan["variants"]}, BASE_EXAMPLE_VARIANTS)
+        report = self.k.szl_score_mutations(plan, flag_all(plan, baseline_flagged=False))
+        self.assertEqual(report["not_tested"], DEFAULT_TEN)
+        self.assertEqual((report["status"], report["coverage"]), ("NO_OUTCOMES_RECORDED", "0/10"))
+        self.assertEqual({r["reason"] for r in report["rows"]}, {"variant_sha256 required"})
+
     def test_non_boolean_binding_is_an_error(self):
         plan = self.k.szl_generate_mutations(asset("example.json"))
         for p, o in ((plan, {"require_variant_binding": "yes", "variants": {}}),
@@ -315,6 +326,14 @@ class PropertyClassTests(unittest.TestCase):
         strings = [{"name": "x", "label": "p"}, {"name": "y", "label": "q"}]
         self.assertEqual(self.gen(["scale_column_inverse"], strings)["variants"][0]["status"], "SKIPPED")
 
+    def test_scale_column_inverse_leaves_cells_beyond_double_range_alone(self):
+        huge = 10 ** 400
+        v = self.variant("scale_column_inverse", [{"a": huge, "label": 1}, {"a": 2000, "label": 0}])
+        self.assertEqual([r["a"] for r in v["rows"]], [huge, 2.0])
+        self.assertEqual(v["detail"]["cells"], 1)
+        only_huge = self.gen(["scale_column_inverse", "negate_column"], [{"a": huge, "label": 1}, {"a": -huge, "label": 0}])
+        self.assertEqual([x["status"] for x in only_huge["variants"]], ["NO_OP", "NO_OP"])
+
     def test_negate_column_over_listed_columns(self):
         v = self.variant("negate_column", columns=["a", "b"])
         self.assertEqual([(r["a"], r["b"]) for r in v["rows"]], [(-10, -0.5), (0, 2.0), (-30, None)])
@@ -344,10 +363,19 @@ class PropertyClassTests(unittest.TestCase):
                          rows=[{"id": "r1", "b": None, "label": 1}])["variants"][0]
         self.assertEqual(nulls["status"], "SKIPPED")
 
+    def test_conflicting_duplicate_id_needs_an_id_and_a_value_that_changes(self):
+        for rows in ([{"id": None, "a": 1, "label": 1}, {"id": "r2", "a": None, "label": 0}],
+                     [{"id": "r1", "a": 1e300, "label": 1}, {"id": "r2", "a": -2e300, "label": 0}]):
+            v = self.gen(["conflicting_duplicate_id"], rows, id_column="id", columns=["a"])["variants"][0]
+            self.assertEqual(v["detail"], {"skipped": "no row with an id and numeric targets"}, rows)
+
     def test_default_target_skips_label_and_id_columns(self):
         rows = [{"aa_id": 1, "ab_label": 5, "b": 2}, {"aa_id": 2, "ab_label": 6, "b": 4}]
         v = self.variant("negate_column", rows, label_column="ab_label", id_column="aa_id")
         self.assertEqual(v["detail"]["columns"], ["b"])
+        listed = self.variant("negate_column", rows, id_column="aa_id", columns=["aa_id", "b"])
+        self.assertEqual(listed["detail"]["columns"], ["b"])
+        self.assertEqual([r["aa_id"] for r in listed["rows"]], [1, 2])
 
     def test_all_missing_column(self):
         v = self.variant("all_missing_column")
@@ -361,6 +389,14 @@ class PropertyClassTests(unittest.TestCase):
         v = self.variant("single_row")
         self.assertEqual(v["rows"], self.ROWS[:1])
         self.assertEqual(self.gen(["single_row"], self.ROWS[:1])["variants"][0]["status"], "NO_OP")
+
+    def test_per_class_target_rules_match_the_contract(self):
+        rows = [{"i": "a", "x": 0, "s": "t"}, {"i": "b", "x": 0, "s": "u"}]
+        expected = {"x": ["NO_OP", "NO_OP", "GENERATED", "GENERATED", "GENERATED", "GENERATED"],
+                    "s": ["SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED", "GENERATED", "GENERATED"]}
+        for col, statuses in expected.items():
+            plan = self.gen(PROPERTY_SIX, rows, id_column="i", columns=[col])
+            self.assertEqual([v["status"] for v in plan["variants"]], statuses, col)
 
     def test_mixed_plan_keeps_default_class_bytes(self):
         mixed = self.k.szl_generate_mutations(dict(asset("example.json"), mutations=DEFAULT_TEN + ["single_row"]))
@@ -390,6 +426,10 @@ class CliStrictJsonTests(unittest.TestCase):
             self.check_rejected(text)
         self.check_rejected('{"baseline_flagged": false, "baseline_flagged": true, "variants": {}}', "score")
         self.check_rejected('{"variants": {"drop_rows": {"flagged": true}}, "variants": {}}', "score")
+
+    def test_too_deeply_nested_input_exits_2(self):
+        for depth in (600, 100000):  # 600 fails while copying rows, 100000 while reading
+            self.check_rejected('{"rows": [{"a": 1, "b": %s%s}, {"a": 2, "b": 3}]}' % ("[" * depth, "]" * depth))
 
     def test_missing_file_exits_2(self):
         with tempfile.TemporaryDirectory() as d:

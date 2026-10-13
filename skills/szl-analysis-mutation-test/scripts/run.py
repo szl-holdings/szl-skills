@@ -35,12 +35,12 @@ def main():
     g = sub.add_parser("generate"); g.add_argument("dataset"); g.add_argument("--out-dir", required=True)
     s = sub.add_parser("score"); s.add_argument("plan"); s.add_argument("outcomes"); s.add_argument("--output", default=None)
     a = ap.parse_args()
-    try:
+    try:  # RecursionError: input nested too deeply to read or copy
         docs = [read(a.dataset)] if a.cmd == "generate" else [read(a.plan), read(a.outcomes)]
-    except (OSError, ValueError) as e:
+        plan = report = (szl_generate_mutations if a.cmd == "generate" else szl_score_mutations)(*docs)
+    except (OSError, ValueError, RecursionError) as e:
         print(json.dumps({"status": "ERROR", "reason": str(e)}, indent=2)); return 2
     if a.cmd == "generate":
-        plan = szl_generate_mutations(docs[0])
         if plan["status"] == "ERROR":
             print(json.dumps(plan, indent=2)); return 2
         out = pathlib.Path(a.out_dir); out.mkdir(parents=True, exist_ok=True)
@@ -52,7 +52,6 @@ def main():
         print(json.dumps({"status": "GENERATED", "out_dir": str(out), "expected_detection": plan["expected_detection"],
                           "skipped": [v["mutation"] for v in plan["variants"] if v["status"] != "GENERATED"]}, indent=2))
         return 0
-    report = szl_score_mutations(*docs)
     text = json.dumps(report, indent=2)
     if a.output:
         pathlib.Path(a.output).write_text(text + "\n", encoding="utf-8")

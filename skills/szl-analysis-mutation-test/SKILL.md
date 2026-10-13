@@ -64,5 +64,7 @@ that is not the label or id. Plans become `szl.mutation-plan.v2`; see `assets/pr
 It does not execute your pipeline, does not clean or repair data, does not estimate real-world error
 rates, and the coverage count is not a quality score. Semantic errors (a plausible but wrong label on
 one sample) are outside its reach by design. The property classes are fixed corruptions, not a
-property-based testing framework (no search or shrinking). Details: `references/contract.md`;
+property-based testing framework (no search or shrinking). A `SCORED` report with coverage `0/0`
+(every variant SKIPPED or NO_OP) tested nothing. An all-null column counts as numeric, so a default
+target can be one; pass `columns` for the opt-in classes. Details: `references/contract.md`;
 provenance: `references/provenance.md`.

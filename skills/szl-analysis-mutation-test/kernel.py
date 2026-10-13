@@ -150,8 +150,8 @@ def _apply_property(name, rows, label, rng, columns, idc):
             v = r.get(c)
             if name == "all_missing_column" and v is not None:
                 r[c] = None
-            elif name != "all_missing_column" and type(v) in (int, float) and v:
-                r[c] = -v if name == "negate_column" else v / 1000
+            elif name != "all_missing_column" and type(v) in (int, float) and v and abs(v) <= EXTREME:
+                r[c] = -v if name == "negate_column" else v / 1000  # bound: v / 1000 must not overflow
             else:
                 continue
             detail["cells"] += 1
