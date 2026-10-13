@@ -3,7 +3,7 @@
 Stdlib only, offline. The probe builds real reports with the sibling skills' own kernels
 and checks that the pack lists each one as unresolved. One generated test per status name
 added to the unresolved set; the committed sample project must render byte-identically to
-the base commit (b8e259c).
+the base commit (b8e259c). Every JSON input is read strictly (duplicate keys, NaN/Infinity -> error).
 """
 import hashlib
 import importlib.util
@@ -280,6 +280,74 @@ class SampleAndFixtureTests(unittest.TestCase):
             with self.subTest(fixture=name):
                 fixture = json.loads((PACK_DIR / "assets" / "status-probe" / name).read_text(encoding="utf-8"))
                 self.assertEqual(fixture, {key: reports[name][key] for key in fixture})
+
+
+# Raw report texts the strict reader must refuse. The first one would otherwise read as PASS.
+BAD_JSON = {
+    "duplicate_status": '{"schema": "x", "status": "ABSTAIN", "status": "PASS"}',
+    "nested_duplicate": '{"status": "PASS", "findings": [{"id": 1, "id": 2}]}',
+    "nan": '{"status": "PASS", "missed": [NaN]}',
+    "infinity": '{"status": "PASS", "mismatches": Infinity}',
+    "negative_infinity": '{"status": "PASS", "value": -Infinity}',
+    "overflow": '{"status": "PASS", "value": 1e400}',
+}
+
+
+class StrictJsonTests(unittest.TestCase):
+    def write(self, d, name, text):
+        (pathlib.Path(d) / name).write_text(text, encoding="utf-8")
+        return name
+
+    def test_strict_json_rejects_duplicates_and_non_finite_numbers(self):
+        for label, text in BAD_JSON.items():
+            with self.subTest(case=label):
+                json.loads(text)  # the stdlib default accepts every one of these
+                with self.assertRaises(ValueError):
+                    K.szl_strict_json(text)
+        self.assertEqual(K.szl_strict_json('{"a": [1, 2.5, -0.0, 1e300], "b": {"a": 1}}'),
+                         {"a": [1, 2.5, -0.0, 1e300], "b": {"a": 1}})
+
+    def test_bad_extra_report_is_an_error_not_a_verdict(self):
+        for label, text in BAD_JSON.items():
+            with self.subTest(case=label), tempfile.TemporaryDirectory(prefix="szl-rp-strict-") as d:
+                name = self.write(d, "r.json", text)
+                with self.assertRaises(ValueError):
+                    K.szl_build_pack(d, [name])
+                out_json, out_md = pathlib.Path(d) / "pack.json", pathlib.Path(d) / "REVIEW.md"
+                p = run_cli(d, "--extra", name, "--json", str(out_json), "--output", str(out_md))
+                self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+                self.assertEqual(json.loads(p.stdout)["status"], "ERROR")
+                self.assertFalse(out_json.exists() or out_md.exists())
+
+    def test_bad_workbench_check_report_is_an_error(self):
+        text = BAD_JSON["duplicate_status"].encode("utf-8")
+        with tempfile.TemporaryDirectory(prefix="szl-rp-strict-") as d:
+            run = pathlib.Path(d) / "runs" / "20261013T000000000000Z-0123456789ab"
+            run.mkdir(parents=True)
+            (run / "gate.json").write_bytes(text)
+            summary = {"run_id": "r", "checks": {"gate": {"type": "evidence", "path": "runs/" + run.name + "/gate.json",
+                                                          "sha256": hashlib.sha256(text).hexdigest(), "findings": False}}}
+            (run / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate JSON key 'status'"):
+                K.szl_build_pack(d)
+            (run / "summary.json").write_text(json.dumps(summary)[:-1] + ', "checks": {}}', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate JSON key 'checks'"):
+                K.szl_build_pack(d)
+
+    def test_bad_review_config_is_an_error(self):
+        configs = {"duplicate": '{"weights": {"x": 1}, "weights": {"x": 0}}', "nan_literal": '{"scores": {"x": NaN}}',
+                   "nan_string_weight": '{"weights": {"dataset-check": "nan"}}',
+                   "inf_string_score": '{"scores": {"dataset-check": "inf"}}'}
+        for label, text in configs.items():
+            with self.subTest(case=label), tempfile.TemporaryDirectory(prefix="szl-rp-cfg-") as d:
+                cfg = pathlib.Path(d) / "cfg.json"
+                cfg.write_text(text, encoding="utf-8")
+                p = run_cli("assets/project", "--config", str(cfg), "--json", str(pathlib.Path(d) / "pack.json"))
+                self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+                self.assertEqual(json.loads(p.stdout)["status"], "ERROR")
+                self.assertFalse((pathlib.Path(d) / "pack.json").exists())
+        with self.assertRaisesRegex(ValueError, "must be finite"):
+            K.szl_build_pack(PACK_DIR / "assets" / "project", None, {"weights": {"dataset-check": float("nan")}})
 
 
 if __name__ == "__main__":

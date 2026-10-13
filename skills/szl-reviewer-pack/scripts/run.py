@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Usage: python scripts/run.py PROJECT_DIR [--extra report.json ...] [--config review-config.json] [--output REVIEW.md] [--json pack.json]
-Exit 0 = pack rendered (read "status"), 2 = error."""
+Exit 0 = pack rendered (read "status"), 2 = error (also duplicate JSON keys or NaN/Infinity in any input)."""
 import argparse, json, pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from kernel import szl_build_pack, szl_render_markdown  # noqa: E402
+from kernel import szl_build_pack, szl_render_markdown, szl_strict_json  # noqa: E402
 
 def main():
     ap = argparse.ArgumentParser()
@@ -13,8 +13,8 @@ def main():
     ap.add_argument("--output", default=None, help="write REVIEW.md here (default: print)")
     ap.add_argument("--json", default=None, help="also write the pack as JSON")
     a = ap.parse_args()
-    config = json.loads(pathlib.Path(a.config).read_text(encoding="utf-8")) if a.config else None
     try:
+        config = szl_strict_json(pathlib.Path(a.config).read_text(encoding="utf-8")) if a.config else None
         pack = szl_build_pack(a.project, a.extra, config)
     except Exception as exc:
         print(json.dumps({"status": "ERROR", "reason": f"{type(exc).__name__}: {exc}"})); return 2

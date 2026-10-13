@@ -29,7 +29,8 @@ The bundled synthetic project renders `Verdict: REVIEW_REQUIRED` with a five-row
 (dataset ISSUES_FOUND, math NUMERICAL_COUNTEREXAMPLE, paired REJECTED_LOCAL_COMPARISON, two clean),
 the capsule digest over 16 files, and three quoted unresolved findings such as
 `issues (3): ["EXACT_FEATURE_DUPLICATES", "CROSS_SPLIT_FEATURE_LEAKAGE", "CROSS_SPLIT_GROUP_LEAKAGE"]`.
-Exit 0 whenever the pack rendered; 2 on an unreadable project.
+Exit 0 whenever the pack rendered; 2 on an unreadable project, report or config, including
+duplicate JSON keys and NaN/Infinity.
 
 ## Statuses that stay open
 

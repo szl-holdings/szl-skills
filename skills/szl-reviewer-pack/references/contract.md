@@ -14,6 +14,10 @@ positive integer in a count field (`counterexample_count`, `invalid_outputs`, `m
 session-receipt verification is ignored, and that report is listed through its status, which is never
 MATCH when files are missing.
 
+Every JSON input (`project.json`, run summaries, check reports, extra reports, the review config) is read
+strictly: a duplicate key, NaN/Infinity or a float literal that overflows (`1e400`) raises `ValueError`,
+and the CLI exits 2 without writing a pack. Config scores and weights must be finite numbers.
+
 Unresolved = any check with findings, a report digest mismatch or a missing report, plus any extra report
 whose status (`readiness` when it has no `status`) is in the unresolved set below, or that carries finding
 fields.

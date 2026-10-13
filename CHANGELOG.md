@@ -7,7 +7,8 @@
   science upgrades) and reads the `missed`, `not_tested`, `inference_blockers` and `incomparable`
   finding fields, so a SCORED 6/10 mutation report, an INCOMPARABLE comparison, an ABSTAIN gate or
   a DESCRIPTIVE_ONLY clustered report whose only open item is its inference blockers is no longer
-  hidden. The bundled sample project renders byte-identically.
+  hidden. Its JSON inputs are now read strictly (duplicate keys and NaN/Infinity exit 2). The
+  bundled sample project renders byte-identically.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and

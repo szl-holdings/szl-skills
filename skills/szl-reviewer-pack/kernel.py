@@ -58,8 +58,27 @@ def szl_weighted_geomean(axes, weights=None):
     return math.exp(math.fsum(w * math.log(x) for x, w in zip(xs, ws) if w > 0))
 
 
+def _unique_keys(pairs):
+    seen = set()
+    for key, _ in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate JSON key {key!r}")
+        seen.add(key)
+    return dict(pairs)
+
+
+def _nonfinite(token):
+    raise ValueError(f"non-finite JSON number {token}")
+
+
+def szl_strict_json(text: str):
+    """json.loads that rejects duplicate keys, NaN/Infinity and float literals that overflow (1e400)."""
+    return json.loads(text, object_pairs_hook=_unique_keys, parse_constant=_nonfinite,
+                      parse_float=lambda t: float(t) if math.isfinite(float(t)) else _nonfinite(t))
+
+
 def _read(path: Path):
-    return json.loads(path.read_text(encoding="utf-8"))
+    return szl_strict_json(path.read_text(encoding="utf-8"))
 
 
 def _latest_run(root: Path):
@@ -116,7 +135,7 @@ def szl_build_pack(root, extra_reports=None, config=None) -> dict:
             if report_path and report_path.is_file():
                 data = report_path.read_bytes()
                 entry["digest_match"] = hashlib.sha256(data).hexdigest() == meta.get("sha256")
-                report = json.loads(data.decode("utf-8"))
+                report = szl_strict_json(data.decode("utf-8"))
                 entry["status"] = _status_of(report)
                 entry["details"] = _findings_of(report)
             else:
@@ -152,8 +171,11 @@ def szl_build_pack(root, extra_reports=None, config=None) -> dict:
     for c in pack["checks"]:
         default = 0.0 if (c["findings"] or c["digest_match"] is False) else 1.0
         score = float(scores_cfg.get(c["id"], default))
+        weight = float(weights_cfg.get(c["id"], 1.0))
+        if not (math.isfinite(score) and math.isfinite(weight)):
+            raise ValueError(f"review-config score and weight for {c['id']!r} must be finite numbers")
         axes.append(min(1.0, max(0.0, score)))
-        weights.append(float(weights_cfg.get(c["id"], 1.0)))
+        weights.append(weight)
         used.append({"check": c["id"], "score": axes[-1], "weight": weights[-1], "declared": c["id"] in scores_cfg})
     if axes:
         total = math.fsum(weights)
