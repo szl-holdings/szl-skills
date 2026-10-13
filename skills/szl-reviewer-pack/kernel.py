@@ -75,7 +75,8 @@ def _latest_run(root: Path):
 
 def _findings_of(report: dict) -> list:
     out = []
-    for key in ("issues", "findings", "failures", "mismatch_indexes", "missing", "required_failures", "missed", "not_tested"):
+    for key in ("issues", "findings", "failures", "mismatch_indexes", "missing", "required_failures", "missed",
+                "not_tested", "inference_blockers"):
         v = report.get(key)
         if isinstance(v, list) and v:
             out.append({"field": key, "value": v[:10], "count": len(v)})

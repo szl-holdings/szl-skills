@@ -4,9 +4,10 @@
 
 - szl-reviewer-pack lists more non-pass standalone statuses as unresolved (ABSTAIN,
   INCOMPARABLE, NO_OUTCOMES_RECORDED, HOLD, BLOCKED, UNKNOWN and the names reserved for the
-  science upgrades) and reads the `missed`, `not_tested` and `incomparable` finding fields, so a
-  SCORED 6/10 mutation report, an INCOMPARABLE comparison or an ABSTAIN gate is no longer hidden.
-  The bundled sample project renders byte-identically.
+  science upgrades) and reads the `missed`, `not_tested`, `inference_blockers` and `incomparable`
+  finding fields, so a SCORED 6/10 mutation report, an INCOMPARABLE comparison, an ABSTAIN gate or
+  a clustered report with an unbound plan is no longer hidden. The bundled sample project renders
+  byte-identically.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and

@@ -35,8 +35,9 @@ Exit 0 whenever the pack rendered; 2 on an unreadable project.
 
 A standalone report is unresolved when its status is a known non-pass name (ABSTAIN, INCOMPARABLE,
 NO_OUTCOMES_RECORDED, HOLD, BLOCKED, UNKNOWN, REFUSED, DIVERGED and the rest of the set in
-`references/contract.md`) or when it carries finding fields such as `missed`, `not_tested` or
-`incomparable`. A mutation report SCORED 6/10 is listed through its four missed variants. The
+`references/contract.md`) or when it carries finding fields such as `missed`, `not_tested`,
+`incomparable` or `inference_blockers`. A mutation report SCORED 6/10 is listed through its four
+missed variants, and a clustered report with an unbound plan through its inference blockers. The
 `assets/status-probe/` reports are the negative fixture (third command: three unresolved) and, with
 `--extra cross-consistent.json` alone, the positive one.
 

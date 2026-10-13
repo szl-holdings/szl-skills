@@ -128,16 +128,45 @@ class ReviewerPackProbeTests(unittest.TestCase):
         self.assertEqual(entry["details"], [{"field": "not_tested", "value": report["not_tested"][:10],
                                              "count": len(report["not_tested"])}])
 
+    def test_unbound_clustered_report_surfaces_inference_blockers(self):
+        clu = load("szl-clustered-replication")
+        doc = example("szl-clustered-replication")
+        keep = {"donor-A-cell-0", "donor-B-cell-0", "donor-C-cell-0"}
+        doc["plan"]["expected_cases"] = [c for c in doc["plan"]["expected_cases"] if c["id"] in keep]
+        doc["plan"]["reported_n"] = 3
+        doc["rows"] = [dict(r, baseline_loss=13, candidate_loss=10) for r in doc["rows"] if r["id"] in keep]
+        unbound = clu.szl_clustered_replication(doc)
+        bound = clu.szl_clustered_replication(doc, unbound["plan_sha256"])
+        self.assertEqual((unbound["status"], unbound["findings"], unbound["inference_blockers"]),
+                         ("DESCRIPTIVE_ONLY", [], ["EXPECTED_PLAN_COMMITMENT_UNAVAILABLE"]))
+        self.assertEqual((bound["status"], bound["findings"], bound["inference_blockers"]),
+                         ("CONDITIONAL_CLUSTER_RESULT", [], []))
+        (entry,) = build({"unbound.json": unbound, "bound.json": bound})["unresolved"]
+        self.assertEqual(entry, {"source": "unbound.json", "status": "DESCRIPTIVE_ONLY", "details": [
+            {"field": "inference_blockers", "value": ["EXPECTED_PLAN_COMMITMENT_UNAVAILABLE"], "count": 1}]})
+        self.assertEqual(build({"bound.json": bound})["status"], "NO_UNRESOLVED_CHECKED_FINDINGS")
+
 
 class FindingFieldTests(unittest.TestCase):
     def test_new_fields_append_after_existing_ones(self):
-        details = K._findings_of({"failures": ["a"], "missed": ["m"], "not_tested": ["t"], "divergent": 2, "incomparable": 3})
-        self.assertEqual([d["field"] for d in details], ["failures", "missed", "not_tested", "divergent", "incomparable"])
+        details = K._findings_of({"failures": ["a"], "missed": ["m"], "not_tested": ["t"], "inference_blockers": ["b"],
+                                  "divergent": 2, "incomparable": 3})
+        self.assertEqual([d["field"] for d in details],
+                         ["failures", "missed", "not_tested", "inference_blockers", "divergent", "incomparable"])
 
     def test_empty_or_zero_new_fields_are_not_findings(self):
-        self.assertEqual(K._findings_of({"missed": [], "not_tested": [], "incomparable": 0}), [])
+        self.assertEqual(K._findings_of({"missed": [], "not_tested": [], "incomparable": 0, "inference_blockers": []}), [])
+        self.assertEqual(K._findings_of({"inference_blockers": None}), [])
         pack = build({"r.json": {"status": "SCORED", "missed": [], "not_tested": [], "incomparable": 0}})
         self.assertEqual(pack["status"], "NO_UNRESOLVED_CHECKED_FINDINGS")
+
+    def test_analyzed_with_inference_blockers_is_unresolved(self):
+        blockers = ["EXPECTED_PLAN_COMMITMENT_UNAVAILABLE"]
+        pack = build({"a.json": {"schema": "synthetic", "status": "ANALYZED", "plan_binding": "UNBOUND",
+                                 "inference_blockers": blockers}})
+        self.assertEqual(pack["status"], "REVIEW_REQUIRED")
+        self.assertEqual(pack["unresolved"], [{"source": "a.json", "status": "ANALYZED", "details": [
+            {"field": "inference_blockers", "value": blockers, "count": 1}]}])
 
     def test_readiness_hold_and_missing_status_are_unresolved(self):
         pack = build({"map.json": {"readiness": "HOLD"}, "bare.json": {"schema": "x"}})
