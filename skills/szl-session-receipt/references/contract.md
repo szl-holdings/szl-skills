@@ -23,7 +23,9 @@ file must stay inside the resolved root. Violations give ERROR `PATH_OUTSIDE_ROO
 nothing is read; a file above `max_file_bytes` (default 268435456, CLI `--max-file-bytes`) gives ERROR
 `FILE_TOO_LARGE`. In `verify` those rows are `result: ERROR` and the overall status is ERROR (exit 2).
 Precedence: ERROR, RECEIPT_TAMPERED, MISMATCH, EMPTY_RECEIPT (intact receipt with zero files),
-EXTRA_FILES_PRESENT, MATCH.
+EXTRA_FILES_PRESENT, MATCH. Paths are not normalised: older receipts with `./a`, `a//b`, `a/./b` or
+`a/` paths now give ERROR; re-record them with canonical paths. An absent component gives MISSING;
+other OS errors (for example EACCES on a file or directory, or one `--scan` cannot list) are raised.
 
 `scan=True` (`verify --scan`) adds `scan: {directories, extra_files}`. `directories` is the root
 (`.`) and every directory leading to a recorded non-ERROR path; `extra_files` lists the entries
@@ -34,6 +36,7 @@ receipt scans nothing.
 
 Schema v2 (`receipt_schema: "szl.session-receipt.v2"`) adds `root_sha256_v2` = SHA-256 of canonical
 JSON `[[role, path, sha256|null], ...]` in role then path order, before `receipt_sha256`; `root_sha256`
-keeps v1. v2 verification recomputes it from the recorded rows (difference: RECEIPT_TAMPERED) and
-reports `observed_root_sha256_v2`. v1 manifests give byte-identical v1 receipts. The CLI rejects
+keeps v1. v2 verification recomputes it from the recorded rows (difference: RECEIPT_TAMPERED and
+`root_sha256_v2_intact: false`; `receipt_digest_intact` covers `receipt_sha256` only) and reports
+`observed_root_sha256_v2`. v1 manifests give byte-identical v1 receipts. The CLI rejects
 duplicate JSON keys, NaN/Infinity and numbers that overflow to infinity (`1e400`) with exit 2.

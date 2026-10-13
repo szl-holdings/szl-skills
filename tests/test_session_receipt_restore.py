@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -210,6 +211,98 @@ class SessionReceiptRestoreTests(unittest.TestCase):
         r = self.k.szl_make_session_receipt(self.project, {"inputs": ["junction/raw.csv"]})
         self.assertEqual((r["status"], r["reason"]), ("ERROR", "PATH_OUTSIDE_ROOT"))
 
+    @unittest.skipUnless(os.name == "nt", "Windows junctions only")
+    def test_windows_junction_inside_root_and_junction_root_are_refused(self):
+        # resolve() containment passes for both; only the reparse-point check on every component refuses them.
+        import _winapi
+        try:
+            _winapi.CreateJunction(str(self.project / "data"), str(self.project / "jn"))
+            _winapi.CreateJunction(str(self.project), str(self.tmp / "root-jn"))
+        except (OSError, AttributeError) as error:
+            self.skipTest(f"junction creation unavailable: {error}")
+        for root, manifest in ((self.project, {"inputs": ["jn/raw.csv"]}), (self.tmp / "root-jn", asset("example.json"))):
+            with self.subTest(root=root.name):
+                r = self.k.szl_make_session_receipt(root, manifest)
+                self.assertEqual((r["status"], r["reason"]), ("ERROR", "PATH_OUTSIDE_ROOT"))
+                self.assertIn("symlink or reparse point", r["detail"])
+
+    def test_reparse_attribute_on_any_component_is_refused(self):
+        # Portable stand-in for a junction or placeholder: lstat reports FILE_ATTRIBUTE_REPARSE_POINT
+        # (0x400) without S_ISLNK on the root, a directory or the file itself.
+        real_lstat = pathlib.Path.lstat
+        for flagged in ("project", "data", "raw.csv"):
+            def lstat(path):
+                info = real_lstat(path)
+                if path.name != flagged:
+                    return info
+                return types.SimpleNamespace(st_mode=info.st_mode, st_file_attributes=0x400, st_size=info.st_size,
+                                             st_dev=info.st_dev, st_ino=info.st_ino)
+            with self.subTest(flagged=flagged), mock.patch.object(pathlib.Path, "lstat", lstat):
+                r = self.k.szl_make_session_receipt(self.project, {"inputs": ["data/raw.csv"]})
+                self.assertEqual((r["status"], r["reason"]), ("ERROR", "PATH_OUTSIDE_ROOT"))
+                self.assertIn("symlink or reparse point", r["detail"])
+
+    def test_file_resolving_outside_root_is_refused(self):
+        # Stand-in for a redirection the lstat walk cannot see (for example a mount): resolve() is checked too.
+        outside = self.tmp / "outside.csv"
+        outside.write_text("o\n", encoding="utf-8")
+        real_resolve = pathlib.Path.resolve
+
+        def resolve(path, strict=False):
+            return real_resolve(outside if path.name == "raw.csv" else path, strict=strict)
+
+        with mock.patch.object(pathlib.Path, "resolve", resolve):
+            r = self.k.szl_make_session_receipt(self.project, {"inputs": ["data/raw.csv"]})
+        self.assertEqual((r["status"], r["reason"]), ("ERROR", "PATH_OUTSIDE_ROOT"))
+        self.assertIn("resolves outside the root", r["detail"])
+
+    # -- OS errors ----------------------------------------------------------------------------------
+    def test_absent_paths_are_missing_but_permission_errors_raise(self):
+        # Names Windows rejects (WinError 123) and paths through a file are absent, as with Path.is_file.
+        absent = ["no/such/dir.csv", "data/raw.csv/x", "data/ra?w.csv", "data/a<b.csv"]
+        r = self.k.szl_make_session_receipt(self.project, {"inputs": absent})
+        self.assertEqual(r["status"], "RECORDED_WITH_MISSING_FILES")
+        self.assertEqual([f["state"] for f in r["files"]["inputs"]], ["MISSING"] * 4)
+        receipt = self.k.szl_make_session_receipt(self.project, asset("example.json"))
+        real_lstat = pathlib.Path.lstat
+
+        def lstat(path):
+            if path.name == "data":
+                raise PermissionError(13, "Permission denied", str(path))
+            return real_lstat(path)
+
+        with mock.patch.object(pathlib.Path, "lstat", lstat):
+            with self.assertRaises(PermissionError):
+                self.k.szl_make_session_receipt(self.project, {"inputs": ["data/raw.csv"]})
+            with self.assertRaises(PermissionError):
+                self.k.szl_verify_session_receipt(self.project, receipt)
+        real_listdir = os.listdir
+
+        def listdir(path):
+            if pathlib.Path(path).name == "results":
+                raise PermissionError(13, "Permission denied", str(path))
+            return real_listdir(path)
+
+        with mock.patch.object(os, "listdir", listdir), self.assertRaises(PermissionError):
+            self.k.szl_verify_session_receipt(self.project, receipt, scan=True)
+
+    @unittest.skipIf(os.name == "nt" or getattr(os, "geteuid", lambda: 0)() == 0, "needs POSIX permissions, not root")
+    def test_unreadable_directory_raises_on_posix(self):
+        receipt = self.k.szl_make_session_receipt(self.project, asset("example.json"))
+        data = self.project / "data"
+        try:
+            data.chmod(0o600)  # entries cannot be looked up: lstat of data/raw.csv is EACCES
+            with self.assertRaises(PermissionError):
+                self.k.szl_make_session_receipt(self.project, {"inputs": ["data/raw.csv"]})
+            with self.assertRaises(PermissionError):
+                self.k.szl_verify_session_receipt(self.project, receipt)
+            data.chmod(0o300)  # files can be read but the directory cannot be listed
+            self.assertEqual(self.k.szl_verify_session_receipt(self.project, receipt)["status"], "MATCH")
+            with self.assertRaises(PermissionError):
+                self.k.szl_verify_session_receipt(self.project, receipt, scan=True)
+        finally:
+            data.chmod(0o755)
+
     # -- size cap -----------------------------------------------------------------------------------
     def test_per_file_size_cap(self):
         # analysis.py is the largest example file at 76 bytes.
@@ -246,9 +339,12 @@ class SessionReceiptRestoreTests(unittest.TestCase):
         self.assertIn("path-bound root digest " + expected[:16], receipt["methods_paragraph"])
         verdict = self.k.szl_verify_session_receipt(self.project, receipt, scan=True)
         self.assertEqual((verdict["schema"], verdict["status"]), ("szl.session-receipt.v2.verification", "MATCH"))
+        self.assertEqual((verdict["receipt_digest_intact"], verdict["root_sha256_v2_intact"]), (True, True))
         self.assertEqual(verdict["observed_root_sha256_v2"], expected)
         receipt["root_sha256_v2"] = "0" * 64
-        self.assertEqual(self.k.szl_verify_session_receipt(self.project, receipt)["status"], "RECEIPT_TAMPERED")
+        verdict = self.k.szl_verify_session_receipt(self.project, receipt)
+        self.assertEqual(verdict["status"], "RECEIPT_TAMPERED")
+        self.assertEqual((verdict["receipt_digest_intact"], verdict["root_sha256_v2_intact"]), (False, False))
 
     def test_v2_root_is_recomputed_even_when_receipt_digest_is_rederived(self):
         unsigned = ("receipt_sha256", "signature", "methods_paragraph", "status", "scope")
@@ -261,7 +357,9 @@ class SessionReceiptRestoreTests(unittest.TestCase):
                     receipt["files"]["inputs"][0]["sha256"] = "0" * 64
                 receipt["receipt_sha256"] = canonical_digest({k: v for k, v in receipt.items() if k not in unsigned})
                 verdict = self.k.szl_verify_session_receipt(self.project, receipt)
-                self.assertEqual((verdict["status"], verdict["receipt_digest_intact"]), ("RECEIPT_TAMPERED", False))
+                self.assertEqual(verdict["status"], "RECEIPT_TAMPERED")
+                # receipt_sha256 matches the edited body; only the v2 recompute differs, and says so.
+                self.assertEqual((verdict["receipt_digest_intact"], verdict["root_sha256_v2_intact"]), (True, False))
 
     def test_content_swap_between_paths_changes_v2_root_but_not_v1(self):
         (self.project / "a.csv").write_text("alpha\n", encoding="utf-8")

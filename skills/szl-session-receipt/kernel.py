@@ -50,6 +50,11 @@ def _outside(relative, why="not a canonical relative POSIX path"):
     return ValueError("PATH_OUTSIDE_ROOT", "%s: %r" % (why, relative))
 
 
+def _absent(exc) -> bool:
+    """OS errors that mean "not there" (pathlib's ignored set); others, e.g. EACCES, are raised."""
+    return isinstance(exc, (FileNotFoundError, NotADirectoryError)) or getattr(exc, "winerror", None) in (21, 123, 1921)
+
+
 def _locate(root: Path, relative):
     """(path, lstat) of a contained regular file, or None (MISSING)."""
     if not isinstance(relative, str) or "\\" in relative or ":" in relative or any(ord(c) < 32 or 0xD800 <= ord(c) < 0xE000 for c in relative):
@@ -67,7 +72,9 @@ def _locate(root: Path, relative):
             return None
         if not chain[-1].resolve(strict=True).is_relative_to(root.resolve(strict=True)):
             raise _outside(relative, "resolves outside the root")
-    except OSError:
+    except OSError as exc:
+        if not _absent(exc):
+            raise
         return None
     return chain[-1], info
 
@@ -205,7 +212,9 @@ def _scan_extra_files(root, recorded) -> dict:
     for folder in directories:
         try:
             names = sorted(os.listdir(root.joinpath(*folder.split("/")) if folder else root))
-        except OSError:
+        except OSError as exc:
+            if not _absent(exc):
+                raise
             continue
         for name in names:
             rel = f"{folder}/{name}" if folder else name
@@ -242,12 +251,11 @@ def szl_verify_session_receipt(root, receipt: dict, scan: bool = False, max_file
             rows.append({"role": role, "path": rec["path"], "result": result, "recorded_sha256": rec.get("sha256"), "observed_sha256": now["sha256"]})
     check = {k: v for k, v in receipt.items() if k not in ("receipt_sha256", "signature", "methods_paragraph", "status", "scope")}
     receipt_ok = hashlib.sha256(szl_canonical(check).encode()).hexdigest() == receipt.get("receipt_sha256")
-    if schema == SCHEMA_V2:
-        receipt_ok = receipt_ok and receipt.get("root_sha256_v2") == szl_root_sha256_v2(files)
+    root_v2_ok = schema != SCHEMA_V2 or receipt.get("root_sha256_v2") == szl_root_sha256_v2(files)
     found = _scan_extra_files(root, [r["path"] for r in rows if r["result"] != "ERROR"]) if scan else None
     if errors:
         status = "ERROR"
-    elif not receipt_ok:
+    elif not (receipt_ok and root_v2_ok):
         status = "RECEIPT_TAMPERED"
     elif mismatch or missing:
         status = "MISMATCH"
@@ -263,6 +271,7 @@ def szl_verify_session_receipt(root, receipt: dict, scan: bool = False, max_file
                 "signature_state": (receipt.get("signature") or {}).get("state", "UNSIGNED"),
                 "scope": "Byte identity against the recorded receipt. A MATCH is not evidence of correctness."})
     if schema == SCHEMA_V2:
+        out["root_sha256_v2_intact"] = root_v2_ok
         out["observed_root_sha256_v2"] = szl_root_sha256_v2(
             {r: [{"path": x["path"], "sha256": x.get("observed_sha256")} for x in rows if x["role"] == r] for r in ROLES})
     if found is not None:
