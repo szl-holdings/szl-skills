@@ -88,8 +88,8 @@ def run(perturbation, results, digest=DIGEST):
     return entry
 
 
-def stability(values, required=3, digests=(DIGEST, DIGEST, DIGEST)):
-    runs = [run({"seed": i}, {"q": v}, d) for i, (v, d) in enumerate(zip(values, digests))]
+def stability(values, required=3, digests=None):
+    runs = [run({"seed": i}, {"q": v}, d) for i, (v, d) in enumerate(zip(values, digests or [DIGEST] * len(values)))]
     return {"schema": K.STABILITY_SCHEMA, "required_digits": required, "runs": runs}
 
 
@@ -253,6 +253,35 @@ class CliStrictJsonTests(unittest.TestCase):
             self.assertEqual(p.returncode, 0, p.stderr)
             self.assertEqual(json.loads(p.stdout)["status"], status)
 
+    def stability_text(self, literals, required=20):
+        runs = ", ".join('{"input_sha256": "%s", "perturbation": {"precision": "p%d"}, "results": {"q": %s}}'
+                         % (DIGEST, i, v) for i, v in enumerate(literals))
+        return '{"schema": "%s", "required_digits": %d, "runs": [%s]}' % (K.STABILITY_SCHEMA, required, runs)
+
+    def test_float_literal_binary64_cannot_keep_is_error_in_stability_mode(self):
+        # Before the fix these three literals all parsed to 0.3333333333333333 and came out STABLE at 20 digits.
+        literals = ["0.33333333333333333333", "0.33333333333333331483", "0.3333333333333333"]
+        code, out = self.run_text(self.stability_text(literals))
+        self.assertEqual((code, out["schema"], out["status"]), (2, K.STABILITY_REPORT, "ERROR"))
+        self.assertEqual(out["keys"], literals[:2])
+        self.assertIn("decimal string", out["reason"])
+        code, out = self.run_text(self.stability_text(['"%s"' % v for v in literals]))
+        self.assertEqual((code, out["status"], out["quantities"][0]["agreed_digits"]), (0, "UNSTABLE", 16))
+        for literal in ("1e400", "2e-324", "1e-99999999999999999999", "0.1000000000000000055511151231257827"):
+            with self.subTest(literal=literal):
+                code, out = self.run_text(self.stability_text(["0.5", "0.5", literal], required=1))
+                self.assertEqual((code, out["status"], out["keys"]), (2, "ERROR", [literal]))
+
+    def test_float_literals_binary64_keeps_still_run(self):
+        code, out = self.run_text(self.stability_text(["0.1", "1.50", "1e5", "-0.0", "5e-324"], required=1))
+        self.assertEqual((code, out["status"]), (0, "UNSTABLE"))
+        self.assertEqual(out["quantities"][0]["max"], "100000")
+
+    def test_comparison_mode_float_literals_unchanged(self):
+        code, out = self.run_text('{"a": {"results": {"x": 0.33333333333333333333, "y": 1e-99999999999999999999}}, '
+                                  '"b": {"results": {"x": 0.33333333333333331483, "y": 0.0}}}')
+        self.assertEqual((code, out["status"], out["consistent"]), (0, "CONSISTENT", 2))
+
 
 class StabilityTests(unittest.TestCase):
     def test_stable_fixture(self):
@@ -298,6 +327,25 @@ class StabilityTests(unittest.TestCase):
 
         self.assertEqual(K.szl_exact_value(Wrapped(0.1)), K.Fraction(1, 10))
 
+    def test_text_is_exact_beyond_200_digits(self):
+        F = K.Fraction
+        long = "1234567890123456789012345678901234567890.1234567890123456789012345678901234567891"
+        for values in (["1e-150", "1e-150", "1e150", "1e150"], ["1e999", "1e-999", "1e-999", "1e999"],
+                       [10 ** 300, 10 ** 300 + 1, 10 ** 300 + 1], [long, long, "-" + long + "e-999"],
+                       ["9" * 40 + "." + "9" * 40 + "e999", "-1e-999", "0"]):
+            with self.subTest(values=values):
+                qs = sorted(K.szl_exact_value(v) for v in values)
+                q = quantity(check(stability(values, required=1)), "q")
+                self.assertEqual((F(q["min"]), F(q["max"])), (qs[0], qs[-1]))
+                self.assertEqual(F(q["median"]), (qs[(len(qs) - 1) // 2] + qs[len(qs) // 2]) / 2)
+        q = quantity(check(stability([10 ** 300, 10 ** 300 + 1, 10 ** 300 + 1], required=1)), "q")
+        self.assertEqual((q["min"], q["agreed_digits"]), (str(10 ** 300), 300))
+        self.assertEqual(q["max"], str(10 ** 300 + 1))
+        self.assertEqual(K.szl_exact_text(K.Fraction(long)), long)
+        self.assertEqual(K.szl_exact_text(K.Fraction(-3, 2000)), "-0.0015")
+        with self.assertRaises(K.Inexact):  # rounding is trapped, never printed silently
+            K.szl_exact_text(K.Fraction(1, 3))
+
     def test_identical_and_zero_values_are_stable(self):
         for values in ([0, 0, 0], ["2.50", "2.5", 2.5]):
             with self.subTest(values=values):
@@ -335,6 +383,38 @@ class StabilityTests(unittest.TestCase):
         doc = asset("stability-stable.json")
         del doc["runs"][1]["input_sha256"]
         self.assertEqual(check(doc)["status"], "INCOMPARABLE")
+
+    def test_run_digest_must_be_64_lowercase_hex(self):
+        for bad in (123, " ", "<digest>", DIGEST.upper(), DIGEST[:63], DIGEST + "0", ["x"]):
+            with self.subTest(bad=bad):
+                r = check(stability(["1", "1", "1"], digests=(DIGEST, DIGEST, bad)))
+                self.assertEqual((r["status"], r["reason"], r["inputs_match"]), ("INCOMPARABLE", "INPUT_BINDING_INCOMPLETE", None))
+        r = check(stability(["1", "1", "1"], digests=(" ", " ", " ")))
+        self.assertEqual((r["status"], r["reason"], r["inputs_match"]), ("INCOMPARABLE", "INPUT_BINDING_INCOMPLETE", None))
+
+    def test_perturbations_compared_as_text_and_axes_must_vary(self):
+        base = stability(["1", "1", "1"])
+        for perts in (({"seed": 1}, {"seed": "1"}, {"seed": 2}), ({"threads": 1}, {"threads": " 1"}, {"threads": 2}),
+                      ({"seed": 1}, {"seed": ""}, {"seed": 2}), ({"seed": 1}, {"seed": "2\n"}, {"seed": 3})):
+            with self.subTest(perts=perts):
+                doc = copy.deepcopy(base)
+                for entry, p in zip(doc["runs"], perts):
+                    entry["perturbation"] = p
+                r = check(doc)
+                self.assertEqual((r["status"], r["keys"]), ("ERROR", ["runs[1]"]))
+        doc = copy.deepcopy(base)
+        for i, entry in enumerate(doc["runs"]):
+            entry["perturbation"] = {"precision": "float64", "threads": 4, "seed": i}
+        r = check(doc)
+        self.assertEqual((r["status"], r["perturbed_axes"]), ("STABLE", ["seed"]))
+        doc["runs"][2]["perturbation"]["threads"] = "8"
+        self.assertEqual(check(doc)["perturbed_axes"], ["threads", "seed"])
+
+    def test_identical_strings_and_booleans_stay_unstable(self):
+        for values in (["ols", "ols", "ols"], [True, True, True], [None, None, None]):
+            with self.subTest(values=values):
+                r = check(stability(values))
+                self.assertEqual((r["status"], quantity(r, "q")["reason"]), ("UNSTABLE", "NOT_NUMERIC_IN_EVERY_RUN"))
 
     def test_no_quantities_is_incomparable(self):
         doc = stability(["1", "1", "1"])

@@ -22,7 +22,7 @@ import hashlib
 import json
 import math
 import re
-from decimal import Context
+from decimal import Context, Inexact
 from fractions import Fraction
 
 SCHEMA = "szl.cross-implementation-report.v1"
@@ -30,7 +30,7 @@ STABILITY_SCHEMA = "szl.cross-implementation.stability.v1"
 STABILITY_REPORT = "szl.cross-implementation-stability-report.v1"
 AXES = ("precision", "threads", "summation_order", "seed")
 DECIMAL = re.compile(r"-?[0-9]{1,40}(\.[0-9]{1,40})?([eE][+-]?[0-9]{1,3})?")
-EXACT = Context(prec=200)
+HEX = re.compile(r"[0-9a-f]{64}")
 
 
 def szl_canonical(value) -> str:
@@ -169,6 +169,12 @@ def szl_exact_value(value):
     return None if f is None else Fraction(value if isinstance(value, int) else repr(f))
 
 
+def szl_exact_text(q) -> str:
+    """Exact decimal text of a Fraction with a 2^a*5^b denominator; Inexact is trapped."""
+    n, d = q.numerator, q.denominator
+    return str(Context(prec=abs(n).bit_length() // 3 + d.bit_length() + 2, traps=[Inexact]).divide(n, d))
+
+
 def szl_stability_quantity(name, values, required) -> dict:
     qs = sorted(q for q in map(szl_exact_value, values) if q is not None)
     if len(qs) < len(values):
@@ -182,7 +188,7 @@ def szl_stability_quantity(name, values, required) -> dict:
         while rel * 10 ** (digits + 1) <= 1:
             digits += 1
     ok = digits is None or digits >= required
-    text = [str(EXACT.divide(q.numerator, q.denominator)) for q in (lo, hi, median)]
+    text = [szl_exact_text(q) for q in (lo, hi, median)]
     return dict(quantity=name, status="STABLE" if ok else "UNSTABLE",
                 reason="WITHIN_REQUIRED_DIGITS" if ok else "BELOW_REQUIRED_DIGITS",
                 min=text[0], max=text[1], median=text[2], relative_spread=float(rel), agreed_digits=digits,
@@ -196,11 +202,13 @@ def szl_stability_check(document) -> dict:
             isinstance(r, dict) and isinstance(r.get("results"), dict) for r in runs):
         return _error(STABILITY_REPORT, "runs: need >= 3 objects with a results object", [])
     perts = [r.get("perturbation") for r in runs]
+    text = [{k: str(v) for k, v in p.items()} if isinstance(p, dict) else None for p in perts]
     bad = [f"runs[{i}]" for i, p in enumerate(perts) if not (isinstance(p, dict) and p and set(p) <= set(AXES)
-           and all(type(v) in (str, int) for v in p.values()) and perts.index(p) == i)]
+           and all(type(v) is int or type(v) is str and v == v.strip() != "" for v in p.values())
+           and text.index(text[i]) == i)]
     if bad or type(req) is not int or req < 1:
-        return _error(STABILITY_REPORT, "perturbations: distinct, non-empty, keys from precision/threads/"
-                      "summation_order/seed, str/int values; required_digits: int >= 1", bad)
+        return _error(STABILITY_REPORT, "perturbations: non-empty, distinct as text, keys from precision/threads/"
+                      "summation_order/seed, int or trimmed str values; required_digits: int >= 1", bad)
     flats, clash = [], []
     for i, r in enumerate(runs):
         c = []
@@ -210,11 +218,11 @@ def szl_stability_check(document) -> dict:
         return _error(STABILITY_REPORT, "FLATTEN_COLLISION", clash)
     rows = [szl_stability_quantity(n, [f.get(n) for f in flats], req) for n in sorted(set().union(*flats))]
     unstable = [r["quantity"] for r in rows if r["status"] == "UNSTABLE"]
-    digests = [r.get("input_sha256") for r in runs]
-    complete = all(isinstance(d, str) and d for d in digests)
-    match = False if len({d for d in digests if isinstance(d, str) and d}) > 1 else complete or None
+    digests = [d for d in (r.get("input_sha256") for r in runs) if isinstance(d, str) and HEX.fullmatch(d)]
+    complete = len(digests) == len(runs)
+    match = False if len(set(digests)) > 1 else complete or None
     return dict(schema=STABILITY_REPORT, status="UNSTABLE" if unstable else "STABLE" if match and rows else "INCOMPARABLE",
                 **({} if complete else {"reason": "INPUT_BINDING_INCOMPLETE"}), inputs_match=match, runs=len(runs),
-                required_digits=req, perturbed_axes=[k for k in AXES if len({szl_canonical(p.get(k)) for p in perts}) > 1],
+                required_digits=req, perturbed_axes=[k for k in AXES if len({t.get(k) for t in text}) > 1],
                 issues=unstable, quantities=rows, document_sha256=hashlib.sha256(szl_canonical(document).encode()).hexdigest(),
                 scope="One computation across declared perturbations of one input; accuracy is not established.")

@@ -26,11 +26,12 @@
   1 MB SDK batch limit.
 - szl-cross-implementation-check: per-quantity tolerance overrides are checked like the
   globals (INVALID_OVERRIDE, UNKNOWN_OVERRIDE_KEY), flatten collisions are FLATTEN_COLLISION
-  errors, a one-sided input digest is INCOMPARABLE (INPUT_BINDING_INCOMPLETE) instead of
-  CONSISTENT, and the CLI rejects duplicate keys and NaN/Infinity. A new stability mode
+  errors, a one-sided input digest can no longer be CONSISTENT (INPUT_BINDING_INCOMPLETE),
+  and the CLI rejects duplicate keys and NaN/Infinity. A new stability mode
   (`szl.cross-implementation.stability.v1`) reports STABLE / UNSTABLE from exact-fraction agreed
-  digits across three or more declared perturbations. Existing example reports are unchanged;
-  STABLE is not accuracy.
+  digits across three or more declared perturbations; its run digests must be 64 lowercase hex
+  and the CLI rejects float literals that binary64 cannot keep (use decimal strings). Existing
+  example reports are unchanged; STABLE is not accuracy.
 - Point manual-upload guidance and current marketplace metadata to the published
   rc.3 prerelease. Its fixed source and assets remain unchanged. Preserve the
   distinction between package verification, host registration and scientific use.

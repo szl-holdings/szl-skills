@@ -23,11 +23,15 @@ ERROR, in order, `keys` naming offenders: `FLATTEN_COLLISION` (`{"x.y": 1, "x": 
 NaN/Infinity.
 
 Stability (`"schema": "szl.cross-implementation.stability.v1"`): `required_digits` int >= 1 and
->= 3 `runs` of `{input_sha256, perturbation, results}`; each `perturbation` distinct, non-empty,
-keys from `precision`, `threads`, `summation_order`, `seed`. Values (decimal strings, or numbers via
-shortest repr) become fractions. Per quantity: exact `min`/`max`/`median`, `relative_spread` =
-(max-min)/max|v|, `agreed_digits` = largest d with relative_spread <= 10^-d (null if identical),
+>= 3 `runs` of `{input_sha256, perturbation, results}`; each `perturbation` non-empty, keys from
+`precision`, `threads`, `summation_order`, `seed`, values int or trimmed non-empty str, distinct as
+text (`1` equals `"1"`). Values (decimal strings, or numbers via shortest repr) become fractions;
+str/bool/null is `NOT_NUMERIC_IN_EVERY_RUN` even if identical. In stability mode the CLI rejects
+(ERROR, `keys`) a float literal whose value differs from its parsed binary64's shortest repr. Per
+quantity: exact `min`/`max`/`median` text, `relative_spread` = (max-min)/max|v|, `agreed_digits` =
+largest d >= 0 with relative_spread <= 10^-d (0 if spread > 1, null if identical),
 `sign_consistent`, `cancellation` if 10|median| <= max|v|. STABLE if agreed_digits is null or >=
 required_digits, else UNSTABLE (`BELOW_REQUIRED_DIGITS` / `NOT_NUMERIC_IN_EVERY_RUN`). Overall
-UNSTABLE > INCOMPARABLE (missing run digest: INPUT_BINDING_INCOMPLETE; differing digests; nothing to
-compare) > STABLE; `issues` lists UNSTABLE quantities.
+UNSTABLE > INCOMPARABLE (a run digest missing or not 64 lowercase hex: INPUT_BINDING_INCOMPLETE;
+differing digests; nothing to compare) > STABLE; `issues` lists UNSTABLE quantities. Digests and
+perturbations are declared text; nothing checks them against data.

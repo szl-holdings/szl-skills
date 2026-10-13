@@ -51,8 +51,8 @@ two implementations differ in the variance estimator, not the model. Exit 0 when
 `results` may be nested; keys are flattened to dotted paths. Numbers are compared with
 `|a-b| <= max(atol, rtol*max(|a|,|b|))`; strings and booleans must match exactly; anything
 reported by one side only, non-finite or non-numeric is INCOMPARABLE. If both sides declare
-`input_sha256` and they differ, the overall verdict cannot be CONSISTENT; if only one side does,
-it is INCOMPARABLE (INPUT_BINDING_INCOMPLETE). Invalid or unknown per-quantity overrides and
+`input_sha256` and they differ, or only one side declares it (INPUT_BINDING_INCOMPLETE), the
+overall verdict cannot be CONSISTENT. Invalid or unknown per-quantity overrides and
 colliding flattened keys are ERROR (exit 2), as are duplicate JSON keys and NaN/Infinity.
 
 ## Stability mode
@@ -61,7 +61,10 @@ colliding flattened keys are ERROR (exit 2), as are duplicate JSON keys and NaN/
 each under a distinct `perturbation` (precision, threads, summation order, seed). Per quantity,
 in exact fractions: spread, agreed significant digits, sign consistency, cancellation; STABLE if
 the runs agree to `required_digits`. Here the naive float32 variance flips sign (UNSTABLE);
-`assets/stability-stable.json` passes. See `references/contract.md`.
+`assets/stability-stable.json` passes. See `references/contract.md`. Results must be numeric: a
+string or boolean is UNSTABLE even if identical, so leave such fields out. JSON numbers are
+binary64, so give more than 15 significant digits as decimal strings (the CLI rejects a float
+literal it cannot keep, exit 2).
 
 ## What it does not do
 
