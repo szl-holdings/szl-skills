@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Usage: python scripts/run.py COMPARISON.json [--output REPORT.json]
 Exit 0 = comparison ran (read "status"), 2 = ERROR (also duplicate JSON keys, NaN, Infinity and,
-in stability mode, float literals binary64 cannot keep)."""
+in stability mode, float literals that differ from their shortest repr)."""
 import argparse, json, pathlib, sys
 from decimal import Decimal
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -30,8 +30,8 @@ def main():
     except Exception as exc:
         print(json.dumps({"status": "ERROR", "reason": f"cannot read comparison: {exc}"})); return 2
     if lossy and isinstance(doc, dict) and doc.get("schema") == STABILITY_SCHEMA:
-        report = {"schema": STABILITY_REPORT, "status": "ERROR", "reason": "float literals binary64 cannot"
-                  " keep; write them as decimal strings", "keys": lossy}
+        report = {"schema": STABILITY_REPORT, "status": "ERROR", "reason": "float literals differ from their"
+                  " shortest binary64 repr; write exact or long values as decimal strings", "keys": lossy}
     else:
         report = szl_cross_implementation_check(doc)
     text = json.dumps(report, indent=2)

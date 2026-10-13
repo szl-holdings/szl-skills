@@ -272,6 +272,21 @@ class CliStrictJsonTests(unittest.TestCase):
                 code, out = self.run_text(self.stability_text(["0.5", "0.5", literal], required=1))
                 self.assertEqual((code, out["status"], out["keys"]), (2, "ERROR", [literal]))
 
+    def test_exact_but_long_float_literal_reason_names_the_rule(self):
+        literal = "0.100000001490116119384765625"  # float32 0.1: exact in binary64, but its repr is shorter
+        self.assertEqual(K.Fraction(float(literal)), K.Fraction(literal))
+        code, out = self.run_text(self.stability_text([literal, "0.1", "0.1"], required=1))
+        self.assertEqual((code, out["status"], out["keys"]), (2, "ERROR", [literal]))
+        self.assertIn("shortest binary64 repr", out["reason"])
+        self.assertNotIn("cannot keep", out["reason"])
+        code, out = self.run_text(self.stability_text(['"%s"' % literal, "0.1", "0.1"], required=1))
+        self.assertEqual((code, out["status"], out["quantities"][0]["max"]), (0, "STABLE", literal))
+
+    def test_integer_literals_beyond_binary64_run_exactly(self):
+        big = "1" + "0" * 400
+        code, out = self.run_text(self.stability_text([big, big, '"1e400"'], required=1))
+        self.assertEqual((code, out["status"], out["quantities"][0]["median"]), (0, "STABLE", big))
+
     def test_float_literals_binary64_keeps_still_run(self):
         code, out = self.run_text(self.stability_text(["0.1", "1.50", "1e5", "-0.0", "5e-324"], required=1))
         self.assertEqual((code, out["status"]), (0, "UNSTABLE"))
@@ -360,7 +375,7 @@ class StabilityTests(unittest.TestCase):
         self.assertFalse(quantity(check(stability([0, 1, 1])), "q")["sign_consistent"])
 
     def test_missing_or_non_numeric_values_are_never_stable(self):
-        for bad in (None, True, "1,5", "abc", "+1", "1e5000", float("inf"), float("nan"), 10 ** 400):
+        for bad in (None, True, "1,5", "abc", "+1", "1e5000", float("inf"), float("nan")):
             with self.subTest(bad=bad):
                 r = check(stability(["1", "1", bad]))
                 self.assertEqual((r["status"], r["issues"]), ("UNSTABLE", ["q"]))
@@ -369,6 +384,25 @@ class StabilityTests(unittest.TestCase):
         doc["runs"][2]["results"] = {"other": "1"}
         r = check(doc)
         self.assertEqual((quantity(r, "q")["reason"], quantity(r, "other")["status"]), ("NOT_NUMERIC_IN_EVERY_RUN", "UNSTABLE"))
+
+    def test_integers_beyond_binary64_stay_exact(self):
+        # Before this fix an int past float range was NOT_NUMERIC_IN_EVERY_RUN; "1e400" as a string was accepted.
+        big = 10 ** 400
+        for case, values in enumerate(([big, big, big], [big, "1e400", big])):
+            with self.subTest(case=case):
+                q = quantity(check(stability(values, required=50)), "q")
+                self.assertEqual((q["status"], q["agreed_digits"], q["median"]), ("STABLE", None, str(big)))
+        q = quantity(check(stability([big, big + 1, big], required=401)), "q")
+        self.assertEqual((q["status"], q["reason"], q["agreed_digits"]), ("UNSTABLE", "BELOW_REQUIRED_DIGITS", 400))
+        self.assertEqual(q["max"], str(big + 1))
+        self.assertEqual(quantity(check(stability([big, big + 1, big], required=400)), "q")["status"], "STABLE")
+        q = quantity(check(stability([2 ** 53 + 1, 2 ** 53, 2 ** 53], required=1)), "q")
+        self.assertEqual((q["agreed_digits"], q["max"]), (15, str(2 ** 53 + 1)))
+        q = quantity(check(stability([-big, big, big], required=1)), "q")
+        self.assertEqual((q["status"], q["sign_consistent"], q["agreed_digits"]), ("UNSTABLE", False, 0))
+        top = 10 ** 4299  # 4,300 digits, the CLI's JSON integer limit
+        q = quantity(check(stability([top, top + 1, top], required=1)), "q")
+        self.assertEqual((q["agreed_digits"], q["max"]), (4299, str(top + 1)))
 
     def test_input_binding(self):
         r = check(stability(["1", "1", "1"], digests=(DIGEST, DIGEST, None)))

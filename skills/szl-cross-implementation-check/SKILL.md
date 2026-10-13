@@ -62,9 +62,9 @@ each under a distinct `perturbation` (precision, threads, summation order, seed)
 in exact fractions: spread, agreed significant digits, sign consistency, cancellation; STABLE if
 the runs agree to `required_digits`. Here the naive float32 variance flips sign (UNSTABLE);
 `assets/stability-stable.json` passes. See `references/contract.md`. Results must be numeric: a
-string or boolean is UNSTABLE even if identical, so leave such fields out. JSON numbers are
-binary64, so give more than 15 significant digits as decimal strings (the CLI rejects a float
-literal it cannot keep, exit 2).
+string or boolean is UNSTABLE even if identical, so leave such fields out. Integers stay exact;
+float literals are read as binary64, so write exact or long values as decimal strings (the CLI
+rejects, exit 2, a float literal that differs from its shortest repr).
 
 ## What it does not do
 

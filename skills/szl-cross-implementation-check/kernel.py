@@ -162,11 +162,13 @@ def szl_cross_implementation_check(document) -> dict:
 
 
 def szl_exact_value(value):
-    """Fraction of a decimal string or of a finite number's shortest repr; else None."""
+    """Fraction of a decimal string, an int, or a finite float's shortest repr; else None."""
     if isinstance(value, str):
         return Fraction(value) if DECIMAL.fullmatch(value) else None
+    if type(value) is int:
+        return Fraction(value)
     f = _number(value)
-    return None if f is None else Fraction(value if isinstance(value, int) else repr(f))
+    return None if f is None else Fraction(repr(f))
 
 
 def szl_exact_text(q) -> str:
@@ -184,9 +186,9 @@ def szl_stability_quantity(name, values, required) -> dict:
     rel = (hi - lo) / scale if scale else Fraction(0)
     digits = None
     if rel:
-        digits = 0
-        while rel * 10 ** (digits + 1) <= 1:
-            digits += 1
+        digits, p, q = 0, 10, rel.denominator // rel.numerator
+        while p <= q:
+            digits, p = digits + 1, p * 10
     ok = digits is None or digits >= required
     text = [szl_exact_text(q) for q in (lo, hi, median)]
     return dict(quantity=name, status="STABLE" if ok else "UNSTABLE",
