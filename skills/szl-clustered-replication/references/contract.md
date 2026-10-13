@@ -71,7 +71,7 @@ PLAN_INCOMPLETE lists FACTOR_NEVER_ABLATED, DUPLICATE_ARM (same removed set),
 UNDECLARED_MULTI_FACTOR_DIFFERENCE and CASE_SETS_DIFFER (vs `full`). Plan `inference_blockers`
 are listed even if PLAN_COMPLETE.
 
-Rows `{id, cluster, arm, unit, loss}` cover each planned arm/case once, else INPUT_ERROR.
+Rows `{id, cluster, arm, unit, loss}` match distinct planned arm/cases, else INPUT_ERROR.
 Incomplete plans are not analyzed; missing pairs give HOLD. Else `arms[].audit` holds each arm's
 v1 report (`baseline_loss` = arm, `candidate_loss` = full; bound only if the digest matched) and
 `multiplicity_handoff` has raw arm p values as exact decimals or null. Nothing is adjusted: arm p

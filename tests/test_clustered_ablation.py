@@ -242,6 +242,34 @@ class AblationPlannerTests(unittest.TestCase):
                 self.assertEqual(report["status"], status)
         self.assertEqual(report["reason"], "Over 10000 planned rows")
 
+    def test_factor_and_arm_count_caps_on_otherwise_valid_plans(self):
+        reason = "Unsupported schema, or not 1-15 factors and 2-16 arms"
+
+        def planned(factors, removals):
+            plan = example()["plan"]
+            cases = plan["arms"][0]["expected_cases"]
+            arms = [{"id": "full", "removes": [], "multi_factor_declared": False, "expected_cases": cases}]
+            arms += [{"id": "arm%d" % i, "removes": removes, "multi_factor_declared": len(removes) > 1,
+                      "expected_cases": cases} for i, removes in enumerate(removals)]
+            plan.update(factors=factors, arms=arms)
+            return A["szl_cluster_ablation"]({"plan": plan})
+
+        # One declared multi-factor arm removes every factor, so only the factor count can fail.
+        for count, status in ((15, "PLAN_COMPLETE"), (16, "INPUT_ERROR")):
+            with self.subTest(factors=count):
+                factors = ["f%d" % i for i in range(count)]
+                report = planned(factors, [factors])
+                self.assertEqual(report["status"], status)
+        self.assertEqual(report["reason"], reason)
+        # Distinct removal sets that ablate every factor, so only the arm count can fail.
+        factors = ["f%d" % i for i in range(15)]
+        singles = [[name] for name in factors]
+        for removals, status in ((singles, "PLAN_COMPLETE"), (singles + [factors[:2]], "INPUT_ERROR")):
+            with self.subTest(arms=len(removals) + 1):
+                report = planned(factors, removals)
+                self.assertEqual(report["status"], status)
+        self.assertEqual(report["reason"], reason)
+
 
 class AblationAnalyzerTests(unittest.TestCase):
     def test_bound_example_matches_independent_oracle(self):
