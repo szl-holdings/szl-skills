@@ -17,10 +17,41 @@ from unittest import mock
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 NAMES = ["szl-research-anatomy", "szl-math-claim-check", "szl-dataset-readiness",
          "szl-model-evaluation", "szl-kernel-comparison", "szl-reproducibility-capsule"]
+# Selected kernels that already used private helpers or classes when sidecar coverage
+# became installer-derived. Frozen: entries may only be removed, never added.
+STRICT_SIDECAR_AST_EXCEPTIONS = {
+    "szl-evidence-gate", "szl-cross-implementation-check", "szl-analysis-mutation-test",
+    "szl-compute-energy-receipt", "szl-session-receipt", "szl-reviewer-pack",
+    "szl-refutation-ledger", "szl-retrieval-eval", "szl-quantization-check", "szl-repo-pin",
+    "szl-result-fragility", "szl-skill-update-review"}
 
 
 def load(name):
     return runpy.run_path(str(ROOT / "skills" / name / "kernel.py"))
+
+
+def selected_native_kernels():
+    """Root kernel.py text exactly as the installer stages every selected family."""
+    setup = runpy.run_path(str(ROOT / "tools" / "install_claude_science.py"))
+    return {name: files["kernel.py"] for batch in setup["bundle_batches"](ROOT, family="all")
+            for name, files in batch.items() if "kernel.py" in files}
+
+
+def sidecar_ast_violations(tree):
+    allowed = (ast.Expr, ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Assign, ast.AnnAssign)
+    found = []
+    for node in tree.body:
+        if not isinstance(node, allowed):
+            found.append(type(node).__name__)
+        elif isinstance(node, ast.FunctionDef):
+            if node.name.startswith("_") or node.name in dir(builtins) or node.decorator_list:
+                found.append(node.name)
+            for default in node.args.defaults:
+                try:
+                    ast.literal_eval(default)
+                except ValueError:
+                    found.append(node.name + " default")
+    return found
 
 
 def example(name):
@@ -546,21 +577,23 @@ class PackagingTests(unittest.TestCase):
                         json.loads(p.stdout)
 
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
-        for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
-                             "szl-negative-control-audit", "szl-analysis-plan-audit", "szl-clustered-replication",
-                             "szl-multiplicity-audit", "szl-assay-measurement-audit",
-                             "szl-outcome-preservation", "szl-release-continuity"]:
+        # Coverage comes from the installer's "all" selection (every non-evidence family,
+        # checked against the marketplace elsewhere), so a new family cannot evade it.
+        kernels = selected_native_kernels()
+        self.assertTrue(set(NAMES) | {"szl-skill-conformance"} <= set(kernels))
+        self.assertTrue(STRICT_SIDECAR_AST_EXCEPTIONS <= set(kernels))
+        for name, text in sorted(kernels.items()):
             with self.subTest(skill=name):
-                path = ROOT / "skills" / name / "kernel.py"
-                tree = ast.parse(path.read_text())
-                for node in tree.body:
-                    self.assertIsInstance(node, (ast.Expr, ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Assign, ast.AnnAssign))
-                    if isinstance(node, ast.FunctionDef):
-                        self.assertFalse(node.name.startswith("_"))
-                        self.assertNotIn(node.name, dir(builtins))
-                        self.assertEqual(node.decorator_list, [])
-                        for default in node.args.defaults:
-                            ast.literal_eval(default)
+                self.assertEqual(text, (ROOT / "skills" / name / "kernel.py").read_bytes().decode("utf-8"))
+                tree = ast.parse(text)
+                entrypoints = [node.name for node in tree.body
+                               if isinstance(node, ast.FunctionDef) and node.name.startswith("szl_")]
+                self.assertTrue(entrypoints, "staged native kernel has no top-level szl_* entrypoint")
+                violations = sidecar_ast_violations(tree)
+                if name in STRICT_SIDECAR_AST_EXCEPTIONS:
+                    self.assertTrue(violations, "now strict-compliant: remove from the frozen exceptions")
+                else:
+                    self.assertEqual(violations, [])
                 namespace = load(name)
                 self.assertTrue(any(k.startswith("szl_") and callable(v) for k, v in namespace.items()))
 

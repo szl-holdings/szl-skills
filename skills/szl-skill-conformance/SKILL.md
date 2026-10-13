@@ -24,7 +24,10 @@ host observation, and scientific result validity. Never combine them into "verif
 
    Without an export or trials, report `INCOMPLETE`. Do not turn missing evidence
    into a successful empty comparison. `--imported-name ALIAS` declares a display-name
-   mapping; it does not excuse modified payload bytes.
+   mapping; it does not excuse modified payload bytes. If staging added root LICENSE
+   and NOTICE files (this repository's installer and ZIPs do), add `--legal-root ROOT`
+   from the same source revision: the export must then equal the raw source plus
+   exactly those two files. Otherwise compare directories of the same layer.
 4. Include a task that should invoke the skill and an unrelated task that should not.
    Bind both to retained results. Inspect whether the controls are meaningful:
    this checker cannot judge task relevance or output correctness from hashes.

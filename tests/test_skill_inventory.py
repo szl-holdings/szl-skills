@@ -258,5 +258,66 @@ class InventoryTests(unittest.TestCase):
             skill_inventory.build(self.root)
 
 
+def words(number):
+    ones = ("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+            "fifteen sixteen seventeen eighteen nineteen").split()
+    tens = {2: "twenty", 3: "thirty", 4: "forty", 5: "fifty", 6: "sixty", 7: "seventy", 8: "eighty", 9: "ninety"}
+    if number < 20:
+        return ones[number]
+    return tens[number // 10] + ("-" + ones[number % 10] if number % 10 else "")
+
+
+class CurrentInventoryProseTests(unittest.TestCase):
+    """Current-source prose must agree with the generated canonical inventory.
+
+    Released sections and historical counts are not checked here; they stay as published.
+    """
+
+    def setUp(self):
+        inventory = json.loads((ROOT / skill_inventory.OUTPUT).read_text(encoding="utf-8"))
+        by_plugin = inventory["counts"]["by_plugin"]
+        self.inventory = inventory
+        self.total = words(inventory["counts"]["total"])
+        self.evidence = words(by_plugin["szl-evidence-skills"])
+        self.science = words(inventory["counts"]["total"] - by_plugin["szl-evidence-skills"])
+        self.families = words(len([name for name in by_plugin if name != "szl-evidence-skills"]))
+        self.core = words(by_plugin["szl-science-skills"])
+
+    def text(self, relative):
+        return " ".join((ROOT / relative).read_text(encoding="utf-8").split()).lower()
+
+    def test_current_source_documents_state_canonical_counts(self):
+        unreleased = self.text("CHANGELOG.md").split("## unreleased", 1)[1].split(" ## ", 1)[0]
+        expected = {
+            "specialists/szl-science-workbench/SPECIALIST.md": [
+                f"selects {self.core} core science tools from {self.total} total packages",
+                f"{self.science} science tools across {self.families} science families",
+                "sharing-family installs", "szl-skill-conformance"],
+            "README.md": [
+                f"contains {self.total} skills for claude science, claude code and claude.ai: "
+                f"{self.science} science tools and {self.evidence} evidence skills",
+                f"the science tools have {self.families} import families: {self.core} core checks"],
+            "CLAUDE_SCIENCE_SETUP.md": [
+                f"this source tree contains {self.total} skills: {self.science} science tools and "
+                f"{self.evidence} evidence skills", f"the core family selects {self.core} science tools",
+                f"all {self.families} families exclude"],
+            "VALIDATION.md": [f"current source routing is {self.total} total packages: {self.core} core science tools"],
+        }
+        for relative, phrases in expected.items():
+            for phrase in phrases:
+                with self.subTest(document=relative, phrase=phrase):
+                    self.assertIn(phrase, self.text(relative))
+        with self.subTest(document="CHANGELOG.md unreleased"):
+            self.assertIn(f"current source inventory is {self.total} skills: {self.science} science tools in "
+                          f"{self.families} science families and {self.evidence} evidence skills", unreleased)
+
+    def test_specialist_curated_list_matches_core_family(self):
+        text = (ROOT / "specialists/szl-science-workbench/SPECIALIST.md").read_text(encoding="utf-8")
+        listed = text.split("Skills (curated):", 1)[1].split(".", 1)[0]
+        names = [name.strip() for name in listed.split(",")]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertEqual(set(names), set(self.inventory["plugins"]["szl-science-skills"]))
+
+
 if __name__ == "__main__":
     unittest.main()

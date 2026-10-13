@@ -14,6 +14,7 @@ MAX_NODES = 512
 MAX_FILES = 128
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,63}\Z")
+LEGAL = ("LICENSE", "NOTICE")
 
 
 def strict_json(data):
@@ -146,9 +147,37 @@ def bundle(value):
     if (not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", name)
             or name in {"true", "false", "null", "yes", "no", "on", "off", "y", "n"}):
         raise ValueError("invalid skill identity")
+    return {"name": name, "bundle_sha256": manifest_sha256(files), "files": files, "total_bytes": total}
+
+
+def manifest_sha256(files):
     records = [{"path": key, **files[key]} for key in sorted(files)]
     canonical = json.dumps(records, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
-    return {"name": name, "bundle_sha256": hashlib.sha256(canonical).hexdigest(), "files": files, "total_bytes": total}
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def staged_files(source, legal_root):
+    """Expected staged set: the clean raw source plus root LICENSE and NOTICE."""
+    if legal_root == "":
+        raise ValueError("empty legal root")
+    if any(path.casefold() in ("license", "notice") for path in source["files"]):
+        raise ValueError("raw source already contains a staged legal resource")
+    if any("__pycache__" in path.split("/") for path in source["files"]):
+        raise ValueError("raw source contains a generated cache")
+    root, files, total = safe_root(legal_root), dict(source["files"]), source["total_bytes"]
+    for path in LEGAL:
+        data = bounded_bytes(root / path)
+        total += len(data)
+        files[path] = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    if total > MAX_TOTAL or len(files) > MAX_FILES:
+        raise ValueError("staged aggregate bound")
+    return files
+
+
+def differences(expected, actual):
+    shared = set(expected) & set(actual)
+    return {"missing": sorted(set(expected) - shared), "unexpected": sorted(set(actual) - shared),
+            "changed": sorted(path for path in shared if expected[path] != actual[path])}
 
 
 def keys(value, expected):
@@ -216,12 +245,17 @@ def validate_trials(root_value, document, source, exported, imported_name):
     return {"evidence_kind": document["evidence_kind"], "cases": rows, "consistent": all(row["declaration_consistent"] for row in rows)}
 
 
-def check(source_path, export_path=None, trials_path=None, trial_root=None, imported_name=None):
+def szl_check_skill_conformance(source_path, export_path=None, trials_path=None, trial_root=None, imported_name=None, legal_root=None):
     report = {"schema_version": 1, "offline_conformance": "INCOMPLETE", "source_binding": "UNAVAILABLE", "supplied_export_binding": "UNAVAILABLE", "supplied_trial_consistency": "UNAVAILABLE", "actual_host_invocation": "NOT_VERIFIED", "scientific_result_validity": "NOT_EVALUATED", "issues": []}
     try:
         source = bundle(source_path)
         report["source_binding"] = "OBSERVED_LOCAL_BYTES"
         report["source"] = source
+        expected = source["files"]
+        if legal_root is not None:
+            expected = staged_files(source, legal_root)
+            report["staged_resources"] = {"contract": "szl.skill-staged-resources.v1", "expected_bundle_sha256": manifest_sha256(expected),
+                                          "legal_resources": {path: expected[path] for path in LEGAL}, "legal_source_revision": "NOT_VERIFIED"}
         identity = source["name"] if imported_name is None else imported_name
         if not isinstance(identity, str) or not NAME.fullmatch(identity):
             raise ValueError("invalid imported identity")
@@ -231,9 +265,12 @@ def check(source_path, export_path=None, trials_path=None, trial_root=None, impo
             return report
         exported = bundle(export_path)
         report["supplied_export_bundle_sha256"] = exported["bundle_sha256"]
-        if source["files"] != exported["files"] or source["name"] != exported["name"]:
+        if expected != exported["files"] or source["name"] != exported["name"]:
             report["supplied_export_binding"] = "MISMATCH"
-            raise ValueError("supplied host export differs from source")
+            if legal_root is None:
+                raise ValueError("supplied host export differs from source")
+            report["staged_resources"]["export_differences"] = differences(expected, exported["files"])
+            raise ValueError("supplied host export differs from expected staged resources")
         report["supplied_export_binding"] = "MATCHED_SUPPLIED_BYTES"
         if trials_path is None or trial_root is None:
             report["issues"].append("no complete supplied trial evidence")
@@ -251,3 +288,7 @@ def check(source_path, export_path=None, trials_path=None, trial_root=None, impo
         report["offline_conformance"] = "REJECTED"
         report["issues"].append(str(error) if isinstance(error, ValueError) else type(error).__name__)
     return report
+
+
+# Earlier callers use this name; the host-convention entrypoint is szl_check_skill_conformance.
+check = szl_check_skill_conformance

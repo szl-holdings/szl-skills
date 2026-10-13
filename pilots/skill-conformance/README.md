@@ -12,12 +12,17 @@ From the repository root, Python 3.10+:
 python -B pilots/skill-conformance/demo.py
 python -B -m unittest discover -s tests -p test_skill_conformance_pilot.py -v
 python -B skills/szl-skill-conformance/scripts/run.py --source SKILL_DIRECTORY
+python -B skills/szl-skill-conformance/scripts/run.py --source skills/szl-skill-conformance --host-export EXPORTED_SKILL_DIRECTORY --legal-root .
 ```
 
 The first command runs two synthetic tasks in a disposable directory and prints
 CONSISTENT_SUPPLIED_EVIDENCE together with actual_host_invocation NOT_VERIFIED.
 The third reports INCOMPLETE (exit 2), because a source directory alone does not
-prove an import or trial. Complete retained-evidence usage and bounds are in
+prove an import or trial. The fourth compares this repository's raw source with an
+export staged by the installer or a ZIP from this package tool, both of which add the root
+LICENSE and NOTICE; run it from a checkout at the staged revision. A matching export
+without trials still reports INCOMPLETE (exit 2); any other missing, changed or extra
+file is REJECTED (exit 1). Complete retained-evidence usage and bounds are in
 [SKILL.md](../../skills/szl-skill-conformance/SKILL.md) and
 [contract.md](../../skills/szl-skill-conformance/references/contract.md).
 

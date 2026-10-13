@@ -2,6 +2,13 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
+- Repair szl-skill-conformance after #62. Its staged root `kernel.py` now exposes the
+  `szl_check_skill_conformance` entrypoint (the CLI and `check` alias are unchanged), and
+  the sidecar AST/entrypoint test covers every kernel the installer stages instead of a
+  hand-kept list. `--legal-root` defines one staged-resource contract: the raw source plus
+  root LICENSE and NOTICE from the same revision, as the installer and ZIPs stage them;
+  any other missing, changed or extra file still rejects. A matched export without trials
+  stays INCOMPLETE; host invocation stays NOT_VERIFIED and scientific validity NOT_EVALUATED.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and
@@ -16,9 +23,11 @@
   pinned synthetic case and HPO/ClinVar-shaped declarations at a cutoff, with
   source/provenance ablations and permanent HOLD readiness. It does not diagnose,
   rank disease, evaluate a model or qualify clinical use.
-- Current source inventory is forty-one skills: thirty-eight science tools and three
-  evidence skills. The reporting map, both synthetic rare-disease tools, and measurement
-  harmonization are unreleased source additions; the fixed v0.5.0-rc.3 assets are unchanged.
+- Current source inventory is forty-two skills: thirty-nine science tools in eleven science
+  families and three evidence skills. Skill conformance (the sharing family), the reporting
+  map, both synthetic rare-disease tools, and measurement harmonization are unreleased source
+  additions; the fixed v0.5.0-rc.3 assets are unchanged. Selecting the sharing family raised
+  the aggregate `skills/` source cap from 1,050,000 to 1,065,000 bytes; SDK limits are unchanged.
 - Add offline measurement harmonization with declared specimen ID maps, source hashes and
   affine unit conversions. Ambiguous or incomplete joins retain no usable rows; the result
   does not establish identity, calibration or scientific agreement. Package it with the

@@ -169,7 +169,8 @@ class MultiplicityTests(unittest.TestCase):
             p, r, report = root / "plan.json", root / "results.json", root / "report.json"
             p.write_bytes(encoded(plan))
             r.write_bytes(encoded(results))
-            command = [sys.executable, str(SKILL / "scripts" / "run.py"), str(p), str(r), "--output", str(report)]
+            # -B: the CLI imports the kernel; never leave bytecode caches under skills/.
+            command = [sys.executable, "-B", str(SKILL / "scripts" / "run.py"), str(p), str(r), "--output", str(report)]
             complete = subprocess.run(command, capture_output=True, text=True, timeout=20)
             self.assertEqual(complete.returncode, 0, complete.stderr)
             self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["status"], "COMPLETE")

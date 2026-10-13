@@ -25,6 +25,17 @@ Other Python `splitlines` separators (VT, FF, NEL, LS and PS) are rejected insid
 frontmatter; they may occur in the opaque Markdown body. This is a conservative
 subset, not a general YAML parser.
 
+Staged-resource contract `szl.skill-staged-resources.v1` (`--legal-root ROOT`): the
+expected export is every raw source file plus root `LICENSE` and `NOTICE` read from
+ROOT at the source revision, as this repository's installer and ZIP packager stage
+them. The source must not already hold a root LICENSE/NOTICE (any case) or a
+`__pycache__` entry. Nothing else is added or ignored: a missing, modified or extra
+export file is MISMATCH, listed in `staged_resources.export_differences`.
+`source.bundle_sha256` stays the raw-source identity; `expected_bundle_sha256` is the
+staged identity a matching export reproduces. Trials bind `source_bundle_sha256` to
+the raw source and `host_bundle_sha256` to the export. Only the supplied legal bytes
+are hashed; `legal_source_revision` stays NOT_VERIFIED.
+
 Trials JSON has exactly these fields:
 
 ```json
@@ -72,6 +83,7 @@ case collisions, symlinks and reparse points are rejected. Files are never impor
 or executed. On Windows, concurrent filesystem replacement is outside the trust
 boundary; use stable owner-controlled exported directories.
 
+The CLI wraps the native entrypoint `szl_check_skill_conformance` (alias `check`).
 CLI exit 0 means CONSISTENT_SUPPLIED_EVIDENCE only; 2 is INCOMPLETE; 1 is REJECTED.
 `actual_host_invocation` always stays NOT_VERIFIED and `scientific_result_validity`
 stays NOT_EVALUATED. Any source update changes its digest and invalidates earlier
