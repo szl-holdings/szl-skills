@@ -65,7 +65,7 @@ produces a DSSE signature when `szl-receipt-dsse` is installed; otherwise the re
 A MATCH means the files are byte-identical to the recorded ones. It does not mean the analysis is
 correct, that the recorded commands were the only ones run, or that the declared environment was
 real. It does not capture files you did not list; `--scan` does not open unrecorded subdirectories
-(shown as `dir/`) or hash extras, and on a case-insensitive filesystem a recorded file or directory
-whose case differs from the disk is reported as extra. Symlinks are refused, not followed; bind
+(shown as `dir/`) or hash extras, and a recorded file or directory spelled differently from the disk
+(case, or a Windows 8.3 short name) is reported as extra. Symlinks are refused, not followed; bind
 mounts and hard links inside the root are not detected. `root_sha256_v2` is a digest, not a
 signature. Details: `references/contract.md`, `references/provenance.md`.

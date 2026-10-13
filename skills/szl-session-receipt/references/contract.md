@@ -32,9 +32,9 @@ other OS errors (for example EACCES on a file or directory, or one `--scan` cann
 `scan=True` (`verify --scan`) adds `scan: {directories, extra_files}`. `directories` is the root
 (`.`) and every directory leading to a recorded non-ERROR path; `extra_files` lists the entries
 directly inside them that are neither recorded nor a directory leading to one. Directories end in `/`
-and are not opened; nothing is hashed. Names compare exactly, so on a case-insensitive filesystem a
-path recorded in another case is reported as extra (false positive, never a hidden entry). An empty
-receipt scans nothing.
+and are not opened; nothing is hashed. Names compare exactly, so a path recorded in another spelling
+than the directory entry (case on a case-insensitive filesystem, or a Windows 8.3 short name) is
+reported as extra (false positive, never a hidden entry). An empty receipt scans nothing.
 
 Schema v2 (`receipt_schema: "szl.session-receipt.v2"`) adds `root_sha256_v2` = SHA-256 of canonical
 JSON `[[role, path, sha256|null], ...]` in role then path order, before `receipt_sha256`; `root_sha256`
