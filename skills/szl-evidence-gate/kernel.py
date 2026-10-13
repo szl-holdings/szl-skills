@@ -12,8 +12,8 @@ Verdicts per claim (same vocabulary as the published szl-evidence-mandate gate):
 
 Aggregate: FAIL if any required claim FAILs or ERRORs; otherwise ABSTAIN if any
 claim is ABSTAIN (or there are no claims); otherwise PASS. Repeated claim ids are
-ERROR DUPLICATE_CLAIM_ID. A PASS proves integrity and presence of the
-declared artifacts. It does not prove the claim is true.
+ERROR DUPLICATE_CLAIM_ID. A PASS shows the declared artifacts are present and match
+any declared digests, snippets or values; it does not show the claim is true.
 Opt-in strict_numeric_binding: see references/contract.md.
 """
 from __future__ import annotations
@@ -29,7 +29,16 @@ SCHEMA = "szl.evidence-gate-report.v1"
 SCHEMA_V2 = "szl.evidence-gate-report.v2"
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
-_NUMBER = re.compile(r"(?<![\w.+-])[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?(?!\.?\d)")
+# Number grammar for strict_numeric_binding (references/contract.md): optional sign (- + U+2212
+# U+2013), 1,234 grouping, .5 decimals, e/caret/superscript/x10 exponents; dash-joined ranges.
+_SIGN = r"[-+\u2212\u2013]"
+_EXP = r"(?:[eE][-+\u2212]?\d+|(?: ?[\u00d7x\u00b7] ?10)?(?:\^[-+\u2212]?\d+|[\u207a\u207b]?[\u2070\u00b9\u00b2\u00b3\u2074-\u2079]+))"
+_UNUM = r"(?:\d{1,3}(?:,\d{3}(?!\d))+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)" + _EXP + r"?(?!\.?\d)"
+_NUMBER = re.compile(r"(?<![\w.^+\-\u2212\u2010-\u2013\ufe63\uff0d])" + _SIGN + "?" + _UNUM)
+_RANGE_END = re.compile(_UNUM)
+_VALUE = re.compile(_SIGN + "?" + _UNUM)
+_IDENT = re.compile(r"\d+(?:\.\d+){2,}|[^\W\d][\w\u207a\u207b]*(?:[-.^][\w\u207a\u207b]+)*")
+_AMBIGUOUS_COMMA = re.compile(r"\d,(?:\d{1,2}|\d{4,})(?![\d.])")  # 0,91 or 7,11: decimal comma or list
 _CODED = {"PATH_OUTSIDE_ROOT", "ARTIFACT_TOO_LARGE"}
 
 
@@ -41,9 +50,56 @@ def szl_sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _norm(token: str) -> str:
+    return token.replace("\u2212", "-")
+
+
+def _spans(text: str, parts=False):
+    """Yield (start, end, token); a dash between two numbers is a range. parts: also 1,234 -> 1, 234."""
+    last = 0
+    for match in _NUMBER.finditer(text):
+        if match.start() < last:
+            continue
+        chain = [match]
+        while text[chain[-1].end():chain[-1].end() + 1] in ("-", "\u2013"):
+            end = _RANGE_END.match(text, chain[-1].end() + 1)
+            if end is None:
+                break
+            chain.append(end)
+        last = chain[-1].end()
+        for found in chain:
+            token = _norm(found.group())
+            yield found.start(), found.end(), token
+            if parts and "," in token:
+                start = found.start()
+                for piece in token.split(","):
+                    yield start, start + len(piece), piece
+                    start += len(piece) + 1
+
+
 def szl_number_tokens(text: str) -> list:
-    """Unique decimal number tokens in order of first appearance."""
-    return list(dict.fromkeys(_NUMBER.findall(text)))
+    """Unique number tokens in order of first appearance (U+2212 read as '-')."""
+    return list(dict.fromkeys(token for _, _, token in _spans(text)))
+
+
+def _unparsed(text: str) -> list:
+    """Words with a digit outside number tokens and identifiers (R07, SHA-256), or a 0,91-style comma."""
+    covered = set()
+    for start, end, _ in _spans(text):
+        covered.update(range(start, end))
+    for match in _IDENT.finditer(text):
+        if match.group()[0].isdecimal() or not match.group()[0].isdigit():
+            covered.update(range(match.start(), match.end()))
+    bad = [i for i, char in enumerate(text) if char.isdigit() and i not in covered]
+    words = []
+    for i in sorted(bad + [m.start() for m in _AMBIGUOUS_COMMA.finditer(text)]):
+        start, end = i, i
+        while start and not text[start - 1].isspace():
+            start -= 1
+        while end < len(text) and not text[end].isspace():
+            end += 1
+        words.append(text[start:end])
+    return list(dict.fromkeys(words))
 
 
 def _safe_path(root: Path, relative: str) -> Path:
@@ -102,19 +158,24 @@ def _check_item(root: Path, item, numeric=False):  # -> (record, bound numbers)
     values = item.get("values") if numeric else None
     bound = set()
     if numeric:
-        tokens = set(_NUMBER.findall(text))
-        if values is not None:
-            if not isinstance(values, list) or not all(isinstance(v, str) and _NUMBER.fullmatch(v) for v in values):
-                record.update(status="ERROR", reason="values must be a list of decimal number strings")
-                return record, set()
-            missing = [v for v in values if v not in tokens]
-            if missing:
-                record.update(status="FAIL", reason="TEXT_NOT_FOUND", missing_values=missing)
-                return record, set()
-            bound.update(values)
-        for snippet in snippets or []:
-            bound.update(t for t in _NUMBER.findall(snippet) if t in tokens)
-    if record["declared_sha256"] is None and snippets is None and values is None:
+        if values is not None and (not isinstance(values, list)
+                                   or not all(isinstance(v, str) and _VALUE.fullmatch(v) for v in values)):
+            record.update(status="ERROR", reason="values must be a list of decimal number strings")
+            return record, set()
+        wanted = [(snippet, list(_spans(snippet))) for snippet in snippets or []]
+        need = {_norm(v) for v in values or []} | {t for _, spans in wanted for _, _, t in spans}
+        where = {}  # artifact token -> start offsets, only for tokens a value or snippet names
+        for start, _, token in (_spans(text, parts=True) if need else ()):
+            if token in need:
+                where.setdefault(token, []).append(start)
+        missing = [v for v in values or [] if _norm(v) not in where]
+        if missing:
+            record.update(status="FAIL", reason="TEXT_NOT_FOUND", missing_values=missing)
+            return record, set()
+        bound.update(_norm(v) for v in values or [])
+        for snippet, spans in wanted:  # bind only where the snippet's token is a whole artifact token
+            bound.update(t for a, _, t in spans if any(s >= a and text.startswith(snippet, s - a) for s in where.get(t, ())))
+    if record["declared_sha256"] is None and snippets is None and not values:
         record["reason"] = "PRESENCE_ONLY"
     return record, bound
 
@@ -152,21 +213,22 @@ def szl_gate_claim(root: Path, claim, strict=None) -> dict:  # strict None: v1 s
     if strict is not None:
         numbers = szl_number_tokens(claim["text"])
         unbound = [n for n in numbers if n not in bound]
+        unparsed = _unparsed(claim["text"])
         result["numeric_binding"] = {"numbers_in_text": numbers, "bound": [n for n in numbers if n in bound],
-                                     "unbound": unbound}
-        if strict and unbound and result["status"] == "PASS":
+                                     "unbound": unbound, "unparsed": unparsed}
+        if strict and (unbound or unparsed) and result["status"] == "PASS":
             result.update(status="ABSTAIN", reason="NUMBERS_NOT_BOUND")
     return result
 
 
 def szl_evidence_gate(root, claims_document) -> dict:
     root = Path(root)
-    if not isinstance(claims_document, dict) or not isinstance(claims_document.get("claims"), list):
-        return {"schema": SCHEMA, "status": "ERROR", "reason": "document must contain a claims list",
-                "claims": [], "counts": {}}
-    numeric = "strict_numeric_binding" in claims_document
-    strict = claims_document.get("strict_numeric_binding") if numeric else None
+    numeric = isinstance(claims_document, dict) and "strict_numeric_binding" in claims_document
     schema = SCHEMA_V2 if numeric else SCHEMA
+    if not isinstance(claims_document, dict) or not isinstance(claims_document.get("claims"), list):
+        return {"schema": schema, "status": "ERROR", "reason": "document must contain a claims list",
+                "claims": [], "counts": {}}
+    strict = claims_document.get("strict_numeric_binding") if numeric else None
     if numeric and not isinstance(strict, bool):
         return {"schema": schema, "status": "ERROR", "reason": "strict_numeric_binding must be true or false",
                 "claims": [], "counts": {}}

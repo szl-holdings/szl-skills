@@ -27,10 +27,22 @@ Artifacts over `MAX_ARTIFACT_BYTES` (33,554,432) are not read: ERROR `ARTIFACT_T
 `scripts/run.py` exits 2 on duplicate JSON keys, NaN, Infinity or overflowing floats.
 
 Opt-in: a document containing `strict_numeric_binding` (`true`/`false`, else report ERROR) gets
-report schema `szl.evidence-gate-report.v2`, item field `values: [str]` and, per evaluated claim,
-`numeric_binding: {numbers_in_text, bound, unbound}` (unique, first-appearance order). Tokens match
-`(?<![\w.+-])[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?(?!\.?\d)` and compare as exact strings. Each
-`values` entry must be one token (else item ERROR) found in the decoded artifact (else item FAIL
-`TEXT_NOT_FOUND`, `missing_values`). Only PASS items bind: their `values` and the `must_contain`
-snippet tokens that are whole artifact tokens. With `true`, a would-be PASS claim with an unbound
-number is ABSTAIN `NUMBERS_NOT_BOUND`. Without the key the v1 shape is kept and `values` is ignored.
+report schema `szl.evidence-gate-report.v2` (its malformed-document ERROR too), item field
+`values: [str]` and, per evaluated claim, `numeric_binding: {numbers_in_text, bound, unbound, unparsed}`
+(unique, first-appearance order).
+
+Number token (kernel `_NUMBER`): an optional sign (`-`, `+`, U+2212 read as `-`, U+2013 kept as
+written); then `1,234`-style grouping, digits with optional decimals, or a leading-dot decimal; then an
+optional exponent (`e`, `^`, superscript digits, or `×10`/`x10`/`·10` followed by `^` or superscript
+digits). A token may not follow a word character, `.`, `^`, a sign or a hyphen variant, nor run into
+a digit or `.digit`. A `-` or U+2013 directly between a token and an unsigned number is a range; each end is a
+token. Tokens compare as exact strings. `unparsed` lists the claim-text words holding a digit that is in
+no token and no identifier (a run that starts with a letter or `_` and is joined by `-`, `.` or `^`, or a
+dotted version with three or more parts), plus digit,digit runs that are not 3-digit grouping (`0,91`).
+
+Each `values` entry must be one token (else item ERROR) that is a token of the decoded artifact (else
+item FAIL `TEXT_NOT_FOUND`, `missing_values`). In artifacts, `1,234` also yields `1` and `234` (CSV
+fields). Only PASS items bind: their `values`, and each `must_contain` snippet token that coincides with
+an artifact token where the snippet matches. An empty `values` list declares nothing. With `true`, a
+would-be PASS claim with an unbound or unparsed number is ABSTAIN `NUMBERS_NOT_BOUND`. Without the key
+the v1 shape is kept and `values` is ignored.
