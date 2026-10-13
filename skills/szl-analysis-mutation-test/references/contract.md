@@ -15,10 +15,11 @@ status SCORED, BASELINE_FLAGGED, NO_OUTCOMES_RECORDED or BASELINE_NOT_TESTED.
 
 ## Upgrade: baseline, binding, strict input, property classes
 
-- `k` (>= 0) and `seed` must be JSON integers; `mutations` a list of distinct known names ([] = default ten).
+- `k` (>= 0) and `seed` must be JSON integers, `label_column` a string or null; `mutations` a list of
+  distinct known names ([] = default ten).
 - Opt-in classes, never default: `scale_column_inverse`, `negate_column`, `extreme_value`,
   `conflicting_duplicate_id` (needs `id_column`), `all_missing_column`, `single_row`. `columns` and
-  `id_column` must name row keys and need one of them. `negate_column` and `scale_column_inverse`
+  `id_column` must name row keys and need one of them; `id_column` is dropped from `columns`. `negate_column` and `scale_column_inverse`
   SKIP non-numeric targets and leave zero cells and cells beyond the largest finite double alone
   (nothing left to change: NO_OP). `extreme_value` and `conflicting_duplicate_id` need numeric
   targets and change zeros too; the twin needs a row with a non-null id whose targets change under +1.
@@ -32,6 +33,6 @@ status SCORED, BASELINE_FLAGGED, NO_OUTCOMES_RECORDED or BASELINE_NOT_TESTED.
 - Status order: BASELINE_FLAGGED, NO_OUTCOMES_RECORDED, BASELINE_NOT_TESTED (`baseline_flagged` not
   `false`; adds `reason`), SCORED. A SCORED report with coverage `0/0` tested nothing.
 - CLI: bad JSON, duplicate keys, NaN/Infinity, input or report nested too deeply, an unreadable
-  input or an unwritable output exit 2 with a JSON ERROR. Kept from base (exit 1, traceback):
-  `precision_drift` on an integer beyond the double range; a hand-edited plan variant without
-  `status` or `sha256`.
+  input or an unwritable output exit 2 with a JSON ERROR. Exit-1 tracebacks kept from base include
+  `precision_drift` on an integer beyond the double range and a hand-edited plan variant without
+  `status`, `sha256` or `detail`.

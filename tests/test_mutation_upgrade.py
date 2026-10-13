@@ -265,6 +265,14 @@ class StrictInputTests(unittest.TestCase):
         self.assertEqual(self.gen(k=0)["status"], "GENERATED")
         self.assertEqual(self.gen(seed=-7)["status"], "GENERATED")
 
+    def test_label_column_must_be_a_string_or_null(self):
+        for value in (["outcome"], {}, [], 0, 5, True, False):
+            report = self.gen(label_column=value)
+            self.assertEqual(report["status"], "ERROR", value)
+            self.assertIn("label_column", report["reason"])
+        for value in (None, "", "outcome"):
+            self.assertEqual(self.gen(label_column=value)["status"], "GENERATED", value)
+
     def test_duplicate_or_malformed_mutation_names_are_rejected(self):
         for value in (["drop_rows", "drop_rows"], "drop_rows", [1], [""], {"drop_rows": True}):
             self.assertEqual(self.gen(mutations=value)["status"], "ERROR", value)
@@ -376,6 +384,8 @@ class PropertyClassTests(unittest.TestCase):
         listed = self.variant("negate_column", rows, id_column="aa_id", columns=["aa_id", "b"])
         self.assertEqual(listed["detail"]["columns"], ["b"])
         self.assertEqual([r["aa_id"] for r in listed["rows"]], [1, 2])
+        only_id = self.gen(["negate_column"], rows, id_column="aa_id", columns=["aa_id"])["variants"][0]
+        self.assertEqual((only_id["status"], only_id["detail"]), ("SKIPPED", {"skipped": "no target column"}))
 
     def test_all_missing_column(self):
         v = self.variant("all_missing_column")
@@ -426,6 +436,10 @@ class CliStrictJsonTests(unittest.TestCase):
             self.check_rejected(text)
         self.check_rejected('{"baseline_flagged": false, "baseline_flagged": true, "variants": {}}', "score")
         self.check_rejected('{"variants": {"drop_rows": {"flagged": true}}, "variants": {}}', "score")
+
+    def test_non_string_label_column_exits_2(self):
+        for label in ('["x"]', "{}", "5"):  # an unhashable label used to raise TypeError (exit 1)
+            self.check_rejected('{"rows": [{"a": 1}, {"a": 2}], "label_column": %s}' % label)
 
     def test_too_deeply_nested_input_exits_2(self):
         for depth in (600, 100000):  # 600 fails while copying rows, 100000 while reading

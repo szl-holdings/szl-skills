@@ -170,6 +170,8 @@ def _invalid(doc, rows):
     sel, cols, idc = doc.get("mutations"), doc.get("columns"), doc.get("id_column")
     if type(doc.get("k", 0)) is not int or doc.get("k", 0) < 0 or type(doc.get("seed", 0)) is not int:
         return "k (>= 0) and seed must be integers"
+    if not isinstance(doc.get("label_column"), (str, type(None))):
+        return "label_column must be a string or null"
     if sel is not None and not _names(sel):
         return "mutations must be distinct names"
     if not (cols is None or cols and _names(cols)) or not (idc is None or _names([idc])):

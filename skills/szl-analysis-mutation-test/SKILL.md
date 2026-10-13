@@ -56,8 +56,8 @@ an outcome without `variant_sha256` is `NOT_TESTED`.
 
 Run only when named in `mutations`, so default plans and digests are unchanged: `scale_column_inverse`
 (x0.001), `negate_column`, `extreme_value` (largest finite double), `conflicting_duplicate_id` (needs
-`id_column`), `all_missing_column`, `single_row`. Targets: `columns`, else the first numeric column
-that is not the label or id. Plans become `szl.mutation-plan.v2`; see `assets/property-example.json`.
+`id_column`), `all_missing_column`, `single_row`. Targets: `columns` (minus `id_column`), else the
+first numeric column that is not the label or id. Plans become `szl.mutation-plan.v2`; see `assets/property-example.json`.
 
 ## What it does not do
 
