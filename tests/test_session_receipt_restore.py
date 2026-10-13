@@ -243,7 +243,8 @@ class SessionReceiptRestoreTests(unittest.TestCase):
                 self.assertIn("symlink or reparse point", r["detail"])
 
     def test_file_resolving_outside_root_is_refused(self):
-        # Stand-in for a redirection the lstat walk cannot see (for example a mount): resolve() is checked too.
+        # Stand-in for any redirection that makes resolve() leave the root. Bind mounts and hard links
+        # are not caught by resolve() or the lstat walk; contract.md states that limit.
         outside = self.tmp / "outside.csv"
         outside.write_text("o\n", encoding="utf-8")
         real_resolve = pathlib.Path.resolve
@@ -317,6 +318,31 @@ class SessionReceiptRestoreTests(unittest.TestCase):
                 self.assertEqual(self.k.szl_make_session_receipt(self.project, asset("example.json"), max_file_bytes=small)["reason"], "FILE_TOO_LARGE")
         code, out = cli("record", SKILL / "assets" / "example.json", "--root", self.project, "--max-file-bytes", "75")
         self.assertEqual((code, json.loads(out)["reason"]), (2, "FILE_TOO_LARGE"))
+
+    def test_size_cap_is_enforced_by_the_precheck_and_by_the_read_loop(self):
+        # Each half of the cap on its own, with the cap set to the file's exact size. A file that grows
+        # after the lstat (same inode, so the identity check passes) is caught by the read loop; an lstat
+        # size above the cap is refused by the precheck even though the bytes on disk would fit.
+        raw = self.project / "data" / "raw.csv"
+        original, cap = raw.read_bytes(), raw.stat().st_size
+        real = self.k._locate
+
+        def grows_after_check(root, relative):
+            found = real(root, relative)
+            with found[0].open("ab") as handle:
+                handle.write(b"x")
+            return found
+
+        def lstat_says_larger(root, relative):
+            path, info = real(root, relative)
+            return path, types.SimpleNamespace(st_size=cap + 1, st_dev=info.st_dev, st_ino=info.st_ino)
+
+        self.assertEqual(self.k.szl_make_session_receipt(self.project, {"inputs": ["data/raw.csv"]}, max_file_bytes=cap)["status"], "RECORDED")
+        for name, wrapper in (("read loop", grows_after_check), ("precheck", lstat_says_larger)):
+            raw.write_bytes(original)
+            with self.subTest(name), mock.patch.object(self.k, "_locate", wrapper):
+                r = self.k.szl_make_session_receipt(self.project, {"inputs": ["data/raw.csv"]}, max_file_bytes=cap)
+                self.assertEqual((r["status"], r.get("reason")), ("ERROR", "FILE_TOO_LARGE"))
 
     # -- empty receipt ------------------------------------------------------------------------------
     def test_empty_receipt_is_not_a_match(self):

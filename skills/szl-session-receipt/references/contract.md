@@ -19,9 +19,11 @@ read by the kernel; the CLI passes the PEM bytes you point it at.
 Paths are canonical relative POSIX: no backslash, colon (`C:/`, `C:x`, streams), control character,
 lone surrogate, leading `/`, empty, `.`, `..` or trailing-dot/space segment. Each component from the
 root down is `lstat`ed; symlinks and reparse points (the root included) are refused and the resolved
-file must stay inside the resolved root. Violations give ERROR `PATH_OUTSIDE_ROOT` (with `detail`) and
-nothing is read; a file above `max_file_bytes` (default 268435456, CLI `--max-file-bytes`) gives ERROR
-`FILE_TOO_LARGE`. In `verify` those rows are `result: ERROR` and the overall status is ERROR (exit 2).
+file must stay inside the resolved root. Bind mounts and hard links inside the root are not detected:
+a file reached through one is read even if its data lives outside the root. Violations give ERROR
+`PATH_OUTSIDE_ROOT` (with `detail`) and nothing is read; a file above `max_file_bytes` (default
+268435456, CLI `--max-file-bytes`) gives ERROR `FILE_TOO_LARGE`. In `verify` those rows are
+`result: ERROR` and the overall status is ERROR (exit 2).
 Precedence: ERROR, RECEIPT_TAMPERED, MISMATCH, EMPTY_RECEIPT (intact receipt with zero files),
 EXTRA_FILES_PRESENT, MATCH. Paths are not normalised: older receipts with `./a`, `a//b`, `a/./b` or
 `a/` paths now give ERROR; re-record them with canonical paths. An absent component gives MISSING;

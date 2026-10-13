@@ -66,5 +66,6 @@ A MATCH means the files are byte-identical to the recorded ones. It does not mea
 correct, that the recorded commands were the only ones run, or that the declared environment was
 real. It does not capture files you did not list; `--scan` does not open unrecorded subdirectories
 (shown as `dir/`) or hash extras, and on a case-insensitive filesystem a recorded file or directory
-whose case differs from the disk is reported as extra. Symlinks are refused, not followed;
-`root_sha256_v2` is a digest, not a signature. Details: `references/contract.md`, `references/provenance.md`.
+whose case differs from the disk is reported as extra. Symlinks are refused, not followed; bind
+mounts and hard links inside the root are not detected. `root_sha256_v2` is a digest, not a
+signature. Details: `references/contract.md`, `references/provenance.md`.
