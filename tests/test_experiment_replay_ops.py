@@ -217,6 +217,44 @@ class ExperimentReplayOpsTests(unittest.TestCase):
         with mock.patch.dict(OPS["replay"].__globals__, {"_ops_hash": mock.Mock(side_effect=OSError("gone"))}):
             self.assertEqual(OPS["replay"](self.root, pin)["reason"], "ENGINE_OPS_UNREADABLE")
 
+    def test_unloadable_engine_ops_exits_2_with_no_pin_or_receipt(self):
+        # references/contract.md: if engine_ops.py cannot load, v2 exits 2 with no pin or receipt; v1 is unaffected.
+        copy = tempfile.TemporaryDirectory(prefix="szl-experiment-replay-copy-")
+        self.addCleanup(copy.cleanup)
+        scripts = pathlib.Path(copy.name)
+        for name in ("run.py", "engine.py", "engine_ops.py"):
+            (scripts / name).write_bytes((SKILL / "scripts" / name).read_bytes())
+        run = lambda *args: subprocess.run([sys.executable, "-I", "-B", str(scripts / "run.py"), *args, "--root", str(self.root)],
+                                           capture_output=True, text=True, timeout=30)
+        self.assertEqual(run("prepare", "assets/ops-declaration.json", "--output", "ops-pin.json").returncode, 0)
+        for state in ("missing", "broken"):
+            if state == "missing":
+                (scripts / "engine_ops.py").unlink()
+            else:
+                (scripts / "engine_ops.py").write_text("raise RuntimeError('broken')\n", encoding="utf-8")
+            for command, target in (("replay", "ops-pin.json"), ("prepare", "assets/ops-declaration.json")):
+                output = "%s-%s.json" % (state, command)
+                with self.subTest(state=state, command=command):
+                    result = run(command, target, "--receipt" if command == "replay" else "--output", output)
+                    self.assertEqual((result.returncode, result.stdout), (2, ""))
+                    self.assertIn("engine_ops.py failed to load", result.stderr)
+                    self.assertFalse((self.root / output).exists())
+        self.assertEqual(run("prepare", "assets/declaration.json", "--output", "v1-pin.json").returncode, 0)
+        self.assertEqual(run("replay", "v1-pin.json", "--receipt", "v1-receipt.json").returncode, 0)
+
+    def test_reference_values_keep_the_bounded_v1_decimal_form(self):
+        # references/contract.md: at most 18 integer and 18 fraction digits; prepare refuses results that need more.
+        (self.root / "big.csv").write_text("measurement\n499999999999999999\n500000000000000000\n", encoding="utf-8")
+        edge = self.pin("csv_column_sum_v1", {"measurement": "999999999999999999"}, data="big.csv", name="edge.json")
+        self.assertEqual(OPS["replay"](self.root, edge)["status"], "MATCH")
+        fine = self.pin("csv_column_median_v1", {"measurement": "2.000000000000000000"}, name="fine.json")
+        self.assertEqual(OPS["replay"](self.root, fine)["status"], "MATCH")
+        (self.root / "over.csv").write_text("measurement\n999999999999999999\n999999999999999999\n", encoding="utf-8")
+        for name, operation, value, data in (("sum", "csv_column_sum_v1", "1999999999999999998", "over.csv"),
+                                             ("fraction", "csv_column_median_v1", "2.0000000000000000000", "data.csv")):
+            with self.subTest(case=name), self.assertRaisesRegex(ValueError, "PINNED_CONTENT_INVALID"):
+                self.pin(operation, {"measurement": value}, data=data, name="over-%s.json" % name)
+
     def test_declaration_and_reference_strictness(self):
         (self.root / "one.csv").write_text("measurement\n2.5\n", encoding="utf-8")
         total, grouped = EXPECTED["csv_column_sum_v1"], EXPECTED["csv_grouped_mean_v1"]

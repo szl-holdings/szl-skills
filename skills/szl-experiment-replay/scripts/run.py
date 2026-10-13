@@ -13,7 +13,7 @@ ENGINE = runpy.run_path(str(pathlib.Path(__file__).resolve().parent / "engine.py
 V2 = ("szl.experiment-replay.declaration.v2", "szl.experiment-replay.pin.v2")
 
 
-def _engine(document):  # v2 documents use the separately pinned engine_ops.py
+def _engine(document):
     if not isinstance(document, dict) or document.get("schema") not in V2:
         return ENGINE
     try:
