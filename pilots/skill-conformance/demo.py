@@ -8,7 +8,7 @@ import pathlib
 import shutil
 import tempfile
 
-PILOT = pathlib.Path(__file__).resolve().parent / "szl-skill-conformance"
+PILOT = pathlib.Path(__file__).resolve().parents[2] / "skills" / "szl-skill-conformance"
 spec = importlib.util.spec_from_file_location("conformance_demo", PILOT / "kernel.py")
 kernel = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kernel)

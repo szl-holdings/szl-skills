@@ -339,7 +339,8 @@ class PackagingTests(unittest.TestCase):
                                               "szl-science-rare-disease-replay-skills",
                                               "szl-paper-evidence-skills", "szl-science-assay-skills",
                                               "szl-science-multiplicity-skills", "szl-science-change-impact-skills",
-                                              "szl-science-uncertainty-skills", "szl-science-reporting-skills"}
+                                              "szl-science-uncertainty-skills", "szl-science-reporting-skills",
+                                              "szl-science-sharing-skills"}
                         for path in plugin["skills"]}
             self.assertEqual({report["skill"] for report in reports}, expected)
             for report in reports:
@@ -470,6 +471,18 @@ class PackagingTests(unittest.TestCase):
                         self.assertEqual(mapped["visual_confirmation"], "NOT_PERFORMED")
                         self.assertEqual(len(mapped["items"]), 42)
                         self.assertFalse((unpacked / "kernel.py").exists())
+                        continue
+                    if report["skill"] == "szl-skill-conformance":
+                        checked = subprocess.run(
+                            [sys.executable, "-I", "-B", str(unpacked / "scripts" / "run.py"),
+                             "--source", str(unpacked)],
+                            capture_output=True, text=True,
+                        )
+                        self.assertEqual(checked.returncode, 2, checked.stdout + checked.stderr)
+                        outcome = json.loads(checked.stdout)
+                        self.assertEqual(outcome["offline_conformance"], "INCOMPLETE")
+                        self.assertEqual(outcome["actual_host_invocation"], "NOT_VERIFIED")
+                        self.assertEqual(outcome["scientific_result_validity"], "NOT_EVALUATED")
                         continue
                     if report["skill"] == "szl-measurement-harmonizer":
                         self.assertTrue((unpacked / "scripts" / "harmonizer.py").is_file())

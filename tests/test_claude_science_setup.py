@@ -159,7 +159,7 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn("szl-rare-disease-evidence-map", SETUP["family_names"]("all"))
         self.assertIn("szl-rare-disease-evidence-replay", SETUP["family_names"]("all"))
 
-    def test_ten_bounded_families_attach_all_tools_without_replacing_profile(self):
+    def test_eleven_bounded_families_attach_all_tools_without_replacing_profile(self):
         design = SETUP["bundle"](ROOT, family="design")
         replay = SETUP["bundle"](ROOT, family="replay")
         rare_replay = SETUP["bundle"](ROOT, family="rare-disease-replay")
@@ -169,6 +169,7 @@ class SetupTests(unittest.TestCase):
         multiplicity = SETUP["bundle"](ROOT, family="multiplicity")
         uncertainty = SETUP["bundle"](ROOT, family="uncertainty")
         reporting = SETUP["bundle"](ROOT, family="reporting")
+        sharing = SETUP["bundle"](ROOT, family="sharing")
         self.assertEqual(set(design), {"szl-experiment-contract"})
         self.assertEqual(set(replay), {"szl-experiment-replay", "szl-figure-data-contract", "szl-measurement-harmonizer"})
         self.assertEqual(set(rare_replay), {"szl-rare-disease-evidence-replay"})
@@ -179,11 +180,13 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(set(uncertainty), {"szl-uncertainty-lineage"})
         self.assertEqual(set(reporting), {"szl-reporting-guideline-audit"})
         self.assertNotIn("kernel.py", reporting["szl-reporting-guideline-audit"])
+        self.assertEqual(set(sharing), {"szl-skill-conformance"})
+        self.assertIn("scripts/run.py", sharing["szl-skill-conformance"])
         for family, resources in (("design", design), ("replay", replay),
                                   ("rare-disease-replay", rare_replay), ("paper", paper),
                                   ("assay", assay), ("multiplicity", multiplicity),
                                   ("change", change), ("uncertainty", uncertainty),
-                                  ("reporting", reporting)):
+                                  ("reporting", reporting), ("sharing", sharing)):
             self.assertLessEqual(sum(map(resource_bytes, resources.values())), SETUP["MAX_BATCH_BYTES"])
             self.assertEqual(SETUP["bundle_batches"](ROOT, family=family), [resources])
         SETUP["install"](self.host, self.resources, self.path, family="core")
@@ -203,13 +206,16 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(uncertainty_result["family"], "uncertainty")
         reporting_result = SETUP["install"](self.host, reporting, self.path.with_name("reporting.json"), family="reporting")
         self.assertEqual(reporting_result["family"], "reporting")
+        sharing_result = SETUP["install"](self.host, sharing, self.path.with_name("sharing.json"), family="sharing")
+        self.assertEqual(sharing_result["family"], "sharing")
+        self.assertEqual(sharing_result["runtime_task_evaluation"], "NOT_EXECUTED")
         result = SETUP["install"](self.host, change, self.path.with_name("change.json"), family="change")
         self.assertEqual(set(result["agent"]["skillNames"]),
                          set(SETUP["NAMES"] + SETUP["DESIGN_NAMES"] + SETUP["REPLAY_NAMES"] +
                              SETUP["RARE_DISEASE_REPLAY_NAMES"] + SETUP["PAPER_NAMES"] +
                              SETUP["ASSAY_NAMES"] + SETUP["MULTIPLICITY_NAMES"] +
                              SETUP["CHANGE_NAMES"] + SETUP["UNCERTAINTY_NAMES"] +
-                             SETUP["REPORTING_NAMES"]))
+                             SETUP["REPORTING_NAMES"] + SETUP["SHARING_NAMES"]))
         self.assertEqual(result["family"], "change")
         self.assertEqual(result["skills"]["szl-research-change-impact"]["sidecar_gate"]["ok"], True)
         self.assertFalse(result["agent"]["unrestricted"])
@@ -255,6 +261,8 @@ class SetupTests(unittest.TestCase):
             SETUP["install"](self.host, {}, self.path, family="assay")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {}, self.path, family="change")
+        with self.assertRaises(ValueError):
+            SETUP["install"](self.host, {}, self.path, family="sharing")
         with self.assertRaises(ValueError):
             SETUP["install"](self.host, {"szl-research-change-impact": {"huge": "x" * 1000001}}, self.path, family="change")
         with self.assertRaises(ValueError):

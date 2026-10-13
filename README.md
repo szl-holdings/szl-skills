@@ -14,19 +14,19 @@
 <!-- /szl:header -->
 
 Executable checks that make scientific claims carry their evidence. This source tree
-contains forty-one skills for Claude Science, Claude Code and claude.ai: thirty-eight science
+contains forty-two skills for Claude Science, Claude Code and claude.ai: thirty-nine science
 tools and three evidence skills. They use the Python standard library and report what they did not
 verify. Normal checks are offline. Repository pins also use local Git; optional session-receipt
 signing requires szl-receipt-dsse. The TypeSafe evidence skill declares its separate optional
 service and credential requirements below.
 
-The science tools have ten import families: twenty-seven core checks, one prospective experiment
+The science tools have eleven import families: twenty-seven core checks, one prospective experiment
 draft, three bounded replay checks, one separate synthetic rare-disease evidence replay,
 one paper evidence audit, one declared assay-run audit,
 one multiplicity audit, one research change-impact check, one uncertainty-lineage check and
-one reporting-guideline map. The SDK stages the complete selection
+one reporting-guideline map and one skill-sharing evidence check. The SDK stages the complete selection
 in at most eight batches of at most 1 MB each, with a 200 KB limit per skill including its license
-and notice. These are local staging bounds, not measured application import limits. All ten
+and notice. These are local staging bounds, not measured application import limits. All eleven
 families can attach to the same specialist. The stable v0.4.0 tag retains its original
 twenty-three-tool science scope.
 
@@ -60,8 +60,9 @@ The stable v0.4.0 tag retains twenty-three science tools and two evidence skills
 The fixed rc.3 source snapshot contains older marketplace metadata and historical
 CHANGELOG counts, as disclosed in its release notes; use its source revision and
 manifest rather than a version string to identify the published bytes.
-The measurement-harmonizer, synthetic rare-disease evidence-replay and synthetic
-rare-disease evidence-map skills are unreleased source candidates on this branch.
+The measurement-harmonizer, synthetic rare-disease evidence-replay, synthetic
+rare-disease evidence-map and skill-conformance skills are unreleased source candidates
+on this branch.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
@@ -91,6 +92,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | catch a scientific decision flip after a numerically close optimization | szl-outcome-preservation | complete-cohort regressions, inactive modes and withheld performance ratios |
 | trace source identity through a wheel, Hub artifact and runtime | szl-release-continuity | missing bindings, conflicts and refused readiness |
 | review a local skill package update before relying on its new bytes | szl-skill-update-review | added and changed skills, declarations, and evidence or tests to rerun |
+| check retained evidence after sharing a scientific skill | szl-skill-conformance | source/export byte consistency and declared positive/irrelevant trials; host invocation stays NOT_VERIFIED |
 | see which conclusions need reassessment when a dependency disappears | szl-research-change-impact | retained before/after graph impact, missing required claims and deterministic recheck order |
 | see how corrected measurements and declared correlation change uncertainty | szl-uncertainty-lineage | local Jacobian, signed covariance contributions, standard uncertainty and retained input ancestry |
 
@@ -132,12 +134,13 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-outcome-preservation | Did optimization preserve scientific decisions on every declared case? | Supplied measurements only; not GPU or scientific qualification |
 | szl-release-continuity | Do registry artifacts and runtime bind to the intended source? | Supplied identity comparison; not attestation verification or release authority |
 | szl-skill-update-review | What changed between two locally pinned skill packages, and which evidence or tests need another run? | Offline byte and declaration comparison; not safety, approval or scientific validity |
+| szl-skill-conformance | Do retained source/export bytes and positive/irrelevant task records agree? | Supplied records only; actual host invocation stays NOT_VERIFIED and scientific validity stays NOT_EVALUATED |
 | szl-research-change-impact | Which conclusions still need review after a research dependency changes or disappears? | Uses declared retained graphs and supplied digests; does not verify scientific truth |
 | szl-uncertainty-lineage | How does uncertainty propagate through a declared arithmetic graph? | First-order local approximation; input validity, units and distribution coverage require separate checks |
 | szl-science-workbench | Nine integrated core checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
 
-Each science skill ships `SKILL.md`, a `kernel.py` or CLI, synthetic fixtures under `assets/`, a contract
-under `references/` where the input format is non-trivial, and tests in `tests/`. The workbench
+Each science skill ships `SKILL.md`, a `kernel.py` or CLI, relevant fixtures under `assets/` where needed,
+a contract under `references/` where the input format is non-trivial, and tests in `tests/`. The workbench
 bundles its own copies of the check implementations (`tools/sync_workbench.py --check` keeps them
 identical to the reviewed originals).
 

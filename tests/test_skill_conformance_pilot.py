@@ -1,4 +1,4 @@
-"""Offline pilot tests. Fixtures do not prove actual Claude Science invocation."""
+"""Offline conformance tests. Fixtures do not prove actual Claude Science invocation."""
 import copy
 import hashlib
 import importlib.util
@@ -11,7 +11,7 @@ import tempfile
 from unittest import TestCase, main, mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-PILOT = ROOT / "pilots/skill-conformance/szl-skill-conformance"
+PILOT = ROOT / "skills/szl-skill-conformance"
 spec = importlib.util.spec_from_file_location("skill_conformance_pilot", PILOT / "kernel.py")
 kernel = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kernel)
