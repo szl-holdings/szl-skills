@@ -51,13 +51,13 @@ def write_zip(path, members, compression=zipfile.ZIP_STORED):
                 archive.writestr(info, data)
 
 
-def set_central_field(path, name, offset, fmt, value):
+def set_central_field(path, name, offset, fmt, *values):
     """Patch one field of NAME's central-directory record (zipfile resets some fields when writing)."""
     raw, encoded = bytearray(path.read_bytes()), name.encode()
     start = raw.find(b"PK\x01\x02")
     while start >= 0:
         if raw[start + 46:start + 46 + struct.unpack_from("<H", raw, start + 28)[0]] == encoded:
-            struct.pack_into(fmt, raw, start + offset, value)
+            struct.pack_into(fmt, raw, start + offset, *values)
             path.write_bytes(bytes(raw))
             return
         start = raw.find(b"PK\x01\x02", start + 4)
@@ -178,10 +178,13 @@ class CapsulePackTests(unittest.TestCase):
         self.assertEqual(report["status"], "REFUSED")
         self.assertFalse((self.base / "reserved.zip").exists())
         for name in ("aux.txt", "data/NUL", "com1.log", "trail.", "space ", "q?.txt", 'a"b', "a|b", "LONGRE~1.TXT",
-                     "data~2/x.csv"):
+                     "data~2/x.csv", "com0", "COM\u00b9.txt", "lpt\u00b2", "LPT\u00b3.log", "CONIN$", "conout$.txt",
+                     "Conin$ .x", "a" * 252 + ".txt", "\u30c7" * 86, "data/" + "\u30c7" * 200 + ".txt"):
             with self.subTest(name=name):
                 self.assertIsNotNone(self.mod["name_problem"](name))
-        for name in ("data/input.csv", "auxiliary.txt", "notes.v2.txt", "backup~.txt", "a~b.txt"):
+        # Segments of at most 255 UTF-8 bytes (Linux NAME_MAX; never more than 255 UTF-16 units on Windows).
+        for name in ("data/input.csv", "auxiliary.txt", "notes.v2.txt", "backup~.txt", "a~b.txt", "com10.txt",
+                     "conin.txt", "console.log", "lpt$.txt", "a" * 251 + ".txt", "\u30c7" * 85, "d/" + "e" * 255):
             with self.subTest(name=name):
                 self.assertIsNone(self.mod["name_problem"](name))
 
@@ -192,7 +195,8 @@ class CapsulePackTests(unittest.TestCase):
         cases = {"device": ["aux.txt"], "trailing-dot": ["trail."], "short-name": ["LONGRE~1.TXT"],
                  "case": ["result.txt", "RESULT.txt"], "dot-alias": ["result.txt", "result.txt."],
                  "file-directory": ["Data/x.txt", "data"], "reserved": ["Capsule.JSON"],
-                 "under-reserved": ["capsule.json/x.txt"]}
+                 "under-reserved": ["capsule.json/x.txt"], "superscript-device": ["COM\u00b9.txt"],
+                 "console": ["data/CONOUT$"], "long-segment": ["\u30c7" * 200 + ".txt"]}
         for label, paths in cases.items():
             with self.subTest(label=label):
                 output = self.base / (label + ".zip")
@@ -250,7 +254,9 @@ class CapsulePackTests(unittest.TestCase):
     def test_zip_slip_and_unsafe_member_names_are_refused_before_writing(self):
         unsafe = ["../escape.txt", "data/../../escape.txt", "/absolute.txt", "C:/drive.txt", "C:drive.txt",
                   "data\\..\\..\\escape.txt", "a\\b.txt", "./result.txt", "data//input.csv", "data/",
-                  "nul\x00.txt", "aux.txt", "trail.", ".env", "q?.txt"]
+                  "nul\x00.txt", "aux.txt", "trail.", ".env", "q?.txt",
+                  # zipfile cuts names at NUL on every host; only the renamed-by-decoding check refuses these.
+                  "result.txt\x00.sh", "x\x00.txt", "LPT\u00b3.log", "conin$", "a" * 252 + ".txt"]
         for index, name in enumerate(unsafe):
             with self.subTest(name=name):
                 archive = self.base / ("slip%d.zip" % index)
@@ -314,7 +320,9 @@ class CapsulePackTests(unittest.TestCase):
         cases = {"case": ["result.txt", "RESULT.txt"], "dot-alias": ["result.txt", "result.txt."],
                  "short-name": ["result.txt", "RESULT~1.TXT"], "traversal": ["../escape.txt"],
                  "device": ["result.txt", "aux.txt"], "file-directory": ["result.txt", "Result.txt/x"],
-                 "reserved": ["result.txt", "capsule.json"], "reserved-case": ["result.txt", "Capsule.JSON"]}
+                 "reserved": ["result.txt", "capsule.json"], "reserved-case": ["result.txt", "Capsule.JSON"],
+                 "superscript-device": ["result.txt", "com\u00b2.txt"], "console": ["result.txt", "CONIN$"],
+                 "long-segment": ["result.txt", "\u30c7" * 200 + ".txt"]}
         for label, paths in cases.items():
             with self.subTest(label=label):
                 archive = self.base / ("declared-%s.zip" % label)
@@ -339,6 +347,31 @@ class CapsulePackTests(unittest.TestCase):
                                                    "encrypted, unsupported or non-regular")
         write_zip(self.base / "plain.zip", members)  # the same members without the patch restore cleanly
         self.assertEqual(self.unpack(self.base / "plain.zip", "plain")[1]["status"], "MATCH")
+
+    def test_zip64_offset_overflow_and_unreadable_members_are_refused_before_writing(self):
+        # A ZIP64 header offset of 2**63 or more makes zipfile's seek raise OverflowError, and a bad
+        # CRC raises only when the member is read. Both must give a JSON REFUSED report, no traceback
+        # and no destination, also when the member is a declared file (not only capsule.json).
+        members = sorted(self.contents.items()) + [("capsule.json", self.embedded())]
+        cases = [(target, offset) for target in ("capsule.json", "result.txt") for offset in (2**63 + 5, 2**64 - 2)]
+        for index, (target, offset) in enumerate(cases + [("result.txt", None)]):
+            with self.subTest(target=target, offset=offset):
+                archive, dest = self.base / ("unreadable%d.zip" % index), self.base / ("unreadable%d" % index)
+                with zipfile.ZipFile(archive, "w") as out:
+                    for name, data in members:
+                        info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+                        info.extra = struct.pack("<HHQ", 0xCAFE, 8, 0) if name == target else b""
+                        out.writestr(info, data)
+                if offset is None:
+                    set_central_field(archive, target, 16, "<I", 0)  # CRC-32 that no data matches
+                else:  # header offset 0xFFFFFFFF defers to the ZIP64 extra (tag 1) that replaces the placeholder
+                    set_central_field(archive, target, 42, "<I", 0xFFFFFFFF)
+                    set_central_field(archive, target, 46 + len(target), "<HHQ", 1, 8, offset)
+                code, out, err = cli(PACK, "unpack-verify", archive, "--dest", dest)
+                self.assertEqual(err, b"")
+                report = json.loads(out)
+                self.assertEqual((code, report["status"], report["destination_created"]), (1, "REFUSED", False), report)
+                self.assertFalse(dest.exists())
 
     def test_member_count_total_and_archive_size_limits(self):
         members = sorted(self.contents.items()) + [("capsule.json", self.embedded())]

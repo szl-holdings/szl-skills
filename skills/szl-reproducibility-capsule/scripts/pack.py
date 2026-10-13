@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Original 2026-10-06 SZL contribution (base b8e259c); see references/provenance.md.
 """Deterministic capsule ZIP pack and fail-closed unpack-verify; nothing is executed.
-Exit 0 MATCH, 1 MISMATCH/EXTRA_MEMBERS/REFUSED, 2 usage or strict-JSON input error."""
-import argparse, hashlib, io, json, math, pathlib, re, runpy, stat, sys, zipfile, zlib
+Exit 0 MATCH, 1 MISMATCH/EXTRA_MEMBERS/REFUSED, 2 usage or strict-JSON input error.
+Non-usage failures are REFUSED reports, never tracebacks."""
+import argparse, hashlib, io, json, math, pathlib, re, runpy, stat, sys, zipfile
 
 K = runpy.run_path(str(pathlib.Path(__file__).resolve().parents[1] / "kernel.py"))
 EMBED, MIB, INPUT = "capsule.json", 1 << 20, "Strict JSON input: "
-UNPORTABLE = re.compile(r'(?i)[<>"|?*]|~\d|[. ]$|^(con|prn|aux|nul|com\d|lpt\d) *(\.|$)')  # per segment; ~N: 8.3 alias
-FAIL = (ValueError, TypeError, KeyError, OSError, RuntimeError, EOFError, zipfile.BadZipFile, zlib.error)
+UNPORTABLE = re.compile(r'(?i)[<>"|?*]|~\d|[. ]$|^(con(in\$|out\$)?|prn|aux|nul|(com|lpt)[\d²³¹]) *(\.|$)')  # ~N: 8.3
 
 
 def strict_json(raw):
@@ -35,7 +35,7 @@ def name_problem(name):
         K["szl_capsule_path"](name)
     except (ValueError, TypeError) as error:
         return str(error)
-    return "Not portable to Windows" if any(UNPORTABLE.search(part) for part in name.split("/")) else None
+    return "Not portable" if any(UNPORTABLE.search(part) or len(part.encode()) > 255 for part in name.split("/")) else None
 
 
 def check_paths(paths, label):
@@ -80,7 +80,7 @@ def pack(capsule, root, output):
             raise ValueError("Embedded capsule over 1 MiB or archive over 34 MiB")
         with out.open("xb") as target:
             target.write(buffer.getvalue())
-    except FAIL as error:
+    except Exception as error:
         return report("pack", "REFUSED", str(error), verification=verdict)
     return report("pack", "MATCH", archive_sha256=hashlib.sha256(buffer.getvalue()).hexdigest(),
                   members=sorted(members), verification=verdict)
@@ -110,27 +110,28 @@ def unpack_verify(path, dest):
             if info.file_size > (MIB if name == EMBED else 8 * MIB) or total > 33 * MIB or count > 129:
                 raise ValueError("Oversize member, total or count at %r" % name)
         check_paths(archive.namelist(), "Member")
-        infos = {info.filename: info for info in archive.infolist()}
-        if EMBED not in infos:
+        names = set(archive.namelist())
+        if EMBED not in names:
             raise ValueError("Missing " + EMBED)
-        capsule = strict_json(archive.read(infos[EMBED]))  # bounded by checked header sizes
+        capsule = strict_json(archive.read(EMBED))  # bounded by checked header sizes
         pre = K["szl_verify_capsule"](str(dest), capsule)  # dest absent: structure and self-digest only
         if pre["integrity"] == "MANIFEST_CHANGED":
             return done("MISMATCH", "Embedded capsule self-digest disagrees", verification=pre)
         declared = [entry["path"] for entry in capsule["files"]]
         check_paths(declared + [EMBED], "Declared path")
-        extras = sorted(set(infos) - set(declared) - {EMBED})
+        data = {name: archive.read(name) for name in names.intersection(declared)}
+        extras = sorted(names - set(data) - {EMBED})
         dest.mkdir()
         state["destination_created"] = True
-        for name in sorted(set(declared) & set(infos)):
+        for name in sorted(data):
             target = dest.joinpath(*name.split("/"))
             target.parent.mkdir(parents=True, exist_ok=True)
             if not target.parent.resolve().is_relative_to(dest.resolve()):
                 raise ValueError("Member escapes destination: " + name)
             with target.open("xb") as handle:
-                handle.write(archive.read(infos[name]))
+                handle.write(data[name])
         verdict = K["szl_verify_capsule"](str(dest), capsule)
-    except FAIL as error:
+    except Exception as error:
         return done("REFUSED", str(error))
     status = "MISMATCH" if verdict["integrity"] != "MATCH" else "EXTRA_MEMBERS" if extras else "MATCH"
     return done(status, extra_members=extras, verification=verdict)
