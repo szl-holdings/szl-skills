@@ -44,7 +44,7 @@ optional signing path).
 ## Pack and unpack-verify
 
 ```bash
-python scripts/pack.py pack assets/pack-match.json --root . --output capsule.zip
+python scripts/pack.py pack assets/pack-match.json --output capsule.zip
 python scripts/pack.py unpack-verify capsule.zip --dest restored
 ```
 
@@ -58,4 +58,4 @@ Never executes argv or source, installs dependencies, launches processes, applie
 comparisons to outputs, or inspects file contents for secrets (credential-name guards look at names).
 Limits: 128 files, 8 MiB per file, 32 MiB total. It cannot prove source safety, enforce a sandbox or
 verify preregistration. Hashes are not signatures; readiness is not reproduction.
-A ZIP is not a signature or sandbox; unpack-verify never executes member contents.
+A ZIP is not a signature or sandbox.

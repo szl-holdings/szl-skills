@@ -29,9 +29,10 @@
   distinction between package verification, host registration and scientific use.
 - Add `scripts/pack.py` to szl-reproducibility-capsule: pack a capsule that verifies MATCH
   into a deterministic stored ZIP with an embedded capsule.json, and unpack-verify one into
-  a new directory as MATCH, MISMATCH, EXTRA_MEMBERS or REFUSED (unsafe names and oversize
-  members are refused before writing). `kernel.py` and the workbench mirror are unchanged;
-  a ZIP is not a signature and nothing is executed.
+  a new directory as MATCH, MISMATCH, EXTRA_MEMBERS or REFUSED. Both directions apply one
+  path rule (safe, Windows-portable, distinct ignoring case) to member names and declared
+  paths, and unsafe or oversize archives are refused before writing. `kernel.py` and the
+  workbench mirror are unchanged; a ZIP is not a signature and nothing is executed.
 
 ## 0.5.0-rc.3
 

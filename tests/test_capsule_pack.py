@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 import hashlib
 import json
+import os
 import pathlib
 import runpy
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -23,16 +25,18 @@ MAIN_REPORTS = {
     "replay-example.json": ("d3e37a8a26f56c1d036fb917189348758596a417c55dd96eada9baaf5058b4e6",
                             "03ee46bf9d237256f7b6dca8ee83e4e46f3bdf3bd211569fc06df547191e4b9b"),
 }
-# Archive of assets/pack-match.json; measured identical on CPython 3.12 Windows and Linux zipfile.
-PACK_MATCH_ARCHIVE_SHA256 = "01ad5cec7a248d3bb80da2bab84ba17fa5a8934176e83971f9b408dbc0a2d4a2"
+# Archive of assets/pack-match.json (compact embedded capsule.json); measured identical with
+# CPython 3.12.10 and 3.11.9 on Windows and CPython 3.12.3 on Ubuntu (WSL).
+PACK_MATCH_ARCHIVE_SHA256 = "12ed91e91cfcee64c1bba38d04203f64703953e9ded7288a17b9bd31b12b2502"
+MIB = 1 << 20
 
 
-def cli(*args, cwd=None):
-    process = subprocess.run([sys.executable, "-B", *map(str, args)], capture_output=True, cwd=cwd)
+def cli(*args, cwd=None, env=None):
+    process = subprocess.run([sys.executable, "-B", *map(str, args)], capture_output=True, cwd=cwd, env=env)
     return process.returncode, process.stdout.replace(b"\r\n", b"\n"), process.stderr
 
 
-def write_zip(path, members):
+def write_zip(path, members, compression=zipfile.ZIP_STORED):
     """Write members as (name, data[, external_mode]) with raw, unsanitized names."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -43,7 +47,21 @@ def write_zip(path, members):
                 info.filename = name
                 info.create_system = 3
                 info.external_attr = (item[2] if len(item) > 2 else 0o100644) << 16
+                info.compress_type = compression
                 archive.writestr(info, data)
+
+
+def set_central_field(path, name, offset, fmt, value):
+    """Patch one field of NAME's central-directory record (zipfile resets some fields when writing)."""
+    raw, encoded = bytearray(path.read_bytes()), name.encode()
+    start = raw.find(b"PK\x01\x02")
+    while start >= 0:
+        if raw[start + 46:start + 46 + struct.unpack_from("<H", raw, start + 28)[0]] == encoded:
+            struct.pack_into(fmt, raw, start + offset, value)
+            path.write_bytes(bytes(raw))
+            return
+        start = raw.find(b"PK\x01\x02", start + 4)
+    raise AssertionError("central record not found: " + name)
 
 
 class CapsulePackTests(unittest.TestCase):
@@ -73,7 +91,23 @@ class CapsulePackTests(unittest.TestCase):
         return code, json.loads(out), self.base / dest
 
     def embedded(self, capsule=None):
-        return (json.dumps(capsule or self.capsule, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode()
+        text = json.dumps(capsule or self.capsule, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+        return (text + "\n").encode()
+
+    def forged(self, paths, data=b"SYNTHETIC result\n", **fields):
+        """A capsule with a valid self-digest that szl_make_capsule would never produce."""
+        body = dict({key: value for key, value in self.capsule.items() if key != "capsule_sha256"}, **fields)
+        body["files"] = [{"path": path, "size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                         for path in paths]
+        return dict(body, capsule_sha256=self.kernel["szl_capsule_digest"](body))
+
+    def assert_refused_before_writing(self, archive, dest, fragment=None):
+        code, report, dest = self.unpack(archive, dest)
+        self.assertEqual((code, report["status"], report["destination_created"]), (1, "REFUSED", False), report)
+        self.assertFalse(dest.exists())
+        if fragment:
+            self.assertIn(fragment, report["reason"])
+        return report
 
     def test_pack_twice_is_byte_identical_with_fixed_member_metadata(self):
         code, first, a = self.pack("a.zip")
@@ -143,15 +177,33 @@ class CapsulePackTests(unittest.TestCase):
         report = self.mod["pack"](capsule, self.root, self.base / "reserved.zip")
         self.assertEqual(report["status"], "REFUSED")
         self.assertFalse((self.base / "reserved.zip").exists())
-        for name in ("aux.txt", "data/NUL", "com1.log", "trail.", "space ", "q?.txt", 'a"b', "a|b"):
+        for name in ("aux.txt", "data/NUL", "com1.log", "trail.", "space ", "q?.txt", 'a"b', "a|b", "LONGRE~1.TXT",
+                     "data~2/x.csv"):
             with self.subTest(name=name):
                 self.assertIsNotNone(self.mod["name_problem"](name))
-        for name in ("data/input.csv", "auxiliary.txt", "notes.v2.txt"):
+        for name in ("data/input.csv", "auxiliary.txt", "notes.v2.txt", "backup~.txt", "a~b.txt"):
             with self.subTest(name=name):
                 self.assertIsNone(self.mod["name_problem"](name))
 
+    def test_pack_applies_portability_and_collision_rules_to_declared_paths(self):
+        # Verification is stubbed to MATCH so the path rules run on every host, including Windows,
+        # where files such as aux.txt or trail. cannot be created to begin with.
+        self.kernel["szl_verify_capsule"] = lambda root, capsule: {"integrity": "MATCH"}
+        cases = {"device": ["aux.txt"], "trailing-dot": ["trail."], "short-name": ["LONGRE~1.TXT"],
+                 "case": ["result.txt", "RESULT.txt"], "dot-alias": ["result.txt", "result.txt."],
+                 "file-directory": ["Data/x.txt", "data"], "reserved": ["Capsule.JSON"],
+                 "under-reserved": ["capsule.json/x.txt"]}
+        for label, paths in cases.items():
+            with self.subTest(label=label):
+                output = self.base / (label + ".zip")
+                report = self.mod["pack"](self.forged(paths), self.root, output)
+                self.assertEqual(report["status"], "REFUSED")
+                self.assertTrue(report["reason"].startswith("Path "), report["reason"])
+                self.assertFalse(output.exists())
+
     def test_pack_input_rejects_duplicate_keys_nonfinite_and_non_objects_with_exit_2(self):
-        for text in ('{"schema": "a", "schema": "b"}', '{"files": NaN}', '{"files": Infinity}', "[]", "{"):
+        for text in ('{"schema": "a", "schema": "b"}', '{"files": NaN}', '{"files": Infinity}', '{"files": -Infinity}',
+                     '{"metadata": {"x": 1e400}}', '{"metadata": {"x": -1E+999}}', "[]", "{"):
             with self.subTest(text=text):
                 self.capsule_path.write_text(text, encoding="utf-8")
                 code, report, output = self.pack("strict.zip")
@@ -214,6 +266,10 @@ class CapsulePackTests(unittest.TestCase):
             "duplicate": [("capsule.json", self.embedded()), ("result.txt", b"a"), ("result.txt", b"b")],
             "case": [("capsule.json", self.embedded()), ("result.txt", b"a"), ("RESULT.txt", b"b")],
             "embedded-case": [("capsule.json", self.embedded()), ("Capsule.JSON", b"{}")],
+            "under-embedded": [("capsule.json", self.embedded()), ("capsule.json/x.txt", b"a")],
+            "file-directory": [("capsule.json", self.embedded()), ("Data/x.txt", b"a"), ("data", b"b")],
+            "file-directory-exact": [("capsule.json", self.embedded()), ("data", b"b"), ("data/x.txt", b"a")],
+            "short-name": [("capsule.json", self.embedded()), ("LONGRE~1.TXT", b"a")],
             "symlink": [("capsule.json", self.embedded()), ("result.txt", b"/etc/passwd", stat.S_IFLNK | 0o777)],
             "directory": [("capsule.json", self.embedded()), ("result.txt", b"", stat.S_IFDIR | 0o755)],
             "missing-capsule": [("result.txt", self.contents["result.txt"])],
@@ -221,9 +277,7 @@ class CapsulePackTests(unittest.TestCase):
         for label, members in cases.items():
             with self.subTest(label=label):
                 write_zip(self.base / (label + ".zip"), members)
-                code, report, dest = self.unpack(self.base / (label + ".zip"), label)
-                self.assertEqual((code, report["status"]), (1, "REFUSED"))
-                self.assertFalse(dest.exists())
+                self.assert_refused_before_writing(self.base / (label + ".zip"), label)
         with zipfile.ZipFile(self.base / "big.zip", "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("capsule.json", self.embedded())
             archive.writestr("result.txt", bytes(8 * 1024 * 1024 + 1))
@@ -237,7 +291,8 @@ class CapsulePackTests(unittest.TestCase):
                 self.assertFalse(dest.exists())
 
     def test_embedded_capsule_is_strict_and_self_digest_bound(self):
-        for label, text in (("dup", b'{"schema": 1, "schema": 2}'), ("nan", b'{"files": NaN}')):
+        for label, text in (("dup", b'{"schema": 1, "schema": 2}'), ("nan", b'{"files": NaN}'),
+                            ("overflow", b'{"metadata": {"x": 1e400}}')):
             with self.subTest(label=label):
                 write_zip(self.base / (label + ".zip"), [("capsule.json", text)])
                 code, report, dest = self.unpack(self.base / (label + ".zip"), label)
@@ -252,6 +307,98 @@ class CapsulePackTests(unittest.TestCase):
         code, report, dest = self.unpack(self.base / "not-a-zip.zip", "not-a-zip")
         self.assertEqual((code, report["status"]), (1, "REFUSED"))
         self.assertFalse(dest.exists())
+
+    def test_unpack_applies_pack_path_rules_to_declared_paths_before_writing(self):
+        # One member can satisfy two declared paths on Windows (case folding, trailing-dot stripping,
+        # 8.3 short names) while Linux reports MISSING; such manifests are refused on every host.
+        cases = {"case": ["result.txt", "RESULT.txt"], "dot-alias": ["result.txt", "result.txt."],
+                 "short-name": ["result.txt", "RESULT~1.TXT"], "traversal": ["../escape.txt"],
+                 "device": ["result.txt", "aux.txt"], "file-directory": ["result.txt", "Result.txt/x"],
+                 "reserved": ["result.txt", "capsule.json"], "reserved-case": ["result.txt", "Capsule.JSON"]}
+        for label, paths in cases.items():
+            with self.subTest(label=label):
+                archive = self.base / ("declared-%s.zip" % label)
+                capsule = self.forged(paths)
+                self.assertEqual(self.kernel["szl_verify_capsule"](str(self.base / "absent"), capsule)["integrity"],
+                                 "MISMATCH")  # well-formed with a valid self-digest; only the path rules refuse it
+                write_zip(archive, [("capsule.json", self.embedded(capsule)), ("result.txt", b"SYNTHETIC result\n")])
+                report = self.assert_refused_before_writing(archive, "declared-" + label, "Declared path ")
+                self.assertEqual(report["archive_sha256"], hashlib.sha256(archive.read_bytes()).hexdigest())
+        self.assertFalse((self.base / "escape.txt").exists())
+
+    def test_encrypted_unsupported_and_directory_attribute_members_are_refused(self):
+        members = sorted(self.contents.items()) + [("capsule.json", self.embedded())]
+        write_zip(self.base / "encrypted.zip", members)
+        set_central_field(self.base / "encrypted.zip", "result.txt", 8, "<H", 0x1)
+        write_zip(self.base / "bzip2.zip", members, compression=zipfile.ZIP_BZIP2)
+        write_zip(self.base / "dos-directory.zip", members)
+        set_central_field(self.base / "dos-directory.zip", "result.txt", 38, "<I", 0x10)  # external attributes
+        for label in ("encrypted", "bzip2", "dos-directory"):
+            with self.subTest(label=label):
+                self.assert_refused_before_writing(self.base / (label + ".zip"), label,
+                                                   "encrypted, unsupported or non-regular")
+        write_zip(self.base / "plain.zip", members)  # the same members without the patch restore cleanly
+        self.assertEqual(self.unpack(self.base / "plain.zip", "plain")[1]["status"], "MATCH")
+
+    def test_member_count_total_and_archive_size_limits(self):
+        members = sorted(self.contents.items()) + [("capsule.json", self.embedded())]
+        extras = [("extra/%03d.txt" % index, b"x") for index in range(125)]  # 129 members in all
+        write_zip(self.base / "count-129.zip", members + extras)
+        code, report, _ = self.unpack(self.base / "count-129.zip", "count-129")
+        self.assertEqual((code, report["status"], len(report["extra_members"])), (1, "EXTRA_MEMBERS", 125))
+        write_zip(self.base / "count-130.zip", members + extras + [("extra/125.txt", b"x")])
+        self.assert_refused_before_writing(self.base / "count-130.zip", "count-130", "Oversize")
+        zeros = bytes(8 * MIB)  # each member is within 8 MiB; together they exceed 33 MiB
+        write_zip(self.base / "total.zip", members + [("big/%d.bin" % index, zeros) for index in range(5)],
+                  compression=zipfile.ZIP_DEFLATED)
+        self.assertLess((self.base / "total.zip").stat().st_size, MIB)
+        self.assert_refused_before_writing(self.base / "total.zip", "total", "Oversize")
+        with open(self.base / "huge.zip", "wb") as handle:
+            handle.truncate(34 * MIB + 1)
+        report = self.assert_refused_before_writing(self.base / "huge.zip", "huge", "Archive exceeds 34 MiB")
+        self.assertIsNone(report["archive_sha256"])  # no digest of a truncated prefix is reported
+
+    def test_embedded_capsule_is_compact_and_pack_enforces_unpack_limits(self):
+        body = {key: value for key, value in self.capsule.items() if key != "capsule_sha256"}
+        nested = [0] * 8000
+        for _ in range(100):
+            nested = [nested]
+        deep = dict(body, scope=nested)
+        deep["capsule_sha256"] = self.kernel["szl_capsule_digest"](deep)
+        self.assertGreater(len(json.dumps(deep, indent=2)), MIB)  # an indented copy would exceed the 1 MiB limit
+        self.capsule_path.write_text(json.dumps(deep), encoding="utf-8")
+        code, report, archive = self.pack("deep.zip")
+        self.assertEqual((code, report["status"]), (0, "MATCH"))
+        with zipfile.ZipFile(archive) as opened:
+            self.assertEqual(opened.read("capsule.json"), self.embedded(deep))
+            self.assertLess(opened.getinfo("capsule.json").file_size, 64 * 1024)
+        self.assertEqual(self.unpack(archive, "deep")[1]["status"], "MATCH")
+        # Under 1 MiB of input, but each 1e15 literal re-serializes as 1000000000000000.0.
+        floats = dict(body, scope=[1e15] * 200_000)
+        digest = self.kernel["szl_capsule_digest"](floats)
+        text = json.dumps(dict(body, scope="@", capsule_sha256=digest))
+        text = text.replace('"@"', "[" + ",".join(["1e15"] * 200_000) + "]")
+        self.assertLess(len(text), MIB)
+        self.capsule_path.write_text(text, encoding="utf-8")
+        code, report, output = self.pack("floats.zip")
+        self.assertEqual((code, report["status"], report["verification"]["integrity"]), (1, "REFUSED", "MATCH"))
+        self.assertIn("Embedded capsule over 1 MiB", report["reason"])
+        self.assertFalse(output.exists())
+
+    def test_cli_reports_non_ascii_names_without_utf8_mode(self):
+        name = "\u30c7\u30fc\u30bf.csv"
+        (self.root / name).write_bytes(b"a,b\n")
+        capsule = self.kernel["szl_make_capsule"](str(self.root), [name])
+        self.capsule_path.write_text(json.dumps(capsule), encoding="utf-8")
+        env = {key: value for key, value in os.environ.items() if key not in ("PYTHONUTF8", "PYTHONIOENCODING")}
+        output = self.base / "unicode.zip"
+        code, out, err = cli(PACK, "pack", self.capsule_path, "--root", self.root, "--output", output, env=env)
+        self.assertEqual(code, 0, err)
+        self.assertTrue(out.isascii())
+        self.assertEqual(json.loads(out)["members"], ["capsule.json", name])
+        code, out, err = cli(PACK, "unpack-verify", output, "--dest", self.base / "unicode", env=env)
+        self.assertEqual((code, json.loads(out)["status"]), (0, "MATCH"), err)
+        self.assertEqual((self.base / "unicode" / name).read_bytes(), b"a,b\n")
 
     def test_existing_examples_report_exactly_as_on_main(self):
         for name, (made_digest, verified_digest) in MAIN_REPORTS.items():

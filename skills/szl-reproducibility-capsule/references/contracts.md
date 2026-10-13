@@ -72,22 +72,23 @@ A human must review sensitive scientific use, executable source and licensing se
 ## Deterministic pack and unpack-verify
 
 `scripts/pack.py pack CAPSULE.json --root R --output OUT.zip` reads strict JSON (at most 1 MiB;
-duplicate keys, NaN/Infinity or a non-object exit 2), refuses unless `szl_verify_capsule` is
-`MATCH`, and re-reads each file through the same path walk against its manifest size and SHA-256.
-Paths must be Windows-portable and case-distinct; `capsule.json` is reserved. Members are sorted,
-dated 1980-01-01, `create_system` 3, mode 0644 and `ZIP_STORED`, plus sorted-key `capsule.json`;
-the output is created exclusively. Identical bytes were measured on CPython 3.12 (Windows, Linux).
+duplicate keys, NaN/Infinity, overflowing numbers or a non-object exit 2), refuses unless
+`szl_verify_capsule` is `MATCH`, and re-reads each file against its manifest size and SHA-256.
+Members are sorted, dated 1980-01-01, `create_system` 3, mode 0644 and `ZIP_STORED`, plus a compact
+sorted-key `capsule.json` of at most 1 MiB; output is created exclusively. Bytes matched on
+CPython 3.11 and 3.12, Windows and Linux.
 
-`unpack-verify OUT.zip --dest NEW_DIR` reads at most 34 MiB and, before creating anything,
-refuses an existing destination; names that are absolute, traversing, backslashed, drive-qualified,
-noncanonical, credential-like, unportable, altered by decoding or duplicated (also ignoring case);
-encrypted, symlink, directory or oversize members (8 MiB, `capsule.json` 1 MiB, 33 MiB total,
-129 members); and a missing, non-strict (exit 2) or invalid capsule. A self-digest disagreement
-is `MISMATCH` without extraction. Declared members are extracted exclusively and re-verified:
-`MISMATCH` (changed or missing), `EXTRA_MEMBERS` (undeclared members, listed, never extracted)
-or `MATCH`. Later failures are `REFUSED` with `destination_created: true`. Exit 0 `MATCH`,
-1 other, 2 usage or strict-JSON error. A self-consistent replacement archive is undetectable
-without an independently retained digest.
+Declared paths and member names follow one rule in both directions: canonical, relative, not
+credential-like, Windows-portable (no device names, `<>"|?*`, trailing dot or space, `~N` short
+names), distinct ignoring case, and no file named like a directory. `capsule.json` is reserved.
+`unpack-verify OUT.zip --dest NEW_DIR` reads at most 34 MiB and, before creating anything, refuses
+an existing destination; names that break the rule or change in decoding; encrypted, unsupported,
+symlink, directory or oversize members (8 MiB, `capsule.json` 1 MiB, 33 MiB total, 129 members);
+and a missing, non-strict (exit 2) or invalid capsule. A self-digest disagreement is `MISMATCH`
+without extraction. Declared members are extracted exclusively and re-verified: `MISMATCH`,
+`EXTRA_MEMBERS` (undeclared, listed, never extracted) or `MATCH`. Later failures are `REFUSED` with
+`destination_created: true`. Exit 0 `MATCH`, 1 other, 2 usage or strict JSON; reports are ASCII.
+A self-consistent replacement archive is undetectable without an independently retained digest.
 
 ## Acceptance and provenance
 
