@@ -341,6 +341,18 @@ class StabilityTests(unittest.TestCase):
                 self.assertEqual((q["status"], q["agreed_digits"]), ("STABLE", 5))
                 self.assertEqual(quantity(check(stability(values, required=6)), "q")["status"], "UNSTABLE")
 
+    def test_relative_spread_is_binary64_and_agreed_digits_stay_exact(self):
+        contract = " ".join((SKILL / "references" / "contract.md").read_text(encoding="utf-8").split())
+        self.assertIn("`relative_spread` = (max-min)/max|v| rounded to binary64 (0.0 past ~323 agreed digits)", contract)
+        self.assertIn("`agreed_digits` = largest d >= 0 with the exact spread <= 10^-d", contract)
+        for digits, spread in ((300, 1e-300), (323, 1e-323), (324, 0.0), (331, 0.0)):
+            with self.subTest(digits=digits):
+                values = ["1", "1." + "0" * (digits - 1) + "1", "1"]
+                q = quantity(check(stability(values, required=digits)), "q")
+                self.assertEqual((q["status"], q["relative_spread"], q["agreed_digits"]), ("STABLE", spread, digits))
+                self.assertEqual((q["min"], q["max"]), ("1", values[1]))
+                self.assertEqual(quantity(check(stability(values, required=digits + 1)), "q")["status"], "UNSTABLE")
+
     def test_median_and_text_are_exact_decimals(self):
         doc = stability(["0.1", "0.2", "0.3"])
         doc["runs"].append(run({"seed": 9}, {"q": "0.4"}))

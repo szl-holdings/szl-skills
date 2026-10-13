@@ -29,10 +29,11 @@ text (`1` equals `"1"`). Values become fractions: decimal strings
 `-?D{1,400}(\.D{1,400})?([eE][+-]?D{1,3})?` (D = 0-9), ints, floats via shortest repr; anything
 else, even identical str/bool/null, is `NOT_NUMERIC_IN_EVERY_RUN`. In stability mode the CLI rejects
 (ERROR, `keys`) a float literal whose value differs from its parsed binary64's shortest repr. Per
-quantity: exact `min`/`max`/`median` text, `relative_spread` = (max-min)/max|v|, `agreed_digits` =
-largest d >= 0 with relative_spread <= 10^-d (0 if spread > 1, null if identical),
-`sign_consistent`, `cancellation` if 10|median| <= max|v|. STABLE if agreed_digits is null or >=
-required_digits, else UNSTABLE (`BELOW_REQUIRED_DIGITS` / `NOT_NUMERIC_IN_EVERY_RUN`). Overall
+quantity: exact `min`/`max`/`median` text, `relative_spread` = (max-min)/max|v| rounded to binary64
+(0.0 past ~323 agreed digits), `agreed_digits` = largest d >= 0 with the exact spread <= 10^-d (0 if
+spread > 1, null if identical), `sign_consistent`, `cancellation` if 10|median| <= max|v|. STABLE if
+agreed_digits is null or >= required_digits, else UNSTABLE (`BELOW_REQUIRED_DIGITS` /
+`NOT_NUMERIC_IN_EVERY_RUN`). Overall
 UNSTABLE > INCOMPARABLE (a run digest missing or not 64 lowercase hex: INPUT_BINDING_INCOMPLETE;
 differing digests; nothing to compare) > STABLE; `issues` lists UNSTABLE quantities. Digests and
 perturbations are declared text; nothing checks them against data.
