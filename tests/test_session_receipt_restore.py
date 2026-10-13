@@ -318,6 +318,9 @@ class SessionReceiptRestoreTests(unittest.TestCase):
                 self.assertEqual(self.k.szl_make_session_receipt(self.project, asset("example.json"), max_file_bytes=small)["reason"], "FILE_TOO_LARGE")
         code, out = cli("record", SKILL / "assets" / "example.json", "--root", self.project, "--max-file-bytes", "75")
         self.assertEqual((code, json.loads(out)["reason"]), (2, "FILE_TOO_LARGE"))
+        # verify forwards the flag too; without it the 256 MiB default would give MATCH here.
+        code, out = cli("verify", self.write_json("receipt.json", receipt), "--root", self.project, "--max-file-bytes", "75")
+        self.assertEqual((code, json.loads(out)["reason"]), (2, "FILE_TOO_LARGE"))
 
     def test_size_cap_is_enforced_by_the_precheck_and_by_the_read_loop(self):
         # Each half of the cap on its own, with the cap set to the file's exact size. A file that grows
