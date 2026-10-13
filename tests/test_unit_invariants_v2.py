@@ -178,6 +178,9 @@ class ExpressionGrammarTests(unittest.TestCase):
         long_unit = "kohm^-1*kohm^1*kohm^-1*kohm^1*kohm^-1*kohm^1*kohm^-1*kohm^1/kohm"
         self.assertEqual(len(long_unit), 64)
         twins = (("m^8", ([8, 0, 0, 0, 0, 0, 0], "1e0"), "m^8*m"),  # composed dimension 9, scale 0
+                 ("m^-8", ([-8, 0, 0, 0, 0, 0, 0], "1e0"), "m^-8*m^-1"),  # composed dimension -9, scale 0
+                 ("m^8*m^-1", ([7, 0, 0, 0, 0, 0, 0], "1e0"), "m^9*m^-1"),  # factor exponent 9, composed 8
+                 ("m^-8*m", ([-7, 0, 0, 0, 0, 0, 0], "1e0"), "m^-9*m"),  # factor exponent -9, composed -8
                  ("Mm^6*km*mm", ([8, 0, 0, 0, 0, 0, 0], "1e36"), "Mm^6*km*cm"),  # scale 1e37
                  ("nm^4*cm*cm^-1", ([4, 0, 0, 0, 0, 0, 0], "1e-36"), "nm^4*mm*cm^-1"),  # scale 1e-37
                  ("m*s*m*s*m*s*m*s/m", ([3, 0, 4, 0, 0, 0, 0], "1e0"), "m*s*m*s*m*s*m*s*m/m"),  # 9 factors
@@ -193,6 +196,9 @@ class ExpressionGrammarTests(unittest.TestCase):
                 PARSE(text)
         with self.assertRaisesRegex(ValueError, "at most 8 unit factors"):
             PARSE("m*s*m*s*m*s*m*s*m/m")
+        for text in ("m^9*m^-1", "m^-9*m"):
+            with self.subTest(unit=text), self.assertRaisesRegex(ValueError, "Unsupported unit factor"):
+                PARSE(text)
 
     def test_offset_and_log_units_still_fail_closed_in_v2_records(self):
         for unit in ("degC", "dB", "pH", "µg"):
@@ -332,6 +338,20 @@ class PowerInvariantTests(unittest.TestCase):
         self.assertEqual(report["failures"][0]["expected_si"], "1" + "0" * 248)
         with self.assertRaisesRegex(ValueError, "magnitude"):  # (125 + 1) * 2 = 252
             AUDIT(square("1e89"))
+
+    def test_power_magnitude_guard_uses_both_absolute_values(self):
+        # Unit 1 has scale 1e0. A tiny base with a positive exponent and a large base with a
+        # negative exponent are each accepted at (30 + 1) * 8 = 248 and refused at (31 + 1) * 8 = 256.
+        def eighth(value, exponent):
+            return v2([quantity("x", "1", NONE, [value]), quantity("y", "1", NONE, ["1"])],
+                      [check("eighth", "power", ["x"], "y", exponent=exponent)])
+        for accepted, refused, exponent in (("1e-30", "1e-31", 8), ("1e30", "1e31", -8)):
+            with self.subTest(base=refused, exponent=exponent):
+                report = invariant(AUDIT(eighth(accepted, exponent)), "eighth")
+                self.assertEqual((report["status"], report["cases_checked"]), ("NUMERICAL_MISMATCH", 1))
+                self.assertEqual(report["failures"][0]["expected_si"], "0." + "0" * 239 + "1")
+                with self.assertRaisesRegex(ValueError, "magnitude"):
+                    AUDIT(eighth(refused, exponent))
 
     def test_power_uses_repeated_fifty_digit_multiplication(self):
         # Repeated multiplication in the 50-digit context ends in ...489 here; Decimal ** gives ...488.
