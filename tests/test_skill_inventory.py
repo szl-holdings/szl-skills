@@ -68,6 +68,19 @@ class InventoryTests(unittest.TestCase):
         installer.write_text(installer.read_text() + "REPLAY_NAMES = ['szl-replay']\n")
         self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
 
+    def test_sharing_family_requires_an_exact_separate_installer_selection(self):
+        directory = self.root / "skills" / "szl-sharing"; directory.mkdir()
+        (directory / "SKILL.md").write_text(
+            "---\nname: szl-sharing\ndescription: fixture\n---\n", encoding="utf-8")
+        self.market["plugins"].append({"name": "szl-science-sharing-skills",
+                                       "skills": ["./skills/szl-sharing"]})
+        self.save_market()
+        with self.assertRaisesRegex(ValueError, "installer/sharing catalog mismatch"):
+            skill_inventory.build(self.root)
+        installer = self.root / "tools" / "install_claude_science.py"
+        installer.write_text(installer.read_text() + "SHARING_NAMES = ['szl-sharing']\n")
+        self.assertEqual(skill_inventory.build(self.root)["counts"]["total"], 2)
+
     def test_rare_disease_replay_family_requires_its_own_installer_selection(self):
         directory = self.root / "skills" / "szl-rare-replay"; directory.mkdir()
         (directory / "SKILL.md").write_text(

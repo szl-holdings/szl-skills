@@ -5,21 +5,27 @@ historical evidence, not measurements of the expanded v0.5.0-rc.1 prerelease or 
 For the later six-upgrade, four-audit candidate and its notice follow-up, see
 [SCIENCE_ACCEPTANCE.md](SCIENCE_ACCEPTANCE.md). That candidate routed fourteen packages:
 twelve science skills selected by its installer and two separate evidence skills.
-Current source routing is forty-one total packages: twenty-seven core science tools, one
+Current source routing is forty-two total packages: twenty-seven core science tools, one
 separate tool each for design, synthetic rare-disease evidence replay, paper evidence, assay,
-multiplicity, change impact, uncertainty lineage and reporting-guideline audit, three existing
+multiplicity, change impact, uncertainty lineage, reporting-guideline audit and skill conformance, three existing
 replay tools, and three evidence skills excluded from the curated installer (including the
 synthetic-only rare-disease evidence map). This count is not a new behavioral acceptance result.
 The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL.md files
 and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These
 historical evidence sets establish neither application import nor measured agent efficacy.
 
-The aggregate `skills/` source budget is 1,050,000 bytes. It moved from 1,000,000 to
+The aggregate `skills/` source budget is 1,065,000 bytes. It moved from 1,000,000 to
 1,025,000 for the two synthetic rare-disease tools, then to 1,050,000 for the
-reporting-guideline family. Regression tests live in the repository test suite. This
-integrated source contains 1,042,966 skill-resource bytes, leaving 7,034 bytes of
-aggregate headroom. The SDK limits remain 200,000 bytes per skill, 1,000,000 bytes per
-staging batch and eight batches. The aggregate repository budget is not an application
+reporting-guideline family. At main `71b513ae2a3697466a3e8e0ec0f3599d6bfac4a6`,
+the 267 tracked skill-resource files measured 1,042,966 bytes. Moving the pilot's four
+resource files into `skills/` adds 20,571 bytes, for 1,063,537 tracked
+skill-resource bytes. The former 1,050,000-byte cap would reject this packaging-only
+graduation by 13,537 bytes; this change therefore raises only that aggregate source
+cap to 1,065,000 bytes, leaving 1,463 bytes of headroom. Regression tests live in the
+repository test suite. The measurements exclude generated, ignored Python caches.
+The SDK limits remain 200,000 bytes per skill, 1,000,000 bytes per staging batch and
+eight batches. Doctrine and honest-status checks are unchanged.
+The aggregate repository budget is not an application
 import limit or a release claim. Native selfcheck fixtures exercise the exact aggregate
 boundary and reject one byte over it; no size check is disabled.
 

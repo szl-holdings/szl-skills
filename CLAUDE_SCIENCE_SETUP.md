@@ -1,14 +1,14 @@
 # Claude Science setup
 
-This source tree contains forty-one skills: thirty-eight science tools and three evidence
+This source tree contains forty-two skills: thirty-nine science tools and three evidence
 skills. The core family selects twenty-seven science tools. Separate design,
-rare-disease-replay, paper, assay, multiplicity, change-impact, uncertainty and reporting
+rare-disease-replay, paper, assay, multiplicity, change-impact, uncertainty, reporting and sharing
 families select one tool each. The replay family selects szl-experiment-replay,
 szl-figure-data-contract and szl-measurement-harmonizer; the rare-disease-replay family
-selects only szl-rare-disease-evidence-replay. The SDK stages all thirty-eight science
+selects only szl-rare-disease-evidence-replay. The SDK stages all thirty-nine science
 tools in at most eight batches, each at most 1 MB, with a 200 KB limit per skill including
 its license and notice. These are local staging bounds, not measured application import
-limits. All ten families exclude szl-typesafe-ai, szl-governed-decision and the
+limits. All eleven families exclude szl-typesafe-ai, szl-governed-decision and the
 synthetic-only szl-rare-disease-evidence-map. The published
 v0.5.0-rc.3 prerelease has thirty-five science ZIPs at immutable source
 `baf0160e1acb2bee0de3c2324211d8d95e1b68b1`, including outcome preservation,
@@ -57,10 +57,10 @@ print({"status": receipt["status"], "agent": receipt["agent"],
        "staging": receipt["staging"]})
 ```
 
-The SDK procedure preflights all thirty-eight selected science tools and batch limits before any
+The SDK procedure preflights all thirty-nine selected science tools and batch limits before any
 write, checks returned sidecar gates for edited kernel.py resources, publishes through
 host.skills and reads every staged resource path back. A new SZL_SCIENCE profile requests
-exactly the thirty-eight selected tools and zero connectors on creation. It does not switch the
+exactly the thirty-nine selected tools and zero connectors on creation. It does not switch the
 conversation, read tokens, edit application databases or bypass disabled custom skills.
 `update=True` updates staged paths for the selected science skills; protected bundled-name collisions
 and a different existing specialist identity stop the setup. Existing matching profiles

@@ -119,6 +119,9 @@ def build(root):
     reporting = set(installer_names(root, "REPORTING_NAMES", required=False))
     if reporting != set(grouped.get("szl-science-reporting-skills", [])) or reporting & (selected | design | replay | rare_replay | paper | assay | change | multiplicity | uncertainty):
         raise ValueError("installer/reporting catalog mismatch")
+    sharing = set(installer_names(root, "SHARING_NAMES", required=False))
+    if sharing != set(grouped.get("szl-science-sharing-skills", [])) or sharing & (selected | design | replay | rare_replay | paper | assay | change | multiplicity | uncertainty | reporting):
+        raise ValueError("installer/sharing catalog mismatch")
     grouped = dict(sorted(grouped.items()))
     return {
         "schema": "szl.source-skill-inventory.v1",

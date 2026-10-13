@@ -4,7 +4,7 @@ description: "Checks retained scientific skill-sharing evidence: exact local sou
 license: Apache-2.0
 ---
 
-# Skill conformance pilot
+# Skill conformance
 
 Use this when asked whether an imported scientific skill actually worked. Separate
 local source integrity, supplied export binding, declared trial consistency, actual
@@ -36,6 +36,6 @@ host observation, and scientific result validity. Never combine them into "verif
    selected skill, resources, result and irrelevant-task control. Do not inject app
    state, change private databases, bypass permissions or auto-update imports.
 
-This is an additive pilot, not part of the v0.4.0 marketplace/installer release.
+This source candidate is outside the immutable v0.4.0 and v0.5.0-rc.3 releases.
 No claims of cross-host portability, agent efficacy, novelty or scientific validation
 follow from its offline tests. Review every resource before importing this skill.
