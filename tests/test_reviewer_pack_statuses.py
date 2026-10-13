@@ -181,6 +181,17 @@ class FindingFieldTests(unittest.TestCase):
             {"field": "findings", "value": findings, "count": 1},
             {"field": "inference_blockers", "value": blockers, "count": 1}]})
 
+    def test_integer_missing_count_is_not_a_finding_but_status_lists_it(self):
+        sr = load("szl-session-receipt")
+        receipt = sr.szl_make_session_receipt(SKILLS / "szl-session-receipt" / "assets" / "project",
+                                              example("szl-session-receipt"))
+        with tempfile.TemporaryDirectory(prefix="szl-rp-empty-") as empty:
+            verification = sr.szl_verify_session_receipt(empty, receipt)
+        self.assertEqual((verification["status"], verification["mismatches"], verification["missing"]), ("MISMATCH", 0, 3))
+        self.assertEqual(K._findings_of(verification), [])
+        (entry,) = build({"verify.json": verification})["unresolved"]
+        self.assertEqual(entry, {"source": "verify.json", "status": "MISMATCH", "details": []})
+
     def test_readiness_hold_and_missing_status_are_unresolved(self):
         pack = build({"map.json": {"readiness": "HOLD"}, "bare.json": {"schema": "x"}})
         self.assertEqual({(u["source"], u["status"]) for u in pack["unresolved"]},

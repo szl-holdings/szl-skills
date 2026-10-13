@@ -7,9 +7,12 @@ UTC timestamp in its directory name. Per-check reports named in the summary are 
 with the recorded `sha256`; `capsule.json` and `report.json` are summarized when present.
 
 Extra reports: paths relative to the project directory; their `schema`, `status`/`readiness` and finding
-fields (`issues`, `findings`, `failures`, `mismatch_indexes`, `missing`, `required_failures`, `missed`,
-`not_tested`, `inference_blockers`, `counterexample_count`, `invalid_outputs`, `mismatches`, `divergent`,
-`incomparable`) are summarized. A non-empty list or object, or a positive integer, counts as a finding.
+fields are summarized. A non-empty list or object in a list field (`issues`, `findings`, `failures`,
+`mismatch_indexes`, `missing`, `required_failures`, `missed`, `not_tested`, `inference_blockers`), or a
+positive integer in a count field (`counterexample_count`, `invalid_outputs`, `mismatches`, `divergent`,
+`incomparable`), counts as a finding. An integer in a list field is not one: the `missing` count of a
+session-receipt verification is ignored, and that report is listed through its status, which is never
+MATCH when files are missing.
 
 Unresolved = any check with findings, a report digest mismatch or a missing report, plus any extra report
 whose status (`readiness` when it has no `status`) is in the unresolved set below, or that carries finding
