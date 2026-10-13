@@ -63,8 +63,9 @@ in exact fractions: spread, agreed significant digits, sign consistency, cancell
 the runs agree to `required_digits`. Here the naive float32 variance flips sign (UNSTABLE);
 `assets/stability-stable.json` passes. See `references/contract.md`. Results must be numeric: a
 string or boolean is UNSTABLE even if identical, so leave such fields out. Integers stay exact;
-float literals are read as binary64, so write exact or long values as decimal strings (the CLI
-rejects, exit 2, a float literal that differs from its shortest repr).
+float literals are read as binary64, so write exact or long values as decimal strings (<= 400
+digits each side of the point, exponent <= 3 digits; the CLI rejects, exit 2, a float literal that
+differs from its shortest repr).
 
 ## What it does not do
 

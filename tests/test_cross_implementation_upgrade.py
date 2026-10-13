@@ -297,6 +297,20 @@ class CliStrictJsonTests(unittest.TestCase):
                                   '"b": {"results": {"x": 0.33333333333333331483, "y": 0.0}}}')
         self.assertEqual((code, out["status"], out["consistent"]), (0, "CONSISTENT", 2))
 
+    def test_long_decimal_strings_run_as_the_float_literal_error_advises(self):
+        # Before this fix decimal strings were capped at 40 digits per side (undocumented), so these 50-digit
+        # values, written as decimal strings as the ERROR below advises, were UNSTABLE / NOT_NUMERIC_IN_EVERY_RUN.
+        literals = ["0." + "3" * 50, "0." + "3" * 49 + "4", "0." + "3" * 49 + "2"]
+        code, out = self.run_text(self.stability_text(literals, required=30))
+        self.assertEqual((code, out["status"], out["keys"]), (2, "ERROR", literals))
+        self.assertIn("decimal strings (<= 400 digits each side of the point, exponent <= 3 digits)", out["reason"])
+        code, out = self.run_text(self.stability_text(['"%s"' % v for v in literals], required=30))
+        q = out["quantities"][0]
+        self.assertEqual((code, out["status"], q["reason"], q["agreed_digits"]), (0, "STABLE", "WITHIN_REQUIRED_DIGITS", 49))
+        self.assertEqual((q["min"], q["max"], q["median"]), (literals[2], literals[1], literals[0]))
+        code, out = self.run_text(self.stability_text(['"%s"' % v for v in literals], required=50))
+        self.assertEqual((code, out["status"], out["issues"]), (0, "UNSTABLE", ["q"]))
+
 
 class StabilityTests(unittest.TestCase):
     def test_stable_fixture(self):
@@ -360,6 +374,24 @@ class StabilityTests(unittest.TestCase):
         self.assertEqual(K.szl_exact_text(K.Fraction(-3, 2000)), "-0.0015")
         with self.assertRaises(K.Inexact):  # rounding is trapped, never printed silently
             K.szl_exact_text(K.Fraction(1, 3))
+
+    def test_decimal_string_grammar_is_400_digits_per_side_as_documented(self):
+        pattern = K.DECIMAL.pattern.replace("[0-9]", "D")
+        self.assertEqual(pattern, r"-?D{1,400}(\.D{1,400})?([eE][+-]?D{1,3})?")
+        self.assertIn("`%s` (D = 0-9)" % pattern, (SKILL / "references" / "contract.md").read_text(encoding="utf-8"))
+        skill_md = " ".join((SKILL / "SKILL.md").read_text(encoding="utf-8").split())
+        self.assertIn("decimal strings (<= 400 digits each side of the point, exponent <= 3 digits;", skill_md)
+        widest = "-" + "9" * 400 + "." + "9" * 400 + "e-999"
+        for good in ("0." + "3" * 400, "1" * 400, widest, "9" * 400 + "E+999", "0.5e0", "-0"):
+            with self.subTest(good=good[:12]):
+                q = quantity(check(stability([good, good, good], required=1)), "q")
+                self.assertEqual((q["status"], q["agreed_digits"]), ("STABLE", None))
+                self.assertEqual(K.Fraction(q["median"]), K.Fraction(good))
+        for bad in ("0." + "3" * 401, "1" * 401, "1" * 401 + ".5", "1e1000", "1e-1000", "1.", ".5", "+1", " 1",
+                    "1\n", "\u0661", "1_0", "0x1", "1e", "--1"):
+            with self.subTest(bad=bad[:12]):
+                r = check(stability(["1", "1", bad], required=1))
+                self.assertEqual((r["status"], quantity(r, "q")["reason"]), ("UNSTABLE", "NOT_NUMERIC_IN_EVERY_RUN"))
 
     def test_identical_and_zero_values_are_stable(self):
         for values in ([0, 0, 0], ["2.50", "2.5", 2.5]):

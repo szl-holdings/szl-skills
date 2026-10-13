@@ -31,7 +31,8 @@ def main():
         print(json.dumps({"status": "ERROR", "reason": f"cannot read comparison: {exc}"})); return 2
     if lossy and isinstance(doc, dict) and doc.get("schema") == STABILITY_SCHEMA:
         report = {"schema": STABILITY_REPORT, "status": "ERROR", "reason": "float literals differ from their"
-                  " shortest binary64 repr; write exact or long values as decimal strings", "keys": lossy}
+                  " shortest binary64 repr; write them as decimal strings (<= 400 digits each side of the point,"
+                  " exponent <= 3 digits)", "keys": lossy}
     else:
         report = szl_cross_implementation_check(doc)
     text = json.dumps(report, indent=2)

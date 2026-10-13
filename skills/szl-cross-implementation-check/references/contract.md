@@ -25,8 +25,9 @@ NaN/Infinity.
 Stability (`"schema": "szl.cross-implementation.stability.v1"`): `required_digits` int >= 1 and
 >= 3 `runs` of `{input_sha256, perturbation, results}`; each `perturbation` non-empty, keys from
 `precision`, `threads`, `summation_order`, `seed`, values int or trimmed non-empty str, distinct as
-text (`1` equals `"1"`). Values (decimal strings, ints, or floats via shortest repr) become fractions;
-str/bool/null is `NOT_NUMERIC_IN_EVERY_RUN` even if identical. In stability mode the CLI rejects
+text (`1` equals `"1"`). Values become fractions: decimal strings
+`-?D{1,400}(\.D{1,400})?([eE][+-]?D{1,3})?` (D = 0-9), ints, floats via shortest repr; anything
+else, even identical str/bool/null, is `NOT_NUMERIC_IN_EVERY_RUN`. In stability mode the CLI rejects
 (ERROR, `keys`) a float literal whose value differs from its parsed binary64's shortest repr. Per
 quantity: exact `min`/`max`/`median` text, `relative_spread` = (max-min)/max|v|, `agreed_digits` =
 largest d >= 0 with relative_spread <= 10^-d (0 if spread > 1, null if identical),

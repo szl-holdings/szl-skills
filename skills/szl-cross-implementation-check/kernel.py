@@ -29,7 +29,7 @@ SCHEMA = "szl.cross-implementation-report.v1"
 STABILITY_SCHEMA = "szl.cross-implementation.stability.v1"
 STABILITY_REPORT = "szl.cross-implementation-stability-report.v1"
 AXES = ("precision", "threads", "summation_order", "seed")
-DECIMAL = re.compile(r"-?[0-9]{1,40}(\.[0-9]{1,40})?([eE][+-]?[0-9]{1,3})?")
+DECIMAL = re.compile(r"-?[0-9]{1,400}(\.[0-9]{1,400})?([eE][+-]?[0-9]{1,3})?")
 HEX = re.compile(r"[0-9a-f]{64}")
 
 
