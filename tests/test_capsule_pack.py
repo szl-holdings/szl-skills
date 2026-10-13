@@ -433,6 +433,31 @@ class CapsulePackTests(unittest.TestCase):
         self.assertIn("Embedded capsule over 1 MiB", report["reason"])
         self.assertFalse(output.exists())
 
+    def test_pack_embedded_capsule_limit_equals_the_unpack_limit_at_the_boundary(self):
+        # A compact embedded capsule.json of exactly 1 MiB packs and round-trips as MATCH; one byte more
+        # is REFUSED by pack, so pack cannot report MATCH for an archive its own unpack-verify refuses.
+        body = {key: value for key, value in self.capsule.items() if key != "capsule_sha256"}
+        overhead = len(self.embedded(dict(body, scope="", capsule_sha256="0" * 64)))
+        for label, size in (("embed-at-limit", MIB), ("embed-over", MIB + 1)):
+            with self.subTest(label=label):
+                padded = dict(body, scope="s" * (size - overhead))  # the kernel does not bound scope
+                padded["capsule_sha256"] = self.kernel["szl_capsule_digest"](padded)
+                embedded = self.embedded(padded)
+                self.assertEqual(len(embedded), size)
+                self.capsule_path.write_bytes(embedded[:-1])  # compact input without the newline, at most 1 MiB
+                code, report, output = self.pack(label + ".zip")
+                if size == MIB:
+                    self.assertEqual((code, report["status"]), (0, "MATCH"), report)
+                    with zipfile.ZipFile(output) as opened:
+                        self.assertEqual(opened.read("capsule.json"), embedded)
+                    code, report, _ = self.unpack(output, label)
+                    self.assertEqual((code, report["status"]), (0, "MATCH"), report)
+                else:
+                    self.assertEqual((code, report["status"], report["verification"]["integrity"]),
+                                     (1, "REFUSED", "MATCH"), report)
+                    self.assertIn("Embedded capsule over 1 MiB", report["reason"])
+                    self.assertFalse(output.exists())
+
     def test_cli_reports_non_ascii_names_without_utf8_mode(self):
         name = "\u30c7\u30fc\u30bf.csv"
         (self.root / name).write_bytes(b"a,b\n")
