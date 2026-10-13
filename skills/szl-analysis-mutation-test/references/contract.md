@@ -19,11 +19,18 @@ status SCORED, BASELINE_FLAGGED, NO_OUTCOMES_RECORDED or BASELINE_NOT_TESTED.
   distinct known names ([] = default ten).
 - Opt-in classes, never default: `scale_column_inverse`, `negate_column`, `extreme_value`,
   `conflicting_duplicate_id` (needs `id_column`), `all_missing_column`, `single_row`. `columns` and
-  `id_column` must name row keys and need one of them; `id_column` is dropped from `columns`. `negate_column` and `scale_column_inverse`
-  SKIP non-numeric targets and leave zero cells and cells beyond the largest finite double alone
-  (nothing left to change: NO_OP). `extreme_value` and `conflicting_duplicate_id` need numeric
-  targets and change zeros too; the twin needs a row with a non-null id whose targets change under +1.
-  `all_missing_column` accepts any listed column. `single_row` ignores `columns`. An all-null column counts as numeric, so the default target can be one; list `columns`.
+  `id_column` must name row keys and need one of them. Targets: `columns` minus `id_column`, else the
+  first numeric column by name that is not the label or id (an all-null column counts as numeric;
+  list `columns`); no target: SKIPPED. One non-numeric target SKIPs the whole variant, except for
+  `all_missing_column` (any column) and `single_row` (no targets). NO_OP: output equals input.
+  - `negate_column` (sign flip), `scale_column_inverse` (x0.001): change only nonzero int/float cells
+    with abs <= the largest finite double (zeros, nulls, bools stay); none changed: NO_OP.
+  - `extreme_value`: per target, one seeded cell (any row with the key, zero or null too) becomes the
+    largest finite double; NO_OP only if every picked cell already held it.
+  - `conflicting_duplicate_id`: appends a copy of one seeded row with a non-null id and all targets
+    int/float that change under +1, each target +1; no such row: SKIPPED.
+  - `all_missing_column`: every non-null target cell becomes null; an all-null target: NO_OP.
+  - `single_row`: keeps the first row; a one-row dataset: NO_OP.
 - Such plans, or `require_variant_binding: true`, are `szl.mutation-plan.v2` (adds
   `require_variant_binding`, `columns`, `id_column`); every other plan stays v1, byte-identical to
   base commit b8e259c.

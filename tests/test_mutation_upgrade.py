@@ -408,6 +408,21 @@ class PropertyClassTests(unittest.TestCase):
             plan = self.gen(PROPERTY_SIX, rows, id_column="i", columns=[col])
             self.assertEqual([v["status"] for v in plan["variants"]], statuses, col)
 
+    def test_contract_edge_rules_per_class(self):
+        # one non-numeric listed target skips the whole variant, except all_missing_column and single_row
+        rows = [{"i": "a", "x": 1, "s": "t"}, {"i": "b", "x": 2, "s": "u"}]
+        plan = self.gen(PROPERTY_SIX, rows, id_column="i", columns=["x", "s"])
+        self.assertEqual([v["status"] for v in plan["variants"]], ["SKIPPED"] * 4 + ["GENERATED"] * 2)
+        # default target: first numeric column by name; an all-null column counts as numeric
+        nulls = [{"b": None, "z": 1}, {"b": None, "z": 2}]
+        plan = self.gen(["negate_column", "all_missing_column", "extreme_value"], nulls)
+        self.assertEqual([(v["status"], v["detail"]["columns"]) for v in plan["variants"]],
+                         [("NO_OP", ["b"]), ("NO_OP", ["b"]), ("GENERATED", ["b"])])
+        # negate/inverse leave bools alone; extreme_value is NO_OP only if the picked cell already held it
+        v = self.variant("negate_column", [{"x": True}, {"x": 2}], columns=["x"])
+        self.assertEqual(([r["x"] for r in v["rows"]], v["detail"]["cells"]), ([True, -2], 1))
+        self.assertEqual(self.gen(["extreme_value"], [{"a": LARGEST_DOUBLE}])["variants"][0]["status"], "NO_OP")
+
     def test_mixed_plan_keeps_default_class_bytes(self):
         mixed = self.k.szl_generate_mutations(dict(asset("example.json"), mutations=DEFAULT_TEN + ["single_row"]))
         self.assertEqual(mixed["schema"], "szl.mutation-plan.v2")
