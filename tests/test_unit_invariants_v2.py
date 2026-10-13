@@ -173,6 +173,25 @@ class ExpressionGrammarTests(unittest.TestCase):
             with self.subTest(unit=text), self.assertRaises(ValueError):
                 PARSE(text)
 
+    def test_each_documented_bound_is_enforced_on_its_own(self):
+        # Each rejected unit breaks exactly one bound; its accepted twin sits on that bound's edge.
+        long_unit = "kohm^-1*kohm^1*kohm^-1*kohm^1*kohm^-1*kohm^1*kohm^-1*kohm^1/kohm"
+        self.assertEqual(len(long_unit), 64)
+        twins = (("m^8", ([8, 0, 0, 0, 0, 0, 0], "1e0"), "m^8*m"),  # composed dimension 9, scale 0
+                 ("Mm^6*km*mm", ([8, 0, 0, 0, 0, 0, 0], "1e36"), "Mm^6*km*cm"),  # scale 1e37
+                 ("nm^4*cm*cm^-1", ([4, 0, 0, 0, 0, 0, 0], "1e-36"), "nm^4*mm*cm^-1"),  # scale 1e-37
+                 ("m*s*m*s*m*s*m*s/m", ([3, 0, 4, 0, 0, 0, 0], "1e0"), "m*s*m*s*m*s*m*s*m/m"),  # 9 factors
+                 (long_unit, ([-2, -1, 3, 2, 0, 0, 0], "1e-3"), long_unit + "^1"))  # 66 characters
+        for accepted, expected, rejected in twins:
+            with self.subTest(unit=rejected):
+                self.assertEqual(PARSE(accepted), expected)
+                with self.assertRaises(ValueError):
+                    PARSE(rejected)
+        with self.assertRaisesRegex(ValueError, "1..64 character"):
+            PARSE(long_unit + "^1")
+        with self.assertRaisesRegex(ValueError, "at most 8 unit factors"):
+            PARSE("m*s*m*s*m*s*m*s*m/m")
+
     def test_offset_and_log_units_still_fail_closed_in_v2_records(self):
         for unit in ("degC", "dB", "pH", "µg"):
             with self.subTest(unit=unit), self.assertRaisesRegex(ValueError, "offset/logarithmic"):
@@ -292,12 +311,32 @@ class PowerInvariantTests(unittest.TestCase):
                    quantity("c", "nm^4*m^4", [8, 0, 0, 0, 0, 0, 0], ["1e-100"])],
                   [check("product", "product", ["a", "b"], "c"), check("ratio", "ratio", ["c", "a"], "a"),
                    check("square", "power", ["a"], "c", exponent=2)])
+        # A hostile *local* context is ignored. decimal.DefaultContext traps are still inherited
+        # by the kernel Context, as in v1; that pre-existing gap is out of scope here.
         with decimal.localcontext() as context:
             context.prec, context.Emax = 3, 10
             context.traps[decimal.Inexact] = True
             report = AUDIT(wide)
         self.assertEqual(report["status"], "REVIEW_REQUIRED")
         self.assertEqual(invariant(report, "product")["scale_mismatch_count"], 1)
+
+    def test_power_magnitude_guard_edge(self):
+        # Mm^6*m^-6 is dimensionless with scale 1e36: 1e88 normalizes to 1e124 and (124 + 1) * 2 = 250.
+        def square(value):
+            return v2([quantity("x", "Mm^6*m^-6", NONE, [value]), quantity("y", "1", NONE, ["1"])],
+                      [check("square", "power", ["x"], "y", exponent=2)])
+        report = invariant(AUDIT(square("1e88")), "square")
+        self.assertEqual((report["status"], report["cases_checked"]), ("NUMERICAL_MISMATCH", 1))
+        self.assertEqual(report["failures"][0]["expected_si"], "1" + "0" * 248)
+        with self.assertRaisesRegex(ValueError, "magnitude"):  # (125 + 1) * 2 = 252
+            AUDIT(square("1e89"))
+
+    def test_power_uses_repeated_fifty_digit_multiplication(self):
+        # Repeated multiplication in the 50-digit context ends in ...489 here; Decimal ** gives ...488.
+        record = v2([quantity("x", "1", NONE, ["1.52601815908301661318"]),
+                     quantity("y", "1", NONE, ["29.408820920975399720290266820576633808416796829489"])],
+                    [check("eighth", "power", ["x"], "y", exponent=8)])
+        self.assertEqual(invariant(AUDIT(record), "eighth")["status"], "AGREEMENT_ON_DECLARED_CASES")
 
 
 class CliAndSidecarTests(unittest.TestCase):
