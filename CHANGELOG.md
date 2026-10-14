@@ -2,11 +2,6 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
-- Add an additive `szl.measurement-harmonizer.v2` data contract: declared per-source
-  provenance, a `STALE` finding from declared `collected_at`/`as_of` instants (no host
-  clock), and explicit missing tokens kept as null with per-source and per-specimen counts,
-  `BLOCKED` with `MISSINGNESS_EXCEEDED` above the declared fraction and never imputed. v1
-  manifests and reports are unchanged; unit checks stay with szl-unit-invariants.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and
