@@ -2,13 +2,6 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
-- Repair szl-skill-conformance after #62. Its staged root `kernel.py` now exposes the
-  `szl_check_skill_conformance` entrypoint (the CLI and `check` alias are unchanged), and
-  the sidecar AST/entrypoint test covers every kernel the installer stages instead of a
-  hand-kept list. `--legal-root` defines one staged-resource contract: the raw source plus
-  root LICENSE and NOTICE from the same revision, as the installer and ZIPs stage them;
-  any other missing, changed or extra file still rejects. A matched export without trials
-  stays INCOMPLETE; host invocation stays NOT_VERIFIED and scientific validity NOT_EVALUATED.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and
