@@ -1,4 +1,8 @@
-"""Execute the repository source-size gate at its exact reviewed boundary."""
+"""Execute the repository source-size gate at its exact reviewed boundary.
+
+The gate counts source resources under skills/. Generated Python caches (files inside a
+__pycache__ directory, or ending in .pyc or .pyo) are excluded; everything else counts.
+"""
 
 import ast
 import json
@@ -11,7 +15,8 @@ import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE_LIMIT = 1_065_000
+SOURCE_LIMIT = 1_200_000
+CACHE_FILE_BYTES = 25_000
 
 
 class SourceSizeBudgetTests(unittest.TestCase):
@@ -44,10 +49,33 @@ class SourceSizeBudgetTests(unittest.TestCase):
         subprocess.run([sys.executable, "-B", str(tools / "skill_inventory.py"), "--write"],
                        check=True, capture_output=True, text=True, timeout=15)
 
-    def check_size(self, size):
-        (self.skill / "payload.txt").write_bytes(b"x" * (size - self.entry_bytes))
+    def check_size(self, size, other_source_bytes=0):
+        (self.skill / "payload.txt").write_bytes(b"x" * (size - self.entry_bytes - other_source_bytes))
         return subprocess.run([sys.executable, "-B", str(self.root / "tools" / "selfcheck.py")],
                               capture_output=True, text=True, timeout=15)
+
+    def write_files(self, paths, size):
+        for path in paths:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"c" * size)
+        return len(paths) * size
+
+    def write_generated_caches(self):
+        return self.write_files((
+            self.root / "skills" / "__pycache__" / "stray.cpython-312.pyc",
+            self.skill / "__pycache__" / "kernel.cpython-314.pyc",
+            self.skill / "__pycache__" / "kernel.cpython-312.opt-1.pyc",
+            self.skill / "__pycache__" / "unrelated.txt",
+            self.skill / "scripts" / "__pycache__" / "run.cpython-311.pyc",
+            self.skill / "legacy.pyc",
+            self.skill / "optimized.pyo",
+        ), CACHE_FILE_BYTES)
+
+    def assert_over_limit(self, result, size):
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("skills/ source is %d bytes, generated caches excluded (limit %s)"
+                      % (size, format(SOURCE_LIMIT, ",")), result.stdout)
+        self.assertIn("selfcheck: FAIL", result.stdout)
 
     def test_exact_aggregate_source_limit_passes(self):
         result = self.check_size(SOURCE_LIMIT)
@@ -56,9 +84,32 @@ class SourceSizeBudgetTests(unittest.TestCase):
 
     def test_one_byte_over_aggregate_source_limit_fails(self):
         result = self.check_size(SOURCE_LIMIT + 1)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("skills/ is 1065001 bytes (limit 1,065,000)", result.stdout)
-        self.assertIn("selfcheck: FAIL", result.stdout)
+        self.assert_over_limit(result, SOURCE_LIMIT + 1)
+        self.assertIn("skills/ source is 1200001 bytes, generated caches excluded (limit 1,200,000)",
+                      result.stdout)
+
+    def test_generated_caches_do_not_count_at_exact_source_limit(self):
+        cache_bytes = self.write_generated_caches()
+        self.assertGreater(cache_bytes, 0)
+        result = self.check_size(SOURCE_LIMIT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("selfcheck: PASS", result.stdout)
+
+    def test_one_byte_over_source_limit_fails_with_caches_present(self):
+        self.write_generated_caches()
+        result = self.check_size(SOURCE_LIMIT + 1)
+        self.assert_over_limit(result, SOURCE_LIMIT + 1)
+
+    def test_cache_like_names_outside_the_defined_set_still_count(self):
+        near_miss_bytes = self.write_files((
+            self.skill / "pycache" / "notes.txt",
+            self.skill / "__pycache__.md",
+            self.skill / "data" / "__pycache__",
+            self.skill / "notes.pyc.txt",
+            self.skill / "scripts" / "run.py",
+        ), 1_000)
+        result = self.check_size(SOURCE_LIMIT + 1, near_miss_bytes)
+        self.assert_over_limit(result, SOURCE_LIMIT + 1)
 
     def test_installer_skill_and_batch_limits_are_unchanged(self):
         parsed = ast.parse((ROOT / "tools" / "install_claude_science.py").read_text(encoding="utf-8"))

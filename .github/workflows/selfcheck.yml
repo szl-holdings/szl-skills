@@ -16,6 +16,8 @@ jobs:
       - run: python tools/selfcheck.py
       - run: python tools/sync_workbench.py --check
       - run: python -B -m unittest discover -s tests -v
+      - name: Selfcheck again after the full suite
+        run: python tools/selfcheck.py
   evidence-map-windows:
     runs-on: windows-latest
     timeout-minutes: 10

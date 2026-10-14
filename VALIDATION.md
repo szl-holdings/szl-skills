@@ -14,20 +14,27 @@ The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL
 and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These
 historical evidence sets establish neither application import nor measured agent efficacy.
 
-The aggregate `skills/` source budget is 1,065,000 bytes. It moved from 1,000,000 to
+The aggregate `skills/` source budget is 1,200,000 bytes. It moved from 1,000,000 to
 1,025,000 for the two synthetic rare-disease tools, then to 1,050,000 for the
-reporting-guideline family. At main `71b513ae2a3697466a3e8e0ec0f3599d6bfac4a6`,
-the 267 tracked skill-resource files measured 1,042,966 bytes. Moving the pilot's four
-resource files into `skills/` adds 20,571 bytes, for 1,063,537 tracked
-skill-resource bytes. The former 1,050,000-byte cap would reject this packaging-only
-graduation by 13,537 bytes; this change therefore raises only that aggregate source
-cap to 1,065,000 bytes, leaving 1,463 bytes of headroom. Regression tests live in the
-repository test suite. The measurements exclude generated, ignored Python caches.
+reporting-guideline family, then to 1,065,000 when the skill-conformance checker moved
+from its pilot into `skills/`. The budget counts source resources: every regular file
+under `skills/` except generated Python caches, meaning files inside a `__pycache__`
+directory or ending in `.pyc` or `.pyo`. Until this change selfcheck summed every file,
+caches included, so bytecode left under `skills/` by a test run could fail a later
+selfcheck. At main `24a7c835a2d1e7b8fa2fc4f4e070a570ab361e29` the 271 tracked
+skill-resource files measured 1,063,537 bytes. With the twelve R07 skill upgrades applied
+(skill-conformance repair, reviewer pack, unit invariants, clustered replication, dataset
+readiness, evidence gate, measurement harmonizer, analysis mutation test, session receipt,
+cross-implementation check, experiment replay and reproducibility capsule), the 313
+skill-resource files measured 1,187,145 bytes, 123,608 more. The cap is the smallest
+multiple of 5,000 bytes at least 10,000 bytes above that measurement: 1,200,000 bytes,
+leaving 12,855 bytes of headroom. Regression tests live in the repository test suite.
 The SDK limits remain 200,000 bytes per skill, 1,000,000 bytes per staging batch and
 eight batches. Doctrine and honest-status checks are unchanged.
 The aggregate repository budget is not an application
 import limit or a release claim. Native selfcheck fixtures exercise the exact aggregate
-boundary and reject one byte over it; no size check is disabled.
+boundary and reject one byte over it, with and without generated caches present; no size
+check is disabled.
 
 ## Checks
 

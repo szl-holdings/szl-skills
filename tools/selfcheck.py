@@ -6,12 +6,22 @@ import skill_inventory
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
 # Aggregate repository source, separate from the unchanged SDK skill/batch limits.
-MAX_SOURCE_SKILL_BYTES = 1_065_000
+# The budget counts source resources: every regular file under skills/ except generated
+# Python caches, meaning files inside a __pycache__ directory or ending in .pyc or .pyo.
+MAX_SOURCE_SKILL_BYTES = 1_200_000
+GENERATED_CACHE_DIR = "__pycache__"
+GENERATED_CACHE_SUFFIXES = (".pyc", ".pyo")
 SECRET = re.compile(r"(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|hf_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)")
 PERSONAL = re.compile(r"([A-Za-z]:\\Users\\[A-Za-z0-9._-]+|/home/[a-z][a-z0-9_-]*/|/Users/[A-Za-z][A-Za-z0-9._-]*/|\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+\b)")
 REF = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|sh|js|ts|json|yaml|yml|toml|txt|csv))`")
 NOT = re.compile(r"(?i)\b(does not|doesn't|do not|don't|not for|never|is not)\b")
 fails = []
+
+
+def is_generated_cache(path):
+    parents = path.relative_to(SKILLS).parts[:-1]
+    return GENERATED_CACHE_DIR in parents or path.suffix in GENERATED_CACHE_SUFFIXES
+
 
 if not (ROOT / "LICENSE").is_file():
     fails.append("LICENSE missing at repo root")
@@ -27,11 +37,12 @@ except (OSError, ValueError, KeyError, TypeError) as e:
 if not SKILLS.is_dir():
     fails.append("skills/ folder missing")
 else:
-    size = sum(p.stat().st_size for p in SKILLS.rglob("*") if p.is_file())
+    size = sum(p.stat().st_size for p in SKILLS.rglob("*") if p.is_file() and not is_generated_cache(p))
     if size > MAX_SOURCE_SKILL_BYTES:
-        fails.append("skills/ is %d bytes (limit %s)" % (size, format(MAX_SOURCE_SKILL_BYTES, ",")))
+        fails.append("skills/ source is %d bytes, generated caches excluded (limit %s)" %
+                     (size, format(MAX_SOURCE_SKILL_BYTES, ",")))
     names = set()
-    for d in sorted(p for p in SKILLS.iterdir() if p.is_dir()):
+    for d in sorted(p for p in SKILLS.iterdir() if p.is_dir() and p.name != GENERATED_CACHE_DIR):
         md = d / "SKILL.md"
         if not md.is_file():
             fails.append("%s: SKILL.md missing" % d.name); continue
