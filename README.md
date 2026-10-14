@@ -182,7 +182,10 @@ python -B -m unittest discover -s tests -v
 Each ZIP has one enclosing skill directory containing SKILL.md, helpers, CLI, fixtures and
 license notices for manual claude.ai upload. This packaging is not evidence of a successful
 Claude Science import or runtime check. Pass
-`--revision <40-char commit>` to build deterministic archives from immutable Git blobs.
+`--revision <40-char commit>` to build deterministic archives from immutable Git blobs; add
+`--manifest` to bind every member of every ZIP, LICENSE and NOTICE included, to that commit by
+SHA-256. `--verify --output-dir DIR` refuses a missing, modified or unexpected member and a
+re-encoded or unlisted archive.
 [CLAUDE_SCIENCE_SETUP.md](CLAUDE_SCIENCE_SETUP.md) covers the SDK installer and the curated
 specialist. Actual registration and agent task performance in Claude Science remain unverified
 until a pilot runs there; local tests do not establish them.

@@ -38,7 +38,12 @@ older marketplace metadata, disclosed in its notes; the source-bound manifest
 identifies the exact ZIP bytes.
 
 Use a clean, isolated checkout of the reviewed full source commit before staging resources.
-bundle_batches() reads the working tree; it does not resolve an immutable revision itself. Actual
+bundle_batches() reads the working tree; it does not resolve an immutable revision itself, so
+install() requires a binding from revision_binding(). That binding hashes every resource the family
+stages, root LICENSE and NOTICE included, from the Git objects of one full commit. install() refuses
+a missing or modified legal file, an extra resource or any changed byte before host access, and the
+receipt's `source_binding` records the commit and per-resource SHA-256. revision_binding() needs Git;
+a binding made in an identical clean checkout is plain JSON and may be loaded instead. Actual
 application registration requires separate human review and authorization.
 The older one-bundle `bundle(".", family="core")` call exceeds the unchanged 1 MB limit for
 this source tree; use the bounded batch path below.
@@ -50,11 +55,13 @@ Python tool or a terminal), execute:
 ```python
 import runpy
 setup = runpy.run_path("tools/install_claude_science.py")
+revision = "<full 40-character reviewed commit of this checkout>"
 resources = setup["bundle_batches"](".", family="all")
+binding = setup["revision_binding"](".", revision, family="all")
 receipt = setup["install"](host, resources, "claude-science-install-receipt.json",
-                           update=True, family="all")
+                           update=True, family="all", binding=binding)
 print({"status": receipt["status"], "agent": receipt["agent"],
-       "staging": receipt["staging"]})
+       "staging": receipt["staging"], "source_commit": receipt["source_binding"]["source_commit"]})
 ```
 
 The SDK procedure preflights all thirty-nine selected science tools and batch limits before any
@@ -73,8 +80,14 @@ It reports `resource_set_completeness: UNVERIFIED` and
 already present inside a skill, so a prior executable resource may remain after an update.
 A kernel gate rejection, unavailable SDK, publish refusal or mismatch is a visible failure.
 An absent sidecar probe is recorded as PROBE_UNAVAILABLE, even when publication/readback
-succeeds. Unchanged kernels do not receive a fresh probe; CLI-only uncertainty-lineage, paired-science,
-measurement-harmonizer, reporting-guideline-audit and workbench resources do not enter the kernel gate path. Confirm all intended resources in
+succeeds. Unchanged kernels do not receive a fresh probe. Staging mode is declared, not inferred:
+`CLI_ONLY_NAMES` lists the ten CLI-only tools (workbench, paired science, experiment replay, figure
+data contract, measurement harmonizer, rare-disease evidence replay, paper evidence audit,
+uncertainty lineage, reporting-guideline audit and skill conformance). They stage no root kernel.py
+and never enter the kernel gate path. Every other selected tool must stage a root kernel.py that
+exports a `szl_*` entrypoint; staging refuses either contradiction before host access. Skill
+conformance is CLI-only because it is invoked as `python -B scripts/run.py`; no native sidecar
+entrypoint is claimed for it. Confirm all intended resources in
 the actual application's supported import/runtime and retain unresolved checks separately.
 Publication/readback is distinct from real sidecar validation and agent task evaluation;
 the receipt retains NOT_EXECUTED for task evaluation until a pilot is run.

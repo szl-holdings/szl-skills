@@ -2,15 +2,20 @@
 """Create individual import ZIPs. Refuses overwrite; includes only explicit skill resources."""
 import argparse
 import hashlib
+import io
 import json
 import os
 import pathlib
 import re
 import subprocess
 import zipfile
+import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 GIT_ENV = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
+MANIFEST = "science-package-manifest.json"
+# v2 binds every archive member, root LICENSE and NOTICE included, to the source commit.
+MANIFEST_SCHEMA = "szl.science-package-manifest.v2"
 
 
 def git_bytes(revision, relative):
@@ -33,7 +38,7 @@ def package_skills(destination, revision=None, manifest=False):
             raise ValueError("Release revision must be a commit object")
     if manifest and revision is None:
         raise ValueError("A manifest requires --revision at a full immutable commit")
-    manifest_path = destination / "science-package-manifest.json" if manifest else None
+    manifest_path = destination / MANIFEST if manifest else None
     if manifest_path is not None and manifest_path.exists():
         raise FileExistsError(manifest_path)
     market = json.loads(git_bytes(revision, ".claude-plugin/marketplace.json") if revision else (ROOT / ".claude-plugin" / "marketplace.json").read_bytes())
@@ -109,9 +114,11 @@ def package_skills(destination, revision=None, manifest=False):
             reports.append({"skill": skill.name, "archive": archive.name,
                             "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
                             "compressed_bytes": archive.stat().st_size,
-                            "uncompressed_bytes": sum(i.file_size for i in z.infolist())})
+                            "uncompressed_bytes": sum(i.file_size for i in z.infolist()),
+                            "resources": {name: hashlib.sha256(data).hexdigest()
+                                          for name, data in sorted(contents.items())}})
     if manifest_path is not None:
-        record = {"schema": "szl.science-package-manifest.v1",
+        record = {"schema": MANIFEST_SCHEMA,
                   "source_commit": revision, "archives": reports}
         with manifest_path.open("x", encoding="utf-8", newline="\n") as output:
             json.dump(record, output, sort_keys=True, indent=2)
@@ -119,10 +126,64 @@ def package_skills(destination, revision=None, manifest=False):
     return reports
 
 
+def verify_archives(directory):
+    """Round-trip check against the directory's source-bound manifest. Every member,
+    LICENSE and NOTICE included, must match by path and SHA-256; a missing, extra or
+    changed member, a corrupt or re-encoded archive, or an unlisted archive fails."""
+    directory = pathlib.Path(directory)
+    record = json.loads((directory / MANIFEST).read_bytes())
+    if (not isinstance(record, dict) or set(record) != {"schema", "source_commit", "archives"}
+            or record["schema"] != MANIFEST_SCHEMA or not isinstance(record["source_commit"], str)
+            or not re.fullmatch(r"[a-f0-9]{40}", record["source_commit"])
+            or not isinstance(record["archives"], list) or not record["archives"]):
+        raise ValueError("Expected a source-bound " + MANIFEST_SCHEMA + " manifest")
+    entries = {}
+    for entry in record["archives"]:
+        if (not isinstance(entry, dict) or not isinstance(entry.get("skill"), str)
+                or entry.get("archive") != entry["skill"] + ".zip" or entry["archive"] in entries
+                or not isinstance(entry.get("resources"), dict) or not entry["resources"]):
+            raise ValueError("Malformed or duplicate manifest archive entry")
+        entries[entry["archive"]] = entry
+    if sorted(path.name for path in directory.iterdir() if path.name != MANIFEST) != sorted(entries):
+        raise ValueError("Archive directory differs from the manifest")
+    for name, entry in sorted(entries.items()):
+        data = (directory / name).read_bytes()
+        prefix, members = entry["skill"] + "/", {}
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                for info in archive.infolist():
+                    relative = info.filename[len(prefix):] if info.filename.startswith(prefix) else ""
+                    if not relative or info.is_dir() or relative in members:
+                        raise ValueError("Unexpected archive member in " + name + ": " + info.filename)
+                    members[relative] = hashlib.sha256(archive.read(info)).hexdigest()
+        except (zipfile.BadZipFile, zlib.error, EOFError) as error:
+            raise ValueError("Corrupt archive " + name) from error
+        expected = entry["resources"]
+        missing, extra = sorted(set(expected) - set(members)), sorted(set(members) - set(expected))
+        if missing:
+            raise ValueError("Bound member missing from " + name + ": " + missing[0])
+        if extra:
+            raise ValueError("Unexpected archive member in " + name + ": " + extra[0])
+        changed = sorted(path for path in expected if members[path] != expected[path])
+        if changed:
+            raise ValueError("Archive member differs from the bound revision in " + name + ": " + changed[0])
+        if hashlib.sha256(data).hexdigest() != entry["sha256"]:
+            raise ValueError("Archive bytes differ from the manifest: " + name)
+    return {"status": "ARCHIVES_MATCH_MANIFEST", "source_commit": record["source_commit"],
+            "archives": len(entries)}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=pathlib.Path, required=True)
     parser.add_argument("--revision", help="Full immutable commit; package Git blobs, excluding working-copy changes")
     parser.add_argument("--manifest", action="store_true", help="Write a source-bound ZIP hash manifest; requires --revision")
+    parser.add_argument("--verify", action="store_true",
+                        help="Verify --output-dir archives against its manifest instead of packaging")
     args = parser.parse_args()
-    print(json.dumps(package_skills(args.output_dir, args.revision, args.manifest), indent=2))
+    if args.verify:
+        if args.revision or args.manifest:
+            parser.error("--verify takes only --output-dir")
+        print(json.dumps(verify_archives(args.output_dir), indent=2))
+    else:
+        print(json.dumps(package_skills(args.output_dir, args.revision, args.manifest), indent=2))

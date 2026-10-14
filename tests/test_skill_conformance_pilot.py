@@ -12,7 +12,7 @@ from unittest import TestCase, main, mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PILOT = ROOT / "skills/szl-skill-conformance"
-spec = importlib.util.spec_from_file_location("skill_conformance_pilot", PILOT / "kernel.py")
+spec = importlib.util.spec_from_file_location("skill_conformance_pilot", PILOT / "scripts" / "conformance.py")
 kernel = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kernel)
 

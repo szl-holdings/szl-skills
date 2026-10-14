@@ -4,12 +4,24 @@ import copy
 import hashlib
 import json
 import runpy
+import subprocess
 import tempfile
 import types
 import unittest
+import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SETUP = runpy.run_path(str(ROOT / "tools" / "install_claude_science.py"))
+REVISION = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+                          capture_output=True, text=True).stdout.strip()
+BINDINGS = {}
+
+
+def bound(family):
+    """Binding at the checked-out commit; staged working-tree resources must equal it."""
+    if family not in BINDINGS:
+        BINDINGS[family] = SETUP["revision_binding"](ROOT, REVISION, family)
+    return copy.deepcopy(BINDINGS[family])
 
 
 def flattened(batches):
@@ -96,7 +108,7 @@ class SetupTests(unittest.TestCase):
         self.assertLessEqual(len(self.resources), SETUP["MAX_BATCHES"])
         self.assertTrue(all(sum(map(resource_bytes, batch.values())) <= SETUP["MAX_BATCH_BYTES"]
                             for batch in self.resources))
-        result = SETUP["install"](self.host, self.resources, self.path, family="core")
+        result = SETUP["install"](self.host, self.resources, self.path, family="core", binding=bound("core"))
         self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
         self.assertEqual(result["family"], "core")
         self.assertEqual(len(result["skills"]), len(SETUP["NAMES"]))
@@ -112,7 +124,7 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(set(hashes), set(files))
             for path, content in files.items():
                 self.assertEqual(hashes[path], hashlib.sha256(content.encode("utf-8")).hexdigest())
-        second = SETUP["install"](self.host, self.resources, self.path.with_name("second.json"), family="core")
+        second = SETUP["install"](self.host, self.resources, self.path.with_name("second.json"), family="core", binding=bound("core"))
         self.assertEqual(second["status"], "PUBLISHED_AND_READ_BACK")
         self.assertEqual(len(self.host.skills.published), len(SETUP["NAMES"]))
 
@@ -123,7 +135,7 @@ class SetupTests(unittest.TestCase):
         self.host.skills.origins[name] = "personal"
         self.host.skills.files[name, "SKILL.md"] = "retain my personal skill"
         with self.assertRaises(ValueError):
-            SETUP["install"](self.host, self.resources, self.path)
+            SETUP["install"](self.host, self.resources, self.path, binding=bound("core"))
         self.assertEqual(len(self.host.skills.files), 1)
         self.assertEqual(self.host.skills.published, [])
 
@@ -144,7 +156,7 @@ class SetupTests(unittest.TestCase):
                 self.assertLessEqual(resource_bytes(files), SETUP["MAX_SKILL_BYTES"])
                 self.assertEqual(files["LICENSE"], (ROOT / "LICENSE").read_text(encoding="utf-8"))
                 self.assertEqual(files["NOTICE"], (ROOT / "NOTICE").read_text(encoding="utf-8"))
-        result = SETUP["install"](self.host, all_batches, self.path, family="all")
+        result = SETUP["install"](self.host, all_batches, self.path, family="all", binding=bound("all"))
         self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
         self.assertEqual(result["family"], "all")
         self.assertEqual(set(result["skills"]), expected)
@@ -182,6 +194,8 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn("kernel.py", reporting["szl-reporting-guideline-audit"])
         self.assertEqual(set(sharing), {"szl-skill-conformance"})
         self.assertIn("scripts/run.py", sharing["szl-skill-conformance"])
+        self.assertIn("scripts/conformance.py", sharing["szl-skill-conformance"])
+        self.assertNotIn("kernel.py", sharing["szl-skill-conformance"])
         for family, resources in (("design", design), ("replay", replay),
                                   ("rare-disease-replay", rare_replay), ("paper", paper),
                                   ("assay", assay), ("multiplicity", multiplicity),
@@ -189,27 +203,28 @@ class SetupTests(unittest.TestCase):
                                   ("reporting", reporting), ("sharing", sharing)):
             self.assertLessEqual(sum(map(resource_bytes, resources.values())), SETUP["MAX_BATCH_BYTES"])
             self.assertEqual(SETUP["bundle_batches"](ROOT, family=family), [resources])
-        SETUP["install"](self.host, self.resources, self.path, family="core")
-        design_result = SETUP["install"](self.host, design, self.path.with_name("design.json"), family="design")
+        SETUP["install"](self.host, self.resources, self.path, family="core", binding=bound("core"))
+        design_result = SETUP["install"](self.host, design, self.path.with_name("design.json"), family="design", binding=bound("design"))
         self.assertEqual(design_result["family"], "design")
-        replay_result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay")
+        replay_result = SETUP["install"](self.host, replay, self.path.with_name("replay.json"), family="replay", binding=bound("replay"))
         self.assertEqual(replay_result["family"], "replay")
         rare_result = SETUP["install"](self.host, rare_replay,
-                                       self.path.with_name("rare-replay.json"), family="rare-disease-replay")
+                                       self.path.with_name("rare-replay.json"), family="rare-disease-replay", binding=bound("rare-disease-replay"))
         self.assertEqual(rare_result["family"], "rare-disease-replay")
-        paper_result = SETUP["install"](self.host, paper, self.path.with_name("paper.json"), family="paper")
+        paper_result = SETUP["install"](self.host, paper, self.path.with_name("paper.json"), family="paper", binding=bound("paper"))
         self.assertEqual(paper_result["family"], "paper")
-        SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay")
-        multiplicity_result = SETUP["install"](self.host, multiplicity, self.path.with_name("multiplicity.json"), family="multiplicity")
+        SETUP["install"](self.host, assay, self.path.with_name("assay.json"), family="assay", binding=bound("assay"))
+        multiplicity_result = SETUP["install"](self.host, multiplicity, self.path.with_name("multiplicity.json"), family="multiplicity", binding=bound("multiplicity"))
         self.assertEqual(multiplicity_result["family"], "multiplicity")
-        uncertainty_result = SETUP["install"](self.host, uncertainty, self.path.with_name("uncertainty.json"), family="uncertainty")
+        uncertainty_result = SETUP["install"](self.host, uncertainty, self.path.with_name("uncertainty.json"), family="uncertainty", binding=bound("uncertainty"))
         self.assertEqual(uncertainty_result["family"], "uncertainty")
-        reporting_result = SETUP["install"](self.host, reporting, self.path.with_name("reporting.json"), family="reporting")
+        reporting_result = SETUP["install"](self.host, reporting, self.path.with_name("reporting.json"), family="reporting", binding=bound("reporting"))
         self.assertEqual(reporting_result["family"], "reporting")
-        sharing_result = SETUP["install"](self.host, sharing, self.path.with_name("sharing.json"), family="sharing")
+        sharing_result = SETUP["install"](self.host, sharing, self.path.with_name("sharing.json"), family="sharing", binding=bound("sharing"))
         self.assertEqual(sharing_result["family"], "sharing")
         self.assertEqual(sharing_result["runtime_task_evaluation"], "NOT_EXECUTED")
-        result = SETUP["install"](self.host, change, self.path.with_name("change.json"), family="change")
+        self.assertNotIn("sidecar_gate", sharing_result["skills"]["szl-skill-conformance"])
+        result = SETUP["install"](self.host, change, self.path.with_name("change.json"), family="change", binding=bound("change"))
         self.assertEqual(set(result["agent"]["skillNames"]),
                          set(SETUP["NAMES"] + SETUP["DESIGN_NAMES"] + SETUP["REPLAY_NAMES"] +
                              SETUP["RARE_DISEASE_REPLAY_NAMES"] + SETUP["PAPER_NAMES"] +
@@ -232,10 +247,10 @@ class SetupTests(unittest.TestCase):
         self.assertLessEqual(resource_bytes(files), SETUP["MAX_SKILL_BYTES"])
         for malformed in ({}, {"szl-uncertainty-lineage": {"huge": "x" * 1000001}}):
             with self.assertRaises(ValueError):
-                SETUP["install"](self.host, malformed, self.path, family="uncertainty")
+                SETUP["install"](self.host, malformed, self.path, family="uncertainty", binding=bound("uncertainty"))
         self.assertEqual(self.host.skills.files, {})
         self.assertFalse(self.path.exists())
-        result = SETUP["install"](self.host, resources, self.path, family="uncertainty")
+        result = SETUP["install"](self.host, resources, self.path, family="uncertainty", binding=bound("uncertainty"))
         self.assertEqual(result["family"], "uncertainty")
         self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
         self.assertEqual(result["runtime_task_evaluation"], "NOT_EXECUTED")
@@ -290,14 +305,14 @@ class SetupTests(unittest.TestCase):
     def test_gate_rejection_is_not_a_publication_success(self):
         self.host.skills.reject_gate = True
         with self.assertRaises(ValueError):
-            SETUP["install"](self.host, self.resources, self.path, family="core")
+            SETUP["install"](self.host, self.resources, self.path, family="core", binding=bound("core"))
         self.assertEqual(self.host.skills.published, [])
         self.assertIn("FAILED_OR_INCOMPLETE", self.path.read_text())
 
     def test_mismatched_readback_is_not_publication_success(self):
         self.host.skills.corrupt_published_readback = True
         with self.assertRaisesRegex(ValueError, "readback mismatch"):
-            SETUP["install"](self.host, self.resources, self.path, family="core")
+            SETUP["install"](self.host, self.resources, self.path, family="core", binding=bound("core"))
         self.assertIn("FAILED_OR_INCOMPLETE", self.path.read_text())
 
     def test_invalid_receipt_parent_rejected_before_host_access(self):
@@ -307,18 +322,18 @@ class SetupTests(unittest.TestCase):
                              file_parent / "receipt.json"):
             with self.subTest(receipt_path=receipt_path):
                 with self.assertRaisesRegex(ValueError, "receipt"):
-                    SETUP["install"](None, self.resources, receipt_path, family="core")
+                    SETUP["install"](None, self.resources, receipt_path, family="core", binding=bound("core"))
                 self.assertFalse(receipt_path.exists())
         self.assertEqual(file_parent.read_text(encoding="utf-8"), "keep")
 
     def test_update_retains_unstaged_personal_file_and_marks_completeness_unverified(self):
-        SETUP["install"](self.host, self.resources, self.path, family="core")
+        SETUP["install"](self.host, self.resources, self.path, family="core", binding=bound("core"))
         name = SETUP["NAMES"][-1]
         staged = flattened(self.resources)
         self.host.skills.files[name, "scripts/stale.py"] = "print('personal')\n"
         self.host.skills.files[name, "SKILL.md"] += "\nold personal revision\n"
         updated = SETUP["install"](self.host, self.resources, self.path.with_name("updated.json"),
-                                   update=True, family="core")
+                                   update=True, family="core", binding=bound("core"))
         self.assertEqual(updated["status"], "PUBLISHED_AND_READ_BACK")
         self.assertEqual(updated["resource_set_completeness"], "UNVERIFIED")
         self.assertEqual(self.host.skills.files[name, "scripts/stale.py"], "print('personal')\n")
@@ -408,10 +423,154 @@ class SetupTests(unittest.TestCase):
         self.host.skills.origins[name] = "anthropic"
         self.host.skills.files[name, "SKILL.md"] = "protected"
         with self.assertRaisesRegex(ValueError, "Protected skill name collision"):
-            SETUP["install"](self.host, all_batches, self.path, family="all")
+            SETUP["install"](self.host, all_batches, self.path, family="all", binding=bound("all"))
         self.assertEqual(self.host.skills.files, {(name, "SKILL.md"): "protected"})
         self.assertEqual(self.host.skills.published, [])
         self.assertFalse(self.path.exists())
+
+    def test_staging_mode_is_declared_for_every_selected_skill(self):
+        selected = SETUP["family_names"]("all")
+        cli_only = SETUP["CLI_ONLY_NAMES"]
+        self.assertEqual(len(cli_only), len(set(cli_only)))
+        self.assertLessEqual(set(cli_only), set(selected))
+        self.assertIn("szl-skill-conformance", cli_only)
+        staged = flattened(SETUP["bundle_batches"](ROOT, family="all"))
+        for name in selected:
+            with self.subTest(skill=name):
+                self.assertEqual("kernel.py" in staged[name], name not in cli_only)
+
+    def test_staging_mode_contradictions_refused_before_host(self):
+        sharing = SETUP["bundle"](ROOT, family="sharing")
+        planted = copy.deepcopy(sharing)
+        engine = planted["szl-skill-conformance"]["scripts/conformance.py"]
+        planted["szl-skill-conformance"]["kernel.py"] = engine
+        with self.assertRaisesRegex(ValueError, "CLI-only skill must not stage a root kernel.py"):
+            SETUP["install"](None, planted, self.path, family="sharing", binding=bound("sharing"))
+        change = SETUP["bundle"](ROOT, family="change")
+        name = "szl-research-change-impact"
+        for kernel, message in ((None, "lacks a root kernel.py"),
+                                ("def check(document):\n    return document\n", r"exports no szl_\* entrypoint"),
+                                ("def szl_plan(:\n", "does not parse")):
+            with self.subTest(message=message):
+                bad = copy.deepcopy(change)
+                if kernel is None:
+                    del bad[name]["kernel.py"]
+                else:
+                    bad[name]["kernel.py"] = kernel
+                with self.assertRaisesRegex(ValueError, message):
+                    SETUP["install"](None, bad, self.path, family="change", binding=bound("change"))
+        self.assertFalse(self.path.exists())
+
+    def test_binding_covers_every_staged_resource_including_legal_files(self):
+        binding = bound("all")
+        self.assertEqual((binding["schema"], binding["source_commit"], binding["family"]),
+                         (SETUP["BINDING_SCHEMA"], REVISION, "all"))
+        legal = {name: hashlib.sha256(subprocess.run(["git", "show", REVISION + ":" + name], cwd=ROOT,
+                                                     check=True, capture_output=True).stdout).hexdigest()
+                 for name in ("LICENSE", "NOTICE")}
+        staged = flattened(SETUP["bundle_batches"](ROOT, family="all"))
+        self.assertEqual(set(binding["skills"]), set(staged))
+        for name, files in staged.items():
+            with self.subTest(skill=name):
+                expected = binding["skills"][name]
+                self.assertEqual(set(expected), set(files))
+                self.assertEqual({path: expected[path] for path in legal}, legal)
+                for path, content in files.items():
+                    self.assertEqual(expected[path], hashlib.sha256(content.encode("utf-8")).hexdigest())
+        checked = SETUP["verify_binding"](staged, binding, "all")
+        self.assertEqual(checked["status"], "STAGED_RESOURCES_MATCH_REVISION")
+        self.assertEqual(checked["resource_sha256"], binding["skills"])
+        for revision in ("main", "a" * 39, "A" * 40, None):
+            with self.subTest(revision=revision), self.assertRaises(ValueError):
+                SETUP["revision_binding"](ROOT, revision, "sharing")
+        tree = subprocess.run(["git", "rev-parse", "HEAD^{tree}"], cwd=ROOT, check=True,
+                              capture_output=True, text=True).stdout.strip()
+        with self.assertRaisesRegex(ValueError, "commit object"):
+            SETUP["revision_binding"](ROOT, tree, "sharing")
+
+    def test_receipt_binds_readback_to_source_revision(self):
+        change = SETUP["bundle"](ROOT, family="change")
+        result = SETUP["install"](self.host, change, self.path, family="change", binding=bound("change"))
+        self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
+        source = result["source_binding"]
+        self.assertEqual((source["source_commit"], source["status"]),
+                         (REVISION, "STAGED_RESOURCES_MATCH_REVISION"))
+        name = "szl-research-change-impact"
+        self.assertEqual(result["skills"][name]["readback_sha256"], source["resource_sha256"][name])
+        self.assertEqual(json.loads(self.path.read_text(encoding="utf-8"))["source_binding"], source)
+
+    def test_unbound_or_mismatched_sdk_staging_refused_before_host(self):
+        for family, name, payload in (("change", "szl-research-change-impact", "kernel.py"),
+                                      ("sharing", "szl-skill-conformance", "scripts/conformance.py")):
+            resources = SETUP["bundle"](ROOT, family=family)
+            binding = bound(family)
+            tampered = copy.deepcopy(binding)
+            tampered["skills"][name]["SKILL.md"] = "0" * 64
+
+            def mutate(change):
+                bad = copy.deepcopy(resources)
+                change(bad[name])
+                return bad
+
+            def flip(files):
+                files[payload] = files[payload].replace("def ", "def  ", 1)
+
+            cases = {
+                "missing LICENSE": (mutate(lambda files: files.pop("LICENSE")), binding, "LICENSE"),
+                "modified NOTICE": (mutate(lambda files: files.update(NOTICE=files["NOTICE"] + "\n")),
+                                    binding, "differs from the bound revision: " + name + "/NOTICE"),
+                "unexpected resource": (mutate(lambda files: files.update({"scripts/extra.py": "print(1)\n"})),
+                                        binding, "not bound to the revision: " + name + "/scripts/extra.py"),
+                "mutated payload byte": (mutate(flip), binding,
+                                         "differs from the bound revision: " + name + "/" + payload),
+                "no binding": (resources, None, "revision_binding"),
+                "other family binding": (resources, bound("design"), "selected family"),
+                "tampered binding digest": (resources, tampered, "differs from the bound revision"),
+            }
+            for label, (staged, used, message) in cases.items():
+                with self.subTest(family=family, case=label):
+                    with self.assertRaisesRegex(ValueError, message):
+                        SETUP["install"](None, staged, self.path, family=family, binding=used)
+                    self.assertFalse(self.path.exists())
+            missing = mutate(lambda files: files.pop("LICENSE"))
+            with self.assertRaisesRegex(ValueError, "Bound resource missing from staging: " + name + "/LICENSE"):
+                SETUP["verify_binding"](missing, binding, family)
+
+    def test_zip_round_trip_into_sdk_staging(self):
+        package = runpy.run_path(str(ROOT / "tools" / "package_science.py"))
+        names = {"szl-research-change-impact": ("change", "kernel.py"),
+                 "szl-skill-conformance": ("sharing", "scripts/conformance.py")}
+        with tempfile.TemporaryDirectory() as temp:
+            archives = pathlib.Path(temp) / "archives"
+            package["package_skills"](archives, REVISION, manifest=True)
+            self.assertEqual(package["verify_archives"](archives)["status"], "ARCHIVES_MATCH_MANIFEST")
+            for name, (family, payload) in names.items():
+                mutations = {
+                    "missing LICENSE": (lambda files: files.pop("LICENSE"), "LICENSE"),
+                    "modified NOTICE": (lambda files: files.update(NOTICE=files["NOTICE"] + " "),
+                                        "differs from the bound revision: " + name + "/NOTICE"),
+                    "unexpected resource": (lambda files: files.update({"assets/extra.txt": "x"}),
+                                            "not bound to the revision: " + name + "/assets/extra.txt"),
+                    "mutated payload byte": (lambda files: files.update(
+                        {payload: files[payload].replace("def ", "def  ", 1)}),
+                        "differs from the bound revision: " + name + "/" + payload),
+                }
+                with zipfile.ZipFile(archives / (name + ".zip")) as archive:
+                    staged = {name: {info.filename[len(name) + 1:]: archive.read(info).decode("utf-8")
+                                     for info in archive.infolist()}}
+                with self.subTest(skill=name):
+                    result = SETUP["install"](self.host, staged, self.path.with_name(family + "-zip.json"),
+                                              family=family, binding=bound(family))
+                    self.assertEqual(result["status"], "PUBLISHED_AND_READ_BACK")
+                    self.assertEqual(result["skills"][name]["readback_sha256"], bound(family)["skills"][name])
+                for label, (change, message) in mutations.items():
+                    bad = copy.deepcopy(staged)
+                    change(bad[name])
+                    receipt = self.path.with_name(family + "-" + label.replace(" ", "-") + ".json")
+                    with self.subTest(skill=name, case=label):
+                        with self.assertRaisesRegex(ValueError, message):
+                            SETUP["install"](None, bad, receipt, family=family, binding=bound(family))
+                        self.assertFalse(receipt.exists())
 
 
 if __name__ == "__main__":

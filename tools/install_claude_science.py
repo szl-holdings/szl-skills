@@ -2,6 +2,7 @@
 """Use only inside Claude Science's documented control-plane repl with its real host SDK.
 This script never opens a database, reads credentials or emulates the application's host.
 """
+import ast
 import hashlib
 import json
 import pathlib
@@ -26,6 +27,17 @@ MULTIPLICITY_NAMES = ["szl-multiplicity-audit"]
 UNCERTAINTY_NAMES = ["szl-uncertainty-lineage"]
 REPORTING_NAMES = ["szl-reporting-guideline-audit"]
 SHARING_NAMES = ["szl-skill-conformance"]
+# Staging mode is declared, not inferred from an import. Every other selected skill is a
+# native sidecar: a root kernel.py exporting a szl_* entrypoint, whose edit must pass the
+# host sidecar gate. These skills are CLI-only: they run as `python -B scripts/...`, stage
+# no root kernel.py and never enter the gate path. Staging refuses either contradiction.
+CLI_ONLY_NAMES = ["szl-science-workbench", "szl-paired-science", "szl-experiment-replay",
+                  "szl-figure-data-contract", "szl-measurement-harmonizer",
+                  "szl-rare-disease-evidence-replay", "szl-paper-evidence-audit",
+                  "szl-uncertainty-lineage", "szl-reporting-guideline-audit", "szl-skill-conformance"]
+BINDING_SCHEMA = "szl.science-resource-binding.v1"
+COMMIT = re.compile(r"[0-9a-f]{40}\Z")
+DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 MAX_BATCH_BYTES = 1000000
 MAX_SKILL_BYTES = 200000
 MAX_BATCHES = 8
@@ -159,6 +171,112 @@ def bundle_batches(root, family="all"):
     return batches
 
 
+def _check_staging_mode(name, files):
+    """Refuse a staged skill whose root kernel.py contradicts its declared staging mode."""
+    if name in CLI_ONLY_NAMES:
+        if "kernel.py" in files:
+            raise ValueError("CLI-only skill must not stage a root kernel.py: " + name)
+        return
+    if "kernel.py" not in files:
+        raise ValueError("Native sidecar skill lacks a root kernel.py: " + name)
+    try:
+        tree = ast.parse(files["kernel.py"])
+    except (SyntaxError, ValueError) as error:
+        raise ValueError("Native sidecar kernel.py does not parse: " + name) from error
+    if not any(isinstance(node, ast.FunctionDef) and node.name.startswith("szl_") for node in tree.body):
+        raise ValueError("Native sidecar kernel.py exports no szl_* entrypoint: " + name)
+
+
+def revision_binding(root, revision, family="all"):
+    """Hash every resource the family stages, root LICENSE and NOTICE included, from the Git
+    objects of one full commit. install() refuses staged resources that differ from it."""
+    import os
+    import subprocess
+    if not isinstance(revision, str) or not COMMIT.fullmatch(revision):
+        raise ValueError("Binding requires a full 40-character commit")
+    root = pathlib.Path(root).resolve(strict=True)
+    names = family_names(family)
+    env = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
+
+    def git(arguments, data=None):
+        return subprocess.run(["git", *arguments], cwd=root, env=env, input=data,
+                              check=True, capture_output=True).stdout
+
+    def tree(prefix, *paths):
+        entries = {}
+        for record in git(["ls-tree", "-r", "-z", revision, "--", *(paths or (prefix,))]).split(b"\0"):
+            if not record:
+                continue
+            meta, path = record.split(b"\t", 1)
+            mode, kind, oid = meta.decode("ascii").split(" ")
+            path = path.decode("utf-8")
+            if mode not in ("100644", "100755") or kind != "blob" or not path.startswith(prefix):
+                raise ValueError("Only tracked regular files may be bound: " + path)
+            entries[path[len(prefix):]] = oid
+        return entries
+
+    try:
+        if git(["cat-file", "-t", revision]).strip() != b"commit":
+            raise ValueError("Binding revision must be a commit object")
+        legal = tree("", "LICENSE", "NOTICE")
+        listed = {name: tree("skills/" + name + "/") for name in names}
+        oids = list(legal.values()) + [oid for files in listed.values() for oid in files.values()]
+        output = git(["cat-file", "--batch"], ("\n".join(oids) + "\n").encode("ascii"))
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ValueError("Git could not resolve the binding revision") from error
+    digests, offset = {}, 0
+    for oid in oids:
+        end = output.index(b"\n", offset)
+        header = output[offset:end].decode("ascii").split(" ")
+        if len(header) != 3 or header[:2] != [oid, "blob"]:
+            raise ValueError("Unexpected Git object while binding")
+        start = end + 1
+        digests[oid] = hashlib.sha256(output[start:start + int(header[2])]).hexdigest()
+        offset = start + int(header[2]) + 1
+    if set(legal) != {"LICENSE", "NOTICE"}:
+        raise ValueError("Binding revision lacks root LICENSE or NOTICE")
+    skills = {}
+    for name, files in listed.items():
+        if "SKILL.md" not in files or {"LICENSE", "NOTICE"} & set(files):
+            raise ValueError("Bound skill needs SKILL.md and no local LICENSE/NOTICE: " + name)
+        bound = {path: digests[oid] for path, oid in {**files, **legal}.items()}
+        skills[name] = dict(sorted(bound.items()))
+    return {"schema": BINDING_SCHEMA, "source_commit": revision, "family": family, "skills": skills}
+
+
+def verify_binding(resources, binding, family):
+    """Refuse staged resources unless every path and byte matches the revision binding:
+    a missing or modified LICENSE/NOTICE, an extra resource or a changed byte fails."""
+    names = family_names(family)
+    if (not isinstance(binding, dict) or set(binding) != {"schema", "source_commit", "family", "skills"}
+            or binding["schema"] != BINDING_SCHEMA):
+        raise ValueError("Bind staged resources to a source revision with revision_binding() first")
+    commit = binding["source_commit"]
+    if not isinstance(commit, str) or not COMMIT.fullmatch(commit) or binding["family"] != family:
+        raise ValueError("Binding needs a full source commit for the selected family")
+    skills = binding["skills"]
+    if not isinstance(skills, dict) or set(skills) != set(names):
+        raise ValueError("Binding does not cover exactly the selected skills")
+    if not isinstance(resources, dict) or set(resources) != set(names):
+        raise ValueError("Staged skills do not match the selected family")
+    for name in names:
+        expected, staged = skills[name], resources[name]
+        if (not isinstance(expected, dict) or not isinstance(staged, dict)
+                or any(not isinstance(digest, str) or not DIGEST.fullmatch(digest) for digest in expected.values())):
+            raise ValueError("Malformed resource binding: " + name)
+        missing, extra = sorted(set(expected) - set(staged)), sorted(set(staged) - set(expected))
+        if missing:
+            raise ValueError("Bound resource missing from staging: " + name + "/" + missing[0])
+        if extra:
+            raise ValueError("Staged resource is not bound to the revision: " + name + "/" + extra[0])
+        for path in sorted(expected):
+            content = staged[path]
+            if not isinstance(content, str) or hashlib.sha256(content.encode("utf-8")).hexdigest() != expected[path]:
+                raise ValueError("Staged resource differs from the bound revision: " + name + "/" + path)
+    return {"schema": BINDING_SCHEMA, "source_commit": commit, "status": "STAGED_RESOURCES_MATCH_REVISION",
+            "resource_sha256": {name: dict(sorted(skills[name].items())) for name in names}}
+
+
 def _review_batches(resources, selected_names):
     batches = [resources] if isinstance(resources, dict) else resources
     if not isinstance(batches, list) or not 1 <= len(batches) <= MAX_BATCHES:
@@ -174,6 +292,7 @@ def _review_batches(resources, selected_names):
             size += _skill_bytes(files)
             if not _declares_name(files["SKILL.md"], name):
                 raise ValueError("Skill name mismatch")
+            _check_staging_mode(name, files)
             flattened[name] = files
         if size > MAX_BATCH_BYTES:
             raise ValueError("Staging batch exceeds 1 MB")
@@ -183,13 +302,15 @@ def _review_batches(resources, selected_names):
     return flattened, receipts
 
 
-def install(host, resources, receipt_path, update=False, family="core"):
-    """Preflight every batch and collision before SDK edits; publish and read back."""
+def install(host, resources, receipt_path, update=False, family="core", binding=None):
+    """Preflight every batch, its revision binding and collisions before SDK edits;
+    publish and read back. `binding` comes from revision_binding() at the reviewed commit."""
     receipt_path = pathlib.Path(receipt_path)
     if receipt_path.exists():
         raise FileExistsError("Retain the previous receipt; choose a new receipt path")
     names = family_names(family)
     resources, batches = _review_batches(resources, names)
+    source_binding = verify_binding(resources, binding, family)
     if not receipt_path.parent.is_dir():
         raise ValueError("receipt parent must be an existing directory")
     inventory = {s["name"]: s for s in host.skills.list()}
@@ -221,6 +342,7 @@ def install(host, resources, receipt_path, update=False, family="core"):
     receipt = {"schema": "szl.claude-science-install.v1", "status": "IN_PROGRESS", "skills": {},
                "agent": None, "family": family, "runtime_task_evaluation": "NOT_EXECUTED", "signed": False,
                "readback_scope": "STAGED_RESOURCES_ONLY", "resource_set_completeness": "UNVERIFIED",
+               "source_binding": source_binding,
                "staging": {"batches": batches, "max_batch_bytes": MAX_BATCH_BYTES,
                            "max_skill_bytes": MAX_SKILL_BYTES, "max_batches": MAX_BATCHES,
                            "total_resource_bytes": sum(batch["resource_bytes"] for batch in batches)}}

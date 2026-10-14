@@ -9,7 +9,7 @@ import shutil
 import tempfile
 
 PILOT = pathlib.Path(__file__).resolve().parents[2] / "skills" / "szl-skill-conformance"
-spec = importlib.util.spec_from_file_location("conformance_demo", PILOT / "kernel.py")
+spec = importlib.util.spec_from_file_location("conformance_demo", PILOT / "scripts" / "conformance.py")
 kernel = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kernel)
 with tempfile.TemporaryDirectory(prefix="szl-conformance-fixture-") as temporary:

@@ -13,6 +13,8 @@ host observation, and scientific result validity. Never combine them into "verif
 1. Ask for the exact source skill directory, the host-exported resource directory,
    and retained task/result files. An import screenshot or catalog entry is not an
    invocation trace. Do not fabricate absent files or execute unknown candidate code.
+   For a szl-skills package, the source is the extracted revision-bound ZIP folder:
+   packaging adds root LICENSE and NOTICE, so `skills/<name>` alone differs from an export.
 2. Read [the evidence contract](references/contract.md). Record the source revision
    separately. This checker hashes local bytes, not Git publication or signatures.
 3. Run the reviewed checker with Python 3.10+ and `-B` (no dependencies, network,
@@ -36,6 +38,7 @@ host observation, and scientific result validity. Never combine them into "verif
    selected skill, resources, result and irrelevant-task control. Do not inject app
    state, change private databases, bypass permissions or auto-update imports.
 
+This is a CLI-only skill; `scripts/conformance.py` is not a Claude Science sidecar.
 This source candidate is outside the immutable v0.4.0 and v0.5.0-rc.3 releases.
 No claims of cross-host portability, agent efficacy, novelty or scientific validation
 follow from its offline tests. Review every resource before importing this skill.

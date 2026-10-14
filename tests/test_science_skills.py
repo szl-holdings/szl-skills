@@ -17,6 +17,18 @@ from unittest import mock
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 NAMES = ["szl-research-anatomy", "szl-math-claim-check", "szl-dataset-readiness",
          "szl-model-evaluation", "szl-kernel-comparison", "szl-reproducibility-capsule"]
+SETUP = runpy.run_path(str(ROOT / "tools" / "install_claude_science.py"))
+# Selected native kernels that predate full sidecar coverage and still define top-level
+# private helpers or a class. Pinned exactly: a new deviation, or a repaired one, must
+# change this table. Whether the real host gate accepts them remains unverified.
+SIDECAR_NAMESPACE_DEVIATIONS = {
+    "szl-analysis-mutation-test": {"private"}, "szl-compute-energy-receipt": {"private"},
+    "szl-cross-implementation-check": {"private"}, "szl-evidence-gate": {"private"},
+    "szl-quantization-check": {"private"}, "szl-refutation-ledger": {"private"},
+    "szl-repo-pin": {"private"}, "szl-result-fragility": {"private"},
+    "szl-retrieval-eval": {"private"}, "szl-reviewer-pack": {"private"},
+    "szl-session-receipt": {"private"}, "szl-skill-update-review": {"private", "class"},
+}
 
 
 def load(name):
@@ -473,6 +485,7 @@ class PackagingTests(unittest.TestCase):
                         self.assertFalse((unpacked / "kernel.py").exists())
                         continue
                     if report["skill"] == "szl-skill-conformance":
+                        self.assertFalse((unpacked / "kernel.py").exists())
                         checked = subprocess.run(
                             [sys.executable, "-I", "-B", str(unpacked / "scripts" / "run.py"),
                              "--source", str(unpacked)],
@@ -546,23 +559,36 @@ class PackagingTests(unittest.TestCase):
                         json.loads(p.stdout)
 
     def test_sidecar_ast_is_loadable_without_filesystem_or_network(self):
-        for name in NAMES + ["szl-artifact-lineage", "szl-unit-invariants",
-                             "szl-negative-control-audit", "szl-analysis-plan-audit", "szl-clustered-replication",
-                             "szl-multiplicity-audit", "szl-assay-measurement-audit",
-                             "szl-outcome-preservation", "szl-release-continuity"]:
+        # Coverage derives from the installer selection: every selected skill is either a
+        # declared CLI-only skill or a native kernel held to this contract.
+        selected = SETUP["family_names"]("all")
+        kernels = [name for name in selected if (ROOT / "skills" / name / "kernel.py").is_file()]
+        self.assertEqual(set(kernels), set(selected) - set(SETUP["CLI_ONLY_NAMES"]))
+        self.assertLessEqual(set(SIDECAR_NAMESPACE_DEVIATIONS), set(kernels))
+        for name in kernels:
             with self.subTest(skill=name):
                 path = ROOT / "skills" / name / "kernel.py"
-                tree = ast.parse(path.read_text())
+                tree = ast.parse(path.read_text(encoding="utf-8"))
+                deviations = set()
                 for node in tree.body:
+                    if isinstance(node, ast.ClassDef):
+                        deviations.add("class")
+                        self.assertEqual(node.decorator_list, [])
+                        continue
                     self.assertIsInstance(node, (ast.Expr, ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Assign, ast.AnnAssign))
                     if isinstance(node, ast.FunctionDef):
-                        self.assertFalse(node.name.startswith("_"))
+                        if node.name.startswith("_"):
+                            deviations.add("private")
                         self.assertNotIn(node.name, dir(builtins))
                         self.assertEqual(node.decorator_list, [])
                         for default in node.args.defaults:
                             ast.literal_eval(default)
+                self.assertEqual(deviations, SIDECAR_NAMESPACE_DEVIATIONS.get(name, set()))
                 namespace = load(name)
                 self.assertTrue(any(k.startswith("szl_") and callable(v) for k, v in namespace.items()))
+        for name in SETUP["CLI_ONLY_NAMES"]:
+            with self.subTest(cli_only=name):
+                self.assertFalse((ROOT / "skills" / name / "kernel.py").exists())
 
     def test_every_example_runs_as_standalone_skill(self):
         for name in NAMES:
