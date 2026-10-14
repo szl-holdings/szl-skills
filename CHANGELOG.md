@@ -2,10 +2,6 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
-- Add schema szl.unit-invariants.v2 to szl-unit-invariants: a strict unit grammar over
-  allowlisted SI symbols and n/u/m/c/k/M prefixes (`*`, one `/`, integer exponents) with
-  exact power-of-ten scales, plus an integer `power` invariant. Offset and logarithmic units
-  stay rejected and v1 reports are byte-identical. Only declared checks are evaluated.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and
