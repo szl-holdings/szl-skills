@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/szl-holdings/szl-skills/blob/main/pilots/skill-conformance/use-record.schema.json",
+  "title": "SZL supplied skill-use record v1",
+  "description": "A byte-binding record. Conformance never authenticates host invocation or scientific validity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence_kind", "source", "run_id", "artifact", "reported_selection"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "evidence_kind": {"enum": ["synthetic_fixture", "operator_supplied_record"]},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_url", "revision", "skill_path", "name", "imported_name", "bundle_sha256"],
+      "properties": {
+        "repository_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "revision": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+        "skill_path": {"type": "string", "minLength": 1, "maxLength": 512},
+        "name": {"$ref": "#/$defs/skill_name"},
+        "imported_name": {"$ref": "#/$defs/skill_name"},
+        "bundle_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "run_id": {"$ref": "#/$defs/id"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "path": {"type": "string", "minLength": 1, "maxLength": 512},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "reported_selection": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["host", "trace_id", "trace_path", "trace_sha256", "run_id", "skill_name", "source_revision", "source_bundle_sha256", "artifact_id"],
+          "properties": {
+            "host": {"$ref": "#/$defs/id"},
+            "trace_id": {"$ref": "#/$defs/id"},
+            "trace_path": {"type": "string", "minLength": 1, "maxLength": 512},
+            "trace_sha256": {"$ref": "#/$defs/sha256"},
+            "run_id": {"$ref": "#/$defs/id"},
+            "skill_name": {"$ref": "#/$defs/skill_name"},
+            "source_revision": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+            "source_bundle_sha256": {"$ref": "#/$defs/sha256"},
+            "artifact_id": {"$ref": "#/$defs/id"}
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "skill_name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

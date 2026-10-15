@@ -7,6 +7,7 @@ import pathlib
 import re
 import stat
 import unicodedata
+from urllib.parse import urlsplit
 
 MAX_FILE = 1024 * 1024
 MAX_TOTAL = 4 * MAX_FILE
@@ -249,5 +250,90 @@ def check(source_path, export_path=None, trials_path=None, trial_root=None, impo
             report["issues"].append("declared outcome or trigger control failed")
     except (ValueError, OSError, UnicodeError, RecursionError) as error:
         report["offline_conformance"] = "REJECTED"
+        report["issues"].append(str(error) if isinstance(error, ValueError) else type(error).__name__)
+    return report
+
+
+def check_use_record(source_path, record_path, retained_root):
+    """Bind supplied skill, artifact and optional trace bytes; authenticate no host."""
+    report = {"schema_version": 1, "record_consistency": "REJECTED",
+              "source_binding": "UNAVAILABLE", "source_location": "DECLARED_NOT_VERIFIED",
+              "artifact_binding": "UNAVAILABLE", "host_trace_binding": "UNAVAILABLE",
+              "actual_host_invocation": "UNKNOWN", "scientific_result_validity": "NOT_EVALUATED",
+              "issues": []}
+    try:
+        source = bundle(source_path)
+        report["source_bundle_sha256"] = source["bundle_sha256"]
+        path = pathlib.Path(os.path.abspath(record_path))
+        safe_root(path.parent)
+        raw = bounded_bytes(path)
+        report["record_sha256"] = hashlib.sha256(raw).hexdigest()
+        document = strict_json(raw.decode("utf-8"))
+        keys(document, ("schema_version", "evidence_kind", "source", "run_id", "artifact", "reported_selection"))
+        if type(document["schema_version"]) is not int or document["schema_version"] != 1:
+            raise ValueError("unsupported use-record schema")
+        if document["evidence_kind"] not in ("synthetic_fixture", "operator_supplied_record"):
+            raise ValueError("unsupported evidence kind")
+
+        origin = document["source"]
+        keys(origin, ("repository_url", "revision", "skill_path", "name", "imported_name", "bundle_sha256"))
+        url = urlsplit(origin["repository_url"]) if isinstance(origin["repository_url"], str) else None
+        if (url is None or url.scheme != "https" or not url.hostname or url.username or url.password
+                or url.port == 0 or url.query or url.fragment or not url.path.strip("/")
+                or any(char.isspace() for char in origin["repository_url"])):
+            raise ValueError("invalid declared repository URL")
+        revision = origin["revision"]
+        if not isinstance(revision, str) or re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", revision) is None:
+            raise ValueError("immutable full source revision required")
+        portable_parts(origin["skill_path"])
+        if origin["name"] != source["name"] or not isinstance(origin["imported_name"], str) or not NAME.fullmatch(origin["imported_name"]):
+            raise ValueError("skill identity mismatch")
+        if origin["bundle_sha256"] != source["bundle_sha256"]:
+            report["source_binding"] = "MISMATCH"
+            raise ValueError("source bundle digest mismatch")
+        report["source_binding"] = "MATCHED_LOCAL_BYTES"
+
+        identifier = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
+        run_id = document["run_id"]
+        artifact = document["artifact"]
+        keys(artifact, ("id", "path", "sha256"))
+        if not all(isinstance(value, str) and identifier.fullmatch(value) for value in (run_id, artifact["id"])):
+            raise ValueError("invalid run or artifact identity")
+        retained = safe_root(retained_root)
+        artifact_bytes = retained_file(retained, artifact["path"])
+        if not isinstance(artifact["sha256"], str) or hashlib.sha256(artifact_bytes).hexdigest() != artifact["sha256"]:
+            report["artifact_binding"] = "MISMATCH"
+            raise ValueError("artifact digest mismatch")
+        report["artifact_binding"] = "MATCHED_SUPPLIED_BYTES"
+        report["artifact_id"] = artifact["id"]
+        report["artifact_sha256"] = artifact["sha256"]
+
+        selection = document["reported_selection"]
+        if selection is None:
+            report["record_consistency"] = "INCOMPLETE_HOST_TRACE"
+            report["issues"].append("no supplied host selection trace")
+            return report
+        keys(selection, ("host", "trace_id", "trace_path", "trace_sha256", "run_id",
+                         "skill_name", "source_revision", "source_bundle_sha256", "artifact_id"))
+        if not all(isinstance(selection[key], str) and identifier.fullmatch(selection[key])
+                   for key in ("host", "trace_id")):
+            raise ValueError("invalid host or trace identity")
+        if (selection["run_id"] != run_id or selection["skill_name"] != origin["imported_name"]
+                or selection["source_revision"] != revision
+                or selection["source_bundle_sha256"] != source["bundle_sha256"]
+                or selection["artifact_id"] != artifact["id"]):
+            raise ValueError("reported selection does not join source, run and artifact")
+        trace_bytes = retained_file(retained, selection["trace_path"])
+        if os.path.samefile(retained / selection["trace_path"], retained / artifact["path"]):
+            raise ValueError("trace and artifact must be separate retained files")
+        if (not isinstance(selection["trace_sha256"], str)
+                or hashlib.sha256(trace_bytes).hexdigest() != selection["trace_sha256"]):
+            report["host_trace_binding"] = "MISMATCH"
+            raise ValueError("supplied trace digest mismatch")
+        report["host_trace_binding"] = "MATCHED_SUPPLIED_BYTES"
+        report["host_trace_sha256"] = selection["trace_sha256"]
+        report["actual_host_invocation"] = "NOT_VERIFIED"
+        report["record_consistency"] = "CONSISTENT_SUPPLIED_RECORD"
+    except (ValueError, OSError, UnicodeError, RecursionError, TypeError) as error:
         report["issues"].append(str(error) if isinstance(error, ValueError) else type(error).__name__)
     return report
