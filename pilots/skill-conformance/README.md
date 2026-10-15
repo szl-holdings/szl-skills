@@ -27,6 +27,11 @@ imports. Only the demo/tests create and remove their own temporary fixtures. Fil
 establish integrity of supplied bytes, not authenticity of a host, signature validity,
 task relevance, scientific correctness, or agent effectiveness.
 
+An optional [skill-use record](USE_RECORD.md) now binds one retained artifact and a
+supplied host trace, if available, to the local source bundle. The record validator
+reports `UNKNOWN` without a trace and `NOT_VERIFIED` for actual host invocation
+even when supplied trace bytes match. It does not authenticate a host export.
+
 ## Proposed Claude Science study
 
 Compare the same pinned skill across independently retained task runs inside the actual

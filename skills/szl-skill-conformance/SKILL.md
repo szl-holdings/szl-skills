@@ -1,6 +1,6 @@
 ---
 name: szl-skill-conformance
-description: "Checks retained scientific skill-sharing evidence: exact local source and supplied host-export resource bytes, explicit import aliases, task and result digests, and positive versus irrelevant-task trigger declarations. Use when a shared skill appears imported but invocation is uncertain, when comparing retained trials across hosts, or when an update may invalidate an earlier result. Offline checking never executes the candidate and never certifies real host invocation or scientific correctness."
+description: "Checks retained scientific skill-sharing evidence: exact local source and supplied host-export resource bytes, explicit import aliases, task and result digests, positive versus irrelevant-task trigger declarations, and optional artifact-to-trace byte bindings. Use when a shared skill appears imported but invocation is uncertain, when comparing retained trials across hosts, or when an update may invalidate an earlier result. Offline checking never executes the candidate and never certifies real host invocation or scientific correctness."
 license: Apache-2.0
 ---
 
@@ -35,6 +35,13 @@ host observation, and scientific result validity. Never combine them into "verif
    documented interfaces, retain exports, and have a researcher inspect the task,
    selected skill, resources, result and irrelevant-task control. Do not inject app
    state, change private databases, bypass permissions or auto-update imports.
+
+For a retained result artifact, the optional [skill-use record contract](references/use-record.md)
+binds its bytes and an optional trace file to the exact local skill bundle. Run
+`python -B scripts/use_record.py --source SKILL_DIRECTORY --record use-record.json --retained RETAINED_DIRECTORY`.
+An absent trace is `UNKNOWN`; even a matching supplied trace is `NOT_VERIFIED` as
+actual host invocation. The checker does not authenticate the declared Git revision,
+trace origin, or scientific result.
 
 This source candidate is outside the immutable v0.4.0 and v0.5.0-rc.3 releases.
 No claims of cross-host portability, agent efficacy, novelty or scientific validation
