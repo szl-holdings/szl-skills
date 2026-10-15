@@ -66,3 +66,40 @@ original condition set. A failed run returns exit 2 and a `HOLD` report with
 a reason but no evidence ledger. Local hashes prove byte agreement with the
 operator-supplied manifest, not authentic source history. Neither output is a
 diagnosis, disease ranking, model evaluation or clinical-use qualification.
+
+## Two-cutoff declared delta
+
+With `--compare-manifest`, `--manifest` is the earlier manifest and the second
+path is the later manifest. Both must satisfy the v1 manifest contract, have
+strictly increasing cutoffs, and declare exactly equal pinned `case` and
+`sources` objects; only their cutoff may differ. The runner replays each cutoff
+under the same rules above. It never opens a snapshot dated after that cutoff,
+never substitutes an older complete snapshot for an incomplete latest one, and
+does not emit a delta if either replay holds. The bundled
+`assets/manifest-later.json` changes only the cutoff from the original example.
+
+The `szl.rare-disease-evidence-replay.delta.v1` report retains each manifest
+SHA-256, cutoff, and selected source snapshot IDs, releases, capture times and
+SHA-256 values. Deterministic `added`, `declared_removed`, and `changed` arrays
+cover the case features and selected HPO-shaped and ClinVar-shaped rows.
+Case features are keyed by term; a missing term is not `EXCLUDED`. HPO annotation
+identity is `(condition, term, qualifier, source_ref)`, with its declared
+observation time compared as content. A qualifier or provenance change is thus
+reported as one declared removal and one addition, not silently collapsed.
+Synthetic VCV, RCV and SCV entries are compared by accession stem without the
+`.version` suffix, so a version or opaque assertion-token change remains visible.
+VCV entries retain linked RCV tokens; SCV entries retain their RCV/VCV context.
+If one snapshot uses two versions of the same accession stem in a comparison
+scope, the delta holds as `AMBIGUOUS_DELTA_IDENTITY` instead of choosing one.
+
+`declared_removed` means only that a row is absent from the later
+operator-declared complete snapshot; it does **not** verify provider withdrawal,
+historical availability, a clinical reclassification, or biological truth.
+Capture and observation times remain operator declarations, not independently
+witnessed chronology. A structurally valid delta is `DECLARED_ONLY` and always
+`readiness: HOLD`, `qualification: NOT_EVALUATED`, `signed: false`, and
+`independent_witness: false`. A failed comparison returns a `HOLD` report with
+a reason and no `deltas` ledger. The CLI exclusively creates a new report path;
+exit 0 is structural completion, and exit 2 is HOLD or unsafe output. No real
+patient inputs, live data access, diagnosis, variant ranking, or model evaluation
+are permitted by this contract.

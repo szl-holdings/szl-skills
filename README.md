@@ -75,7 +75,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 |---|---|---|
 | run the nine integrated checks on one project and keep immutable runs | szl-science-workbench | what changed, what is stale, what has findings |
 | know whether a claim in a paper or model card has a file behind it | szl-evidence-gate | PASS / FAIL / ABSTAIN per claim |
-| replay a synthetic rare-disease evidence timeline without future leakage | szl-rare-disease-evidence-replay | selected HPO/ClinVar-shaped source snapshots, source/provenance ablations and a permanent HOLD readiness |
+| replay or compare two cutoffs of a synthetic rare-disease evidence timeline without future leakage | szl-rare-disease-evidence-replay | pinned HPO/ClinVar-shaped snapshots, declared row/version deltas or source/provenance ablations, and permanent HOLD readiness |
 | check that a PDF table quote or figure caption has a pinned page and source region | szl-paper-evidence-audit | exact text locator or unresolved, always requiring human review |
 | confirm an R rewrite matches the Python original | szl-cross-implementation-check | CONSISTENT / DIVERGENT / INCOMPARABLE per quantity |
 | know whether your QC would catch a duplicated plate or a x1000 unit error | szl-analysis-mutation-test | which synthetic corruptions were caught or missed |
@@ -108,7 +108,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-paired-science | Does the paired before/after comparison bind to frozen inputs and survive its own control? | Does not verify authenticity or independence |
 | szl-reproducibility-capsule | Are these exactly the files behind the result, and is a replay declaration complete? | Executes nothing; hashes are not signatures |
 | szl-experiment-replay | Does a pinned, small CSV mean rerun match its frozen reference? | Fixed offline operation only; unsigned same-host receipt, not independent replication |
-| szl-rare-disease-evidence-replay | What synthetic case-feature and HPO/ClinVar-shaped evidence was declared at a UTC cutoff, and what disappears under source/provenance ablation? | Synthetic source candidate only; readiness always HOLD; no diagnosis, ranking or model evaluation |
+| szl-rare-disease-evidence-replay | What synthetic case-feature and HPO/ClinVar-shaped evidence was declared at one UTC cutoff, and what declared rows or versions change between two cutoffs? | Synthetic source candidate only; readiness always HOLD; no verified withdrawal, diagnosis, ranking or model evaluation |
 | szl-figure-data-contract | Does a declared CSV-to-SVG figure retain every point, axis unit and numeric caption assertion? | Bounded scatter/line replay; unsigned local receipt, not measurement authenticity or scientific truth |
 | szl-measurement-harmonizer | Do two to four CSV exports align under declared specimen IDs and unit conversions? | Does not infer identity or validate conversion authority |
 | szl-research-anatomy | Which conclusions depend on the input that just changed, expired or got contradicted? | Not a literature monitor |

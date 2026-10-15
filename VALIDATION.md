@@ -14,7 +14,7 @@ The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL
 and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These
 historical evidence sets establish neither application import nor measured agent efficacy.
 
-The aggregate `skills/` source budget is 1,065,000 bytes. It moved from 1,000,000 to
+The aggregate `skills/` source budget is 1,075,000 bytes. It moved from 1,000,000 to
 1,025,000 for the two synthetic rare-disease tools, then to 1,050,000 for the
 reporting-guideline family. At main `71b513ae2a3697466a3e8e0ec0f3599d6bfac4a6`,
 the 267 tracked skill-resource files measured 1,042,966 bytes. Moving the pilot's four
@@ -23,6 +23,10 @@ skill-resource bytes. The former 1,050,000-byte cap would reject this packaging-
 graduation by 13,537 bytes; this change therefore raises only that aggregate source
 cap to 1,065,000 bytes, leaving 1,463 bytes of headroom. Regression tests live in the
 repository test suite. The measurements exclude generated, ignored Python caches.
+The two-cutoff synthetic evidence-delta addition brings tracked `skills/` resources to
+1,074,143 bytes, 10,606 above that baseline. The reviewed aggregate allowance is therefore
+1,075,000 bytes, leaving 857 bytes of headroom; the exact-limit and one-byte-over tests
+remain active. This is a source-volume allowance, not evidence of host import or clinical use.
 The SDK limits remain 200,000 bytes per skill, 1,000,000 bytes per staging batch and
 eight batches. Doctrine and honest-status checks are unchanged.
 The aggregate repository budget is not an application

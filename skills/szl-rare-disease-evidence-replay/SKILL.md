@@ -1,6 +1,6 @@
 ---
 name: szl-rare-disease-evidence-replay
-description: Replay pinned synthetic rare-disease evidence snapshots at a fixed UTC cutoff and show source/provenance ablations without diagnostic or model-performance claims. Use for offline evidence-timeline integrity tests, not patient cases or variant ranking.
+description: Replay pinned synthetic rare-disease evidence at one UTC cutoff or compare two cutoffs for declared row and accession-version changes. Use for offline timeline integrity tests, not patient cases, variant ranking, or model-performance claims.
 license: Apache-2.0
 ---
 
@@ -16,6 +16,21 @@ Run from this skill directory (or copy `assets/` to a separate writable director
 ```bash
 python -I -B scripts/replay.py --root . --manifest assets/manifest.json --output replay-report.json
 ```
+
+To compare two cutoffs over the **same pinned synthetic case and source
+declarations**, use the bundled later manifest:
+
+```bash
+python -I -B scripts/replay.py --root . --manifest assets/manifest.json --compare-manifest assets/manifest-later.json --output delta-report.json
+```
+
+The delta lists added, `declared_removed`, and changed case features,
+HPO-shaped annotations, and synthetic VCV/RCV/SCV scopes. A disappearance is
+not an authenticated provider withdrawal; a changed opaque assertion token is
+not a clinical reclassification. Both selected snapshot IDs and byte hashes
+remain visible. If either cutoff cannot replay, the comparison is `HOLD` with
+no delta ledger. Read the [comparison contract](references/contract.md#two-cutoff-declared-delta)
+before interpreting a change.
 
 The output path must be new and relative to `--root`; the runner refuses overwrite.
 All example identifiers and records are invented. The manifest pins the raw SHA-256

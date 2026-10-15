@@ -16,6 +16,7 @@ MANIFEST_SCHEMA = "szl.rare-disease-evidence-replay.manifest.v1"
 CASE_SCHEMA = "szl.rare-disease-evidence-replay.case.v1"
 SNAPSHOT_SCHEMA = "szl.rare-disease-evidence-replay.snapshot.v1"
 REPORT_SCHEMA = "szl.rare-disease-evidence-replay.report.v1"
+DELTA_REPORT_SCHEMA = "szl.rare-disease-evidence-replay.delta.v1"
 LIMITS = {"manifest": 32 * 1024, "case": 16 * 1024, "snapshot": 64 * 1024}
 IDENT = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
 SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -354,7 +355,7 @@ def _without_provenance(annotations, records, provenance):
     return hpo, clinvar
 
 
-def replay(root, manifest_path):
+def _replay_with_rows(root, manifest_path):
     manifest_raw = _read(root, manifest_path, LIMITS["manifest"])
     manifest_sha = hashlib.sha256(manifest_raw).hexdigest()
     manifest = _json(manifest_raw, "INVALID_MANIFEST")
@@ -393,7 +394,7 @@ def replay(root, manifest_path):
     for provenance in sorted(provenances):
         without_hpo, without_clinvar = _without_provenance(annotations, records, provenance)
         ablations[provenance] = _summary(case_features, without_hpo, without_clinvar, conditions)
-    return {
+    report = {
         "schema": REPORT_SCHEMA,
         "status": "DECLARED_ONLY",
         "readiness": "HOLD",
@@ -423,6 +424,120 @@ def replay(root, manifest_path):
         "limits": ["NOT_AUTHENTICATED_PROVIDER_DATA", "NOT_CLINICALLY_VALIDATED",
                    "NO_PATIENT_OR_VARIANT_INTERPRETATION"],
     }
+    return report, domain_rows
+
+
+def replay(root, manifest_path):
+    """Keep the v1 one-cutoff report and public API unchanged."""
+    return _replay_with_rows(root, manifest_path)[0]
+
+
+def _accession_base(value):
+    return value.rsplit(".", 1)[0]
+
+
+def _index(rows, key):
+    indexed = {}
+    for row in rows:
+        identity = key(row)
+        _must(identity not in indexed, "AMBIGUOUS_DELTA_IDENTITY")
+        indexed[identity] = row
+    return indexed
+
+
+def _scope_indexes(records):
+    rcv, scv, vcv = {}, {}, {}
+    for row in records:
+        rcv_key = _accession_base(row["rcv"])
+        _must(rcv_key not in rcv, "AMBIGUOUS_DELTA_IDENTITY")
+        normalized = {**row, "submissions": sorted(row["submissions"],
+                                                    key=lambda item: item["scv"])}
+        rcv[rcv_key] = normalized
+        vcv_key = _accession_base(row["vcv"])
+        variant = vcv.setdefault(vcv_key, {"vcv": row["vcv"], "rcvs": []})
+        _must(variant["vcv"] == row["vcv"], "AMBIGUOUS_DELTA_IDENTITY")
+        variant["rcvs"].append(row["rcv"])
+        for item in row["submissions"]:
+            scv_key = _accession_base(item["scv"])
+            _must(scv_key not in scv, "AMBIGUOUS_DELTA_IDENTITY")
+            scv[scv_key] = {"condition": row["condition"], "vcv": row["vcv"],
+                            "rcv": row["rcv"], **item}
+    for variant in vcv.values():
+        variant["rcvs"].sort()
+    return vcv, rcv, scv
+
+
+def _delta(before, after):
+    return {
+        "added": [{"identity": key, "after": after[key]}
+                  for key in sorted(after.keys() - before.keys())],
+        "declared_removed": [{"identity": key, "before": before[key]}
+                             for key in sorted(before.keys() - after.keys())],
+        "changed": [{"identity": key, "before": before[key], "after": after[key]}
+                    for key in sorted(before.keys() & after.keys())
+                    if before[key] != after[key]],
+    }
+
+
+def compare_replays(root, earlier_manifest_path, later_manifest_path):
+    """Compare two declared synthetic cutoffs without changing one-cutoff replay."""
+    earlier_raw = _read(root, earlier_manifest_path, LIMITS["manifest"])
+    later_raw = _read(root, later_manifest_path, LIMITS["manifest"])
+    earlier_manifest = _json(earlier_raw, "INVALID_MANIFEST")
+    later_manifest = _json(later_raw, "INVALID_MANIFEST")
+    earlier_cutoff = _manifest(earlier_manifest, earlier_manifest_path)
+    later_cutoff = _manifest(later_manifest, later_manifest_path)
+    _must(earlier_cutoff < later_cutoff, "INVALID_CUTOFF_ORDER")
+    _must(earlier_manifest["case"] == later_manifest["case"] and
+          earlier_manifest["sources"] == later_manifest["sources"],
+          "COMPARISON_INPUT_MISMATCH")
+    earlier, earlier_rows = _replay_with_rows(root, earlier_manifest_path)
+    later, later_rows = _replay_with_rows(root, later_manifest_path)
+    _must(earlier["manifest_sha256"] == hashlib.sha256(earlier_raw).hexdigest() and
+          later["manifest_sha256"] == hashlib.sha256(later_raw).hexdigest(),
+          "COMPARISON_INPUT_CHANGED")
+    hpo_key = lambda row: "|".join((row["condition"], row["term"],
+                                    row["qualifier"], row["source_ref"]))
+    earlier_vcv, earlier_rcv, earlier_scv = _scope_indexes(earlier_rows["CLINVAR_ASSERTIONS"])
+    later_vcv, later_rcv, later_scv = _scope_indexes(later_rows["CLINVAR_ASSERTIONS"])
+    return {
+        "schema": DELTA_REPORT_SCHEMA,
+        "status": "DECLARED_ONLY",
+        "readiness": "HOLD",
+        "qualification": "NOT_EVALUATED",
+        "data_class": "SYNTHETIC_DECLARED",
+        "clinical_use": "NOT_FOR_CLINICAL_USE",
+        "signed": False,
+        "independent_witness": False,
+        "case_sha256": earlier["case_sha256"],
+        "case_id": earlier["case_id"],
+        "earlier": {"cutoff_utc": earlier["cutoff_utc"],
+                    "manifest_sha256": earlier["manifest_sha256"],
+                    "selected_snapshots": earlier["selected_snapshots"]},
+        "later": {"cutoff_utc": later["cutoff_utc"],
+                  "manifest_sha256": later["manifest_sha256"],
+                  "selected_snapshots": later["selected_snapshots"]},
+        "deltas": {
+            "case_features": _delta(_index(earlier["case_features_at_cutoff"],
+                                           lambda row: row["term"]),
+                                    _index(later["case_features_at_cutoff"],
+                                           lambda row: row["term"])),
+            "hpo_annotations": _delta(_index(earlier_rows["HPO_ANNOTATIONS"], hpo_key),
+                                      _index(later_rows["HPO_ANNOTATIONS"], hpo_key)),
+            "clinvar_vcv": _delta(earlier_vcv, later_vcv),
+            "clinvar_rcv": _delta(earlier_rcv, later_rcv),
+            "clinvar_scv": _delta(earlier_scv, later_scv),
+        },
+        "limits": ["DECLARED_TIME_NOT_WITNESSED", "NOT_AUTHENTICATED_PROVIDER_DATA",
+                   "NOT_CLINICALLY_VALIDATED", "NO_PATIENT_OR_VARIANT_INTERPRETATION"],
+    }
+
+
+def _delta_hold(reason):
+    return {"schema": DELTA_REPORT_SCHEMA, "status": "HOLD", "reason": reason,
+            "readiness": "HOLD", "qualification": "NOT_EVALUATED",
+            "data_class": "SYNTHETIC_DECLARED", "clinical_use": "NOT_FOR_CLINICAL_USE",
+            "signed": False, "independent_witness": False}
 
 
 def _hold(reason):
@@ -437,6 +552,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True)
     parser.add_argument("--manifest", required=True)
+    parser.add_argument("--compare-manifest")
     parser.add_argument("--output", required=True)
     args = parser.parse_args(argv)
     try:
@@ -445,9 +561,11 @@ def main(argv=None):
         print(error.args[0], file=sys.stderr)
         return 2
     try:
-        report = replay(args.root, args.manifest)
+        report = (compare_replays(args.root, args.manifest, args.compare_manifest)
+                  if args.compare_manifest is not None else replay(args.root, args.manifest))
     except Hold as error:
-        report = _hold(error.args[0])
+        report = (_delta_hold(error.args[0]) if args.compare_manifest is not None
+                  else _hold(error.args[0]))
     raw = (json.dumps(report, sort_keys=True, indent=2, ensure_ascii=False,
                       allow_nan=False) + "\n").encode("utf-8")
     try:
