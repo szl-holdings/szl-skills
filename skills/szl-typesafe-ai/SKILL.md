@@ -21,7 +21,7 @@ Live docs are the source of truth. Read them as part of the task:
 - HTTP API: https://docs.typesafe.ai/api.md
 - Python SDK: https://docs.typesafe.ai/sdk/python.md
 - JavaScript SDK: https://docs.typesafe.ai/sdk/javascript.md
-- Official skill (MIT): https://github.com/typesafe-ai/skills/blob/main/skills/typesafe-ai/SKILL.md
+- Official skill (MIT): https://github.com/typesafe-ai/skills/blob/65a39f393687675ce170e6094757de20370365b9/skills/typesafe-ai/SKILL.md
 
 This overlay does not replace those pages. If the index is unreachable, say so
 and do not invent version-dependent fields.
