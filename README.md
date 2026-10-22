@@ -13,6 +13,13 @@
 [Product](https://a-11-oy.com) · [Proof](https://a11oy.net) · [GitHub organization](https://github.com/szl-holdings)
 <!-- /szl:header -->
 
+## Scope and data boundary
+
+Not for clinical use: no skill in this repository is a medical device or a clinical decision
+tool, and none is validated or qualified for clinical use. Do not use these skills to make or
+support decisions about patients. Two skills, `szl-dataset-readiness` and `szl-unit-invariants`,
+document patient-level or clinical-export inputs.
+
 Executable checks that make scientific claims carry their evidence. This source tree
 contains forty-two skills for Claude Science, Claude Code and claude.ai: thirty-nine science
 tools and three evidence skills. They use the Python standard library and report what they did not
