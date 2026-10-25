@@ -128,12 +128,15 @@ complete before success. Claims persist after success, failure, disconnect, or
 partial write. Never delete them to retry. Windows and unsupported filesystems
 fail closed. This lock is advisory, not a provider-enforced CPU/GPU reservation.
 
-A future trusted broker must acquire that context, load an owner-authenticated
-permit from protected storage, obtain a fresh independent workload observation,
-validate, durably claim, recheck deadline/workload, and only then execute. It must
-keep the context until cleanup and receipt collection finish. The libraries do
-not provide the protected permit loader, runtime observer, sandbox, or executor;
-passing caller-provided JSON to them does not establish authority.
+`tools/ssh_ci_server.py` drafts that sequence. It accepts one strict request of
+at most 4096 bytes, rejects an invocation other than literal `szl-cpu-build-v1`,
+validates the owner permit and observation, and consumes a permit only through
+an already entered `ClaimStore`. A second claim and a stale permit are denied.
+A lost transport is `UNKNOWN`: not a failed exit, and not permission to retry.
+The draft does not load protected storage, observe the host, install packages,
+open a socket, sandbox a process, or execute a build. `EXECUTION_AUTHORIZED`
+stays false. Passing caller-provided JSON does not establish authority.
+`deployment_instructions()` returns owner text and is not an installer.
 
 **Idle-host execution is still BLOCKED.** The permit validator can describe an
 idle host, but the existing v1 remote receipt contract requires positive pinned
