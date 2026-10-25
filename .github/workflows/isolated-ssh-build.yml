@@ -1,0 +1,139 @@
+name: Isolated SSH CPU build
+
+# Deliberately no push, PR, schedule, workflow_run, or pull_request_target trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      permit_id:
+        description: 'UUID of a fresh owner-issued CPU permit; never a GPU grant'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: szl-skills-massed-cpu-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      github.repository_id == '1389873753' &&
+      github.repository == 'szl-holdings/szl-skills' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: massed-cpu-build
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Require separately provisioned and owner-qualified CPU boundary
+        env:
+          CPU_CI_ENABLED: ${{ vars.SZL_CPU_CI_ENABLED }}
+        run: |
+          if [ "$CPU_CI_ENABLED" != "true" ]; then
+            echo '::error::BLOCKED: isolated CPU broker, protected environment, dedicated key, and owner permit are not activated.'
+            exit 1
+          fi
+      - name: Materialize only the dedicated forced-command credential
+        env:
+          CI_KEY: ${{ secrets.SZL_CPU_SSH_KEY }}
+          CI_KNOWN_HOSTS: ${{ vars.SZL_CPU_KNOWN_HOSTS }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'szl-cpu-ssh'
+          root.mkdir(mode=0o700, exist_ok=False)
+          for name, variable in [('identity', 'CI_KEY'), ('known_hosts', 'CI_KNOWN_HOSTS')]:
+              value = os.environ.get(variable, '')
+              if not value.strip():
+                  raise SystemExit('BLOCKED: required dedicated SSH configuration is absent')
+              fd = os.open(root / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+              with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+                  stream.write(value.rstrip('\n') + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              stream.write('SZL_CPU_SSH_KEY_FILE=' + str(root / 'identity') + '\n')
+              stream.write('SZL_CPU_KNOWN_HOSTS_FILE=' + str(root / 'known_hosts') + '\n')
+          PY
+      - name: Submit one owner-permitted CPU build and verify its response
+        id: submit
+        env:
+          PERMIT_ID: ${{ inputs.permit_id }}
+          SZL_CPU_SSH_HOST: ${{ vars.SZL_CPU_SSH_HOST }}
+          SZL_CPU_SSH_PORT: ${{ vars.SZL_CPU_SSH_PORT }}
+          SZL_CPU_SSH_USER: ${{ vars.SZL_CPU_SSH_USER }}
+        run: python -B tools/ssh_ci_client.py --permit-id "$PERMIT_ID" --output-dir ssh-ci-evidence
+      - name: Retain a failure receipt when the client did not produce one
+        if: always()
+        env:
+          CLIENT_STEP_OUTCOME: ${{ steps.submit.outcome }}
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          from pathlib import Path
+          import stat
+          root = Path('ssh-ci-evidence').absolute()
+          if any(path.is_symlink() for path in (root, *root.parents)):
+              raise SystemExit('BLOCKED: evidence path traverses a symlink')
+          root.mkdir(mode=0o700, exist_ok=True)
+          path = root / 'client-receipt.json'
+          if path.is_symlink():
+              raise SystemExit('BLOCKED: receipt path is a symlink')
+          if path.exists():
+              if not stat.S_ISREG(path.stat().st_mode):
+                  raise SystemExit('BLOCKED: receipt is not a regular file')
+          else:
+              outcome = os.environ.get('CLIENT_STEP_OUTCOME', '')
+              if outcome not in {'success', 'failure', 'cancelled', 'skipped'}:
+                  outcome = 'UNKNOWN'
+              client_evidence = any((root / name).exists() or (root / name).is_symlink()
+                                    for name in ('request.json', 'response.raw.json',
+                                                 'ssh.stderr', 'artifacts'))
+              not_started = outcome == 'skipped' and not client_evidence
+              receipt = {
+                  'schema': 'szl.ssh-cpu-build.bootstrap-receipt.v1',
+                  'evidence_class': 'MEASURED', 'result': 'BLOCKED',
+                  'created_at_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
+                  'signed': False, 'independent_witness': False,
+                  'publication_eligible': False, 'authorized_inference_requests': 0,
+                  'client_step_outcome': outcome,
+                  'transport': {'attempts': 0 if not_started else None,
+                                'started': False if not_started else None,
+                                'remote_completion': 'UNKNOWN'},
+                  'failures': ['Client receipt absent; no retry or remote action performed'],
+              }
+              with path.open('x', encoding='utf-8') as stream:
+                  json.dump(receipt, stream, sort_keys=True, separators=(',', ':'))
+                  stream.write('\n')
+              raise SystemExit('BLOCKED: missing client receipt; bootstrap evidence retained')
+          PY
+      - name: Preserve available success or failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ssh-cpu-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ssh-ci-evidence/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove this job's temporary credential files
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'szl-cpu-ssh'
+          for name in ('identity', 'known_hosts'):
+              (root / name).unlink(missing_ok=True)
+          if root.is_dir():
+              root.rmdir()
+          PY
