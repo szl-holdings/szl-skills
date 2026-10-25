@@ -236,6 +236,80 @@ class ArtifactTests(unittest.TestCase):
         self.assertEqual(outside.read_bytes(), b"keep")
 
 
+class StageTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="szl-broker-stage-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source = self.root / "source"
+        self.source.mkdir()
+        (self.source / "runtime.py").write_bytes(b"print(1)\n")
+        nested = self.source / "pkg"
+        nested.mkdir()
+        (nested / "lib.py").write_bytes(b"x = 1\n")
+        self.dest = self.root / "stage"
+
+    def test_manifest_is_copied_hashed_and_not_executed(self):
+        manifest = server.stage_immutable(
+            self.source, self.dest, ("runtime.py", "pkg/lib.py"), 1024)
+        self.assertFalse(manifest["executed"])
+        self.assertFalse(manifest["network_install"])
+        self.assertEqual(manifest["total_bytes"], len(b"print(1)\n") + len(b"x = 1\n"))
+        self.assertEqual(
+            manifest["files"]["runtime.py"]["sha256"],
+            contract.sha256(b"print(1)\n"))
+        self.assertEqual((self.dest / "pkg" / "lib.py").read_bytes(), b"x = 1\n")
+        writable = True
+        try:
+            descriptor = os.open(self.dest / "runtime.py", os.O_WRONLY | os.O_APPEND)
+            os.close(descriptor)
+        except OSError:
+            writable = False
+        self.assertEqual(manifest["immutable"], not writable)
+        self.assertIs(type(manifest["directory_fsync"]), bool)
+
+    def test_escape_budget_and_installer_names_create_no_destination(self):
+        outside = self.root / "outside.txt"
+        outside.write_bytes(b"secret")
+        samples = (
+            ("../outside.txt",),
+            ("pkg/../../outside.txt",),
+            ("/runtime.py",),
+            ("pkg/pip",),
+            ("runtime.py", "runtime.py"),
+            (),
+        )
+        for names in samples:
+            with self.subTest(names=names), self.assertRaises(server.BrokerError):
+                server.stage_immutable(self.source, self.dest, names, 1024)
+            self.assertFalse(self.dest.exists())
+        with self.assertRaisesRegex(server.BrokerError, "byte budget"):
+            server.stage_immutable(self.source, self.dest, ("runtime.py",), 0)
+        self.assertFalse(self.dest.exists())
+        self.assertEqual(outside.read_bytes(), b"secret")
+
+    def test_existing_destination_is_not_replaced(self):
+        first = server.stage_immutable(self.source, self.dest, ("runtime.py",), 1024)
+        with self.assertRaises(server.BrokerError):
+            server.stage_immutable(self.source, self.dest, ("pkg/lib.py",), 1024)
+        self.assertEqual(first["files"]["runtime.py"]["bytes"], len(b"print(1)\n"))
+        self.assertFalse((self.dest / "pkg").exists())
+
+    def test_symlink_source_is_rejected_before_the_destination_exists(self):
+        real = Path.is_symlink
+
+        def fake(path):
+            if path.name == "runtime.py":
+                return True
+            return real(path)
+
+        with mock.patch.object(Path, "is_symlink", fake):
+            with self.assertRaisesRegex(server.BrokerError, "link"):
+                server.stage_immutable(self.source, self.dest, ("runtime.py",), 1024)
+        self.assertFalse(self.dest.exists())
+        self.assertEqual((self.source / "runtime.py").read_bytes(), b"print(1)\n")
+
+
 class EntrypointTests(unittest.TestCase):
     def test_stdin_cap_and_valid_syntax_still_do_not_install(self):
         code, decision = server.entry(

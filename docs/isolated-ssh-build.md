@@ -137,6 +137,9 @@ The draft does not load protected storage, observe the host, install packages,
 open a socket, sandbox a process, or execute a build. `EXECUTION_AUTHORIZED`
 stays false. Passing caller-provided JSON does not establish authority.
 `deployment_instructions()` returns owner text and is not an installer.
+`stage_immutable()` copies an explicit manifest of regular files into a new
+directory and records hashes. It does not execute those files. A link, an
+escaping path, a network-install basename, or an existing destination is refused.
 
 **Idle-host execution is still BLOCKED.** The permit validator can describe an
 idle host, but the existing v1 remote receipt contract requires positive pinned

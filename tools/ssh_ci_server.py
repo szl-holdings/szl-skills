@@ -27,6 +27,8 @@ EXECUTION_AUTHORIZED = False
 REVIEWED_ARGV = None
 DECISION_SCHEMA = "szl.ssh-cpu-build.broker-decision.v1"
 INSTRUCTION_SCHEMA = "szl.ssh-cpu-build.deployment-instructions.v1"
+STAGE_SCHEMA = "szl.ssh-cpu-build.stage.v1"
+MAX_STAGE_FILES = 32
 NETWORK_INSTALL_TOKENS = frozenset({
     "pip", "pip3", "curl", "wget", "apt", "apt-get", "npm", "uv",
 })
@@ -215,6 +217,127 @@ def write_regular_artifact(directory, name, payload, remaining):
     finally:
         os.close(descriptor)
     return len(payload)
+
+
+def _contained_source(root, name):
+    """Return one regular file that stays inside ``root``.
+
+    The check is component-wise and does not resolve links. A link, a parent
+    segment, or a network-install basename is refused before any copy.
+    """
+    if type(name) is not str or not name or "\x00" in name or "\\" in name or name.startswith("/"):
+        raise BrokerError("stage path is not contained")
+    parts = name.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise BrokerError("stage path is not contained")
+    if any(part in NETWORK_INSTALL_TOKENS for part in parts):
+        raise BrokerError("network install is not staged")
+    current = root
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            raise BrokerError("stage path is a link")
+    if not current.is_file():
+        raise BrokerError("stage path is not a regular file")
+    info = current.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size < 0:
+        raise BrokerError("stage path is not a regular file")
+    return current, info.st_size
+
+
+def _read_regular(path, size):
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    if hasattr(os, "O_BINARY"):
+        flags |= os.O_BINARY
+    descriptor = os.open(path, flags)
+    try:
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or info.st_size != size):
+            raise BrokerError("stage source is not a stable regular file")
+        payload = os.read(descriptor, size + 1)
+        if len(payload) != size:
+            raise BrokerError("stage source changed")
+        return payload
+    finally:
+        os.close(descriptor)
+
+
+def _mark_read_only(path):
+    """Return whether a following write open is refused by the host."""
+    os.chmod(path, stat.S_IREAD)
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_APPEND)
+    except OSError:
+        return True
+    os.close(descriptor)
+    return False
+
+
+def _fsync_directory(path):
+    """Best-effort directory durability. A host that cannot fsync reports false."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+    except OSError:
+        return False
+    try:
+        os.fsync(descriptor)
+    except OSError:
+        return False
+    finally:
+        os.close(descriptor)
+    return True
+
+
+def stage_immutable(source_root, destination, names, remaining):
+    """Copy an explicit manifest into a new directory and do not execute it.
+
+    Validation finishes before the destination is created. A later copy error
+    leaves the partial directory in place. This function never deletes it and
+    never starts a process or installer.
+    """
+    if type(names) is not tuple or not names or len(names) > MAX_STAGE_FILES:
+        raise BrokerError("stage manifest is closed")
+    if len(set(names)) != len(names):
+        raise BrokerError("stage manifest repeats a path")
+    if type(remaining) is not int or remaining < 0:
+        raise BrokerError("stage budget has the wrong type")
+    root = Path(source_root)
+    dest = Path(destination)
+    if not root.is_absolute() or not dest.is_absolute():
+        raise BrokerError("stage directories must be absolute")
+    if root.is_symlink() or dest.exists() or dest.is_symlink():
+        raise BrokerError("stage destination exists or is a link")
+    selected = []
+    total = 0
+    for name in names:
+        path, size = _contained_source(root, name)
+        total += size
+        if total > remaining or total > contract.MAX_OUTPUT_BYTES:
+            raise BrokerError("stage exceeds the byte budget")
+        selected.append((name, path, size))
+    os.mkdir(dest)
+    files = {}
+    write_blocked = True
+    for name, path, size in selected:
+        payload = _read_regular(path, size)
+        parent = dest.joinpath(*name.split("/")[:-1])
+        parent.mkdir(parents=True, exist_ok=True)
+        write_regular_artifact(parent, name.split("/")[-1], payload, remaining)
+        written = parent / name.split("/")[-1]
+        write_blocked = write_blocked and _mark_read_only(written)
+        files[name] = {"sha256": contract.sha256(payload), "bytes": len(payload)}
+    return {
+        "schema": STAGE_SCHEMA,
+        "executed": False,
+        "network_install": False,
+        "immutable": write_blocked,
+        "directory_fsync": _fsync_directory(dest),
+        "files": files,
+        "total_bytes": total,
+    }
 
 
 def deployment_instructions():
