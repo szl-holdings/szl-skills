@@ -3,7 +3,8 @@
 ## Status and trust boundary
 
 **BLOCKED for live VM CI execution.** This change provides the GitHub controller,
-bounded SSH client, and strict request/receipt contract. It does not install or
+bounded SSH client, strict request/receipt contract, offline run planning, pure
+CPU-permit validation, and local POSIX claim-store primitives. It does not install or
 qualify a VM broker, provision an account or key, create an owner permit, or
 establish that isolation exists. Hosted contract tests are offline tests, not a
 remote-build or deployment claim. No consumed GPU grant is accepted or reused.
@@ -85,6 +86,64 @@ Archive outputs are retained as opaque bytes by the CI client, not extracted or
 executed. An unsigned host response is DECLARED remote evidence; local transport
 and byte consistency can be MEASURED. Hashes do not prove independent witness,
 kernel isolation, scientific truth, or uninterrupted model latency.
+
+## Implemented offline admission primitives
+
+These modules are independently testable building blocks, **not an installed
+broker**. Their successful tests do not enable the manual workflow.
+
+`tools/ssh_ci_plan.py` reconstructs the exact controller request from a supplied
+GitHub run API response while that run is waiting for environment approval:
+
+```sh
+python -B tools/ssh_ci_plan.py --run-metadata waiting-run.json --permit-id CPU-PERMIT-UUID
+```
+
+It accepts only this repository's numeric ID and name, the exact manual workflow,
+`main`, attempt one, a full source SHA, and `waiting` status. It shares the actual
+client request builder, including the deterministic request UUID, and emits its
+canonical digest. Input must be a bounded regular file. The output is DECLARED:
+local JSON is not authenticated GitHub evidence. It issues no permit, approval,
+claim, or network call. An authorized operator must independently authenticate
+the waiting run and protected environment before using that digest.
+
+`tools/ssh_ci_admission.py::validate_permit` requires a distinct closed
+`szl.ssh-cpu-build.permit.v1` object bound to that digest and permit UUID, one run,
+the fixed CPU profile, and the exact hostname/boot ID. The UTC window is at most
+900 seconds; admission requires at least 450 seconds remaining (420 execution
+plus 30 margin). Its separate strict observation must be no more than five
+seconds old, not future-dated, and show no competing CPU job. The permitted GPU
+state is either empty or exactly one explicitly pinned PID/start-ticks pair.
+Unknown fields, duplicate JSON keys, legacy GPU grants, mismatched identities,
+and stale observations are rejected. The function does no I/O: it cannot
+authenticate an owner, clock, observation, or isolation boundary.
+
+`tools/ssh_ci_claims.py::ClaimStore` is the local durable-consumption primitive.
+All trusted brokers must use one pre-provisioned root-owned claim directory with
+safe root-owned ancestors and final mode `0700` or `0750`. Directory components
+are opened without following symlinks; lock/claim files are regular, single-link,
+root-owned `0600` files. A nonblocking `flock` is held for the whole context.
+Canonical permit UUIDs name exclusive-create claims; file and directory `fsync`
+complete before success. Claims persist after success, failure, disconnect, or
+partial write. Never delete them to retry. Windows and unsupported filesystems
+fail closed. This lock is advisory, not a provider-enforced CPU/GPU reservation.
+
+A future trusted broker must acquire that context, load an owner-authenticated
+permit from protected storage, obtain a fresh independent workload observation,
+validate, durably claim, recheck deadline/workload, and only then execute. It must
+keep the context until cleanup and receipt collection finish. The libraries do
+not provide the protected permit loader, runtime observer, sandbox, or executor;
+passing caller-provided JSON to them does not establish authority.
+
+**Idle-host execution is still BLOCKED.** The permit validator can describe an
+idle host, but the existing v1 remote receipt contract requires positive pinned
+model PID/start-ticks fields. Supporting an idle host end to end requires a
+versioned receipt contract and qualification; do not invent a PID or relax v1.
+
+The hosted Linux contract job additionally runs real root-owned claim-store
+tests under a fresh `/run` test directory on its disposable runner. Windows
+explicitly skips POSIX cases and tests unsupported-platform denial. Neither test
+job connects to the VM, receives its credentials, or grants live execution.
 
 ## Activation and qualification gates
 

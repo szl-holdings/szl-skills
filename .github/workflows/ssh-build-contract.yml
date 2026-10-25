@@ -37,3 +37,7 @@ jobs:
           python-version: '3.12'
       - name: Test admission, transport bounds, and receipt verification offline
         run: python -B -m unittest discover -s tests -p "test_ssh_ci_*.py" -v
+      - name: Exercise root-owned claim storage on the disposable hosted Linux runner
+        if: matrix.os == 'ubuntu-latest'
+        # This is a temporary filesystem test, never a connection to the VM.
+        run: sudo "$(command -v python)" -B -m unittest discover -s tests -p "test_ssh_ci_claims.py" -v

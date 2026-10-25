@@ -32,6 +32,18 @@ def bootstrap_source():
 
 
 class WorkflowControlsTests(unittest.TestCase):
+    def test_real_claim_storage_test_is_hosted_linux_only_without_host_secrets(self):
+        contract = WORKFLOW.with_name('ssh-build-contract.yml').read_text(encoding='utf-8')
+        self.assertIn('os: [ubuntu-latest, windows-latest]', contract)
+        self.assertIn('runs-on: ${{ matrix.os }}', contract)
+        root_test = contract.split(
+            '      - name: Exercise root-owned claim storage on the disposable hosted Linux runner\n', 1)[1]
+        self.assertIn("if: matrix.os == 'ubuntu-latest'", root_test)
+        self.assertIn('sudo "$(command -v python)" -B -m unittest discover', root_test)
+        self.assertIn('-p "test_ssh_ci_claims.py"', root_test)
+        for forbidden in ('secrets.', 'environment:', 'self-hosted', 'SZL_CPU_SSH', 'continue-on-error:'):
+            self.assertNotIn(forbidden, contract)
+
     def test_remote_workflow_is_manual_only_with_required_cpu_permit(self):
         triggers = TEXT.split('\non:\n', 1)[1].split('\npermissions:\n', 1)[0]
         self.assertEqual(re.findall(r'^  ([a-z_]+):', triggers, re.M), ['workflow_dispatch'])
