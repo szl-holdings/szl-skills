@@ -147,6 +147,19 @@ the durable claim consumed; no retry is offered. The returned executor mapping
 is only a bounded local receipt handoff and is not promoted to a verified v1
 remote receipt or independent witness.
 
+`tools/ssh_ci_owner_window.py::validate_owner_window` is the closed envelope
+that the future loader must supply alongside `OwnerPermit`. It binds the exact
+request and permit digest, a fresh <=900-second window with >=450 seconds
+remaining, Massed Compute instance and host/boot identity, execution ID and run
+nonce, GitHub source SHA and admitted HF revision, the fixed CPU profile, a
+bounded budget-ledger reference, checkpoint-manifest digest, and an explicit
+no-GPU/no-model/no-training/no-inference workload. GPU-grant-shaped objects,
+unknown revisions, missing backup/budget references, duplicate members, and
+scope-expanding fields are rejected. This validator does not authenticate an
+owner signature or read a provider ledger; a trusted loader must do that before
+the executor sees the envelope. No current owner window exists, so this is a
+future-grant contract, not an activation.
+
 **Idle-host execution is still BLOCKED.** The permit validator can describe an
 idle host, but the existing v1 remote receipt contract requires positive pinned
 model PID/start-ticks fields. Supporting an idle host end to end requires a
