@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from tools.ssh_ci_admission import validate_permit
 from tools.ssh_ci_contract import ContractError, canonical, sha256, validate_request
+from tools.ssh_ci_owner_window import validate_owner_window
 
 
 EXECUTION_SCHEMA = "szl.ssh-cpu-build.execution.v1"
@@ -21,6 +22,7 @@ class OwnerPermit:
     """A loader result whose authentication was performed outside this module."""
 
     permit: object
+    window: object
     owner_authenticated: bool
 
 
@@ -66,6 +68,14 @@ def execute(request, *, permit_loader, observation_reader, claim_store_factory,
         return _result("BLOCKED", "PERMIT", "OWNER_AUTHENTICATION_UNAVAILABLE")
 
     try:
+        window_now = clock()
+        window = validate_owner_window(request, loaded.window, window_now)
+    except (ContractError, TypeError, ValueError):
+        return _result("BLOCKED", "PERMIT", "OWNER_WINDOW_REJECTED")
+    except Exception:
+        return _result("BLOCKED", "PERMIT", "OWNER_WINDOW_UNAVAILABLE")
+
+    try:
         observation = observation_reader()
         now = clock()
         permit = validate_permit(request, loaded.permit, observation, now)
@@ -73,6 +83,12 @@ def execute(request, *, permit_loader, observation_reader, claim_store_factory,
         return _result("BLOCKED", "ADMISSION", "INITIAL_OBSERVATION_REJECTED")
     except Exception:
         return _result("BLOCKED", "ADMISSION", "INITIAL_OBSERVATION_UNAVAILABLE")
+
+    if (window["permit_id"] != permit["permit_id"]
+            or window["host"] != permit["host"]
+            or window["not_before"] != permit["not_before"]
+            or window["expires_at"] != permit["expires_at"]):
+        return _result("BLOCKED", "ADMISSION", "OWNER_WINDOW_DRIFT")
 
     # The v1 remote receipt contains positive runtime_before/after identity.
     # An idle permit waits for a separately versioned receipt profile.

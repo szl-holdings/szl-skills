@@ -39,7 +39,29 @@ def fixtures(mode="pinned"):
         "gpu_compute_processes": [dict(process)] if mode == "pinned" else [],
         "competing_cpu_jobs": 0,
     }
-    return request, permit, observation, now
+    window = {
+        "schema": "szl.ssh-cpu-build.owner-window.v1",
+        "window_id": "36d9de7f-0ac1-41c8-b1d3-76d7f6032a11",
+        "permit_id": request["permit_id"],
+        "request_sha256": contract.sha256(contract.canonical(request)),
+        "not_before": permit["not_before"], "expires_at": permit["expires_at"],
+        "provider": {"name": "Massed Compute",
+                      "instance_uuid": "bd6e0a2e-c7d1-4423-bfc2-99b575c6a233"},
+        "host": dict(host),
+        "execution": {"execution_id": "5c3b4a3e-df6f-4b67-9f54-c1dcfe7fd9e4",
+                       "run_nonce": "e0a84a84-7e1c-49f0-b0a4-2e4a8b0d5a67"},
+        "source": {"github_sha": request["source_sha"],
+                   "hf_revision": "dfaf35de3e30f1867dd8dbc38a7fc9fb52d3914f"},
+        "cpu_profile": dict(contract.CPU_PROFILE),
+        "budget": {"ledger_ref": "ledger://massed-compute/2026-10-27",
+                    "remaining_seconds": 180000, "remaining_usd": 2000.0},
+        "workload": {"mode": "cpu_build", "gpu_devices": False,
+                      "model_interaction": "none", "training": False,
+                      "inference": False},
+        "checkpoint_manifest_sha256": "c" * 64,
+        "owner_receipt_ref": "owner://vm2/cpu-window/2026-10-27",
+    }
+    return request, permit, observation, window, now
 
 
 class FakeStore:
@@ -62,12 +84,12 @@ class FakeStore:
 class ExecutorTests(unittest.TestCase):
     def run_case(self, mode="pinned", *, second_observation=None,
                  loader=None, store=None, run_executor=None):
-        request, permit, observation, now = fixtures(mode)
+        request, permit, observation, window, now = fixtures(mode)
         events = []
         observations = iter([observation, second_observation or observation])
         calls = []
         if loader is None:
-            loader = lambda _request: executor.OwnerPermit(permit, True)
+            loader = lambda _request: executor.OwnerPermit(permit, window, True)
         if store is None:
             store = FakeStore(events)
         if run_executor is None:
@@ -83,14 +105,14 @@ class ExecutorTests(unittest.TestCase):
     def test_claim_before_executor_and_lock_held_until_return(self):
         result, events, calls, *_ = self.run_case()
         self.assertEqual(result["result"], "PASS")
-        self.assertEqual(events, ["observe", "clock", "lock", "claim",
+        self.assertEqual(events, ["clock", "observe", "clock", "lock", "claim",
                                   "observe", "clock", "execute", "unlock"])
         self.assertEqual(result["claim_status"], "WRITTEN")
         self.assertTrue(result["executor_called"])
 
     def test_owner_authentication_unavailable_blocks_without_observation(self):
         result, events, *_ = self.run_case(
-            loader=lambda _request: executor.OwnerPermit({}, False))
+            loader=lambda _request: executor.OwnerPermit({}, {}, False))
         self.assertEqual((result["result"], result["reason"]),
                          ("BLOCKED", "OWNER_AUTHENTICATION_UNAVAILABLE"))
         self.assertEqual(events, [])
@@ -101,9 +123,9 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(result["reason"], "PERMIT_LOADER_UNAVAILABLE")
         self.assertEqual(events, [])
         result, events, *_ = self.run_case(
-            loader=lambda _request: executor.OwnerPermit({}, True))
-        self.assertEqual(result["reason"], "INITIAL_OBSERVATION_REJECTED")
-        self.assertEqual(events[:2], ["observe", "clock"])
+            loader=lambda _request: executor.OwnerPermit({}, {}, True))
+        self.assertEqual(result["reason"], "OWNER_WINDOW_REJECTED")
+        self.assertEqual(events[:1], ["clock"])
         result, events, *_ = self.run_case(store=FakeStore(events, fail=True))
         self.assertEqual(result["reason"], "CLAIM_UNAVAILABLE")
         self.assertFalse(result["executor_called"])
@@ -111,11 +133,11 @@ class ExecutorTests(unittest.TestCase):
     def test_idle_v1_incompatibility_never_claims_or_executes(self):
         result, events, calls, *_ = self.run_case(mode="idle")
         self.assertEqual(result["reason"], "IDLE_RECEIPT_PROFILE_UNSUPPORTED")
-        self.assertEqual(events, ["observe", "clock"])
+        self.assertEqual(events, ["clock", "observe", "clock"])
         self.assertEqual(calls, [])
 
     def test_revalidation_drift_preserves_claim_and_blocks(self):
-        _, _, observation, _ = fixtures()
+        _, _, observation, _, _ = fixtures()
         changed = copy.deepcopy(observation)
         changed["gpu_compute_processes"][0]["start_ticks"] += 1
         result, events, calls, *_ = self.run_case(second_observation=changed)
@@ -141,7 +163,7 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(result["claim_status"], "WRITTEN")
 
     def test_no_cross_call_mutation(self):
-        request, permit, observation, _ = fixtures()
+        request, permit, observation, _, _ = fixtures()
         original = (copy.deepcopy(request), copy.deepcopy(permit),
                     copy.deepcopy(observation))
         result, *_ = self.run_case()
