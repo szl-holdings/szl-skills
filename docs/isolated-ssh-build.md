@@ -135,6 +135,18 @@ keep the context until cleanup and receipt collection finish. The libraries do
 not provide the protected permit loader, runtime observer, sandbox, or executor;
 passing caller-provided JSON to them does not establish authority.
 
+`tools/ssh_ci_executor.py::execute` supplies this ordering as a pure,
+dependency-injected state machine for a future broker. It requires an
+`OwnerPermit` loader result whose authentication was performed outside the
+module; then it observes and validates, rejects idle permits while the v1
+receipt still requires positive process identity, acquires the claim context,
+claims once, re-observes/revalidates under the lock, and invokes the injected
+executor. Loader, observer, claim-store, revalidation, and executor failures
+return explicit BLOCKED reason codes. A failed revalidation or executor leaves
+the durable claim consumed; no retry is offered. The returned executor mapping
+is only a bounded local receipt handoff and is not promoted to a verified v1
+remote receipt or independent witness.
+
 **Idle-host execution is still BLOCKED.** The permit validator can describe an
 idle host, but the existing v1 remote receipt contract requires positive pinned
 model PID/start-ticks fields. Supporting an idle host end to end requires a
