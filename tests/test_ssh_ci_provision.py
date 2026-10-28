@@ -165,6 +165,7 @@ class FileWriteTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"), "POSIX writes only")
     def test_ci_key_file_is_group_owned_by_szl_ci_and_a_missing_group_writes_nothing(self):
         keys = "/etc/ssh/szl-ci/authorized_keys"
+        data, mode = provision.render(options())[keys]  # Write what apply would write.
         with tempfile.TemporaryDirectory() as scratch:
             target = Path(scratch) / "authorized_keys"
             owners = []
@@ -173,15 +174,15 @@ class FileWriteTests(unittest.TestCase):
                     mock.patch("grp.getgrnam", return_value=group) as lookup, \
                     mock.patch.object(provision.os, "chown",
                                       side_effect=lambda _path, uid, gid: owners.append((uid, gid))):
-                provision._write(str(target), b"key\n", 0o640)
+                provision._write(str(target), data, mode)
                 lookup.assert_called_once_with(provision.CI_USER)
                 self.assertEqual(owners, [(0, 4321)])
-                self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o640)
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), mode)
                 missing = Path(scratch) / "missing"
                 with mock.patch.dict(provision.FILE_GROUPS, {str(missing): "no-such-group"}), \
                         mock.patch("grp.getgrnam", side_effect=KeyError("no-such-group")), \
                         self.assertRaisesRegex(provision.ProvisionError, "group no-such-group"):
-                    provision._write(str(missing), b"key\n", 0o640)
+                    provision._write(str(missing), data, mode)
                 self.assertFalse(os.path.lexists(missing))
                 self.assertFalse(os.path.lexists(str(missing) + ".szl-tmp"))
             self.assertIn(keys, provision.FILE_GROUPS)
