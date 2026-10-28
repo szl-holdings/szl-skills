@@ -226,6 +226,26 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
   --hidden-path <model-or-data-dir> --stages keys,provision,qualify,github
 ```
 
+Dry-run output is explicitly **SIMULATED**. It executes no command, creates no
+key or file, and establishes no applied/qualified/PASS outcome. A dry run never
+populates the live qualification gate.
+
+The workstation asks for `KEYS` before key creation, `STAGE` before **any** remote
+staging write, `APPLY` after the provisioning plan, `QUALIFY` before the bounded
+controls, and `CONFIGURE` before GitHub configuration. Staging uses a new private
+absolute `/tmp/szl-cpu-bringup-*` directory per attempt. It never deletes/reuses an
+old checkout or overwrites an existing public-key file. The printed staging
+directory is retained on success and failure for owner-controlled inspection and
+cleanup; do not broadly remove matching directories or another operator's work.
+
+Run `qualify,github` together when resuming after provisioning. Standalone
+`--stages github` is refused before credential reads or configuration changes:
+the script must consume the live qualification receipt from this invocation,
+not an arbitrary local JSON file or a remembered exit code. Qualification uses
+non-PTY strict-pinned SSH and non-interactive sudo; unavailable sudo is a stop,
+not a prompt bypass. The provisioning window covers staging, installation and
+qualification separately from the later single-use CPU build permit.
+
 1. **Keys (workstation).** Create a dedicated CI key and a separate owner
    permit-signing key; never reuse the admin key for either.
 
@@ -253,8 +273,8 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
 3. **Qualify (VM, as root).** Rehearse the real build of the same commit.
 
    ```sh
-   sudo python3 -I -B /opt/szl-cpu-broker/current/tools/ssh_ci_qualify.py \
-     --rehearse-build <main-sha> --owner-window-ref <reference>
+   sudo python3 -I -B /opt/szl-cpu-broker/releases/<main-sha>/tools/ssh_ci_qualify.py \
+     --expected-release <main-sha> --rehearse-build <main-sha> --owner-window-ref <reference>
    ```
 
    Proceed only on `"result": "QUALIFIED"`. A readback mismatch (for example a
@@ -264,6 +284,17 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
    systemd unit file are probed from inside the sandbox, as is every reachable
    UNIX socket and the io_uring and keyring syscalls (x86_64 numbers); add any
    visible model path with `--hidden-path` and re-provision.
+
+   The bring-up script validates bounded strict JSON, all five control results,
+   the four-step rehearsal, source/release and configuration digest, owner window
+   reference, and host/boot/protected-process set. It accepts completion at most
+   900 seconds old and compares a fresh (at most five-second-old) observation.
+   Read-only `--readiness --expected-release <main-sha>` rechecks installed
+   qualifier/current/runner paths, configuration and workload without running a
+   probe or writing a receipt. The script repeats that readback before GitHub
+   writes and immediately before enabling the workflow; any drift blocks
+   activation. Root-owned host evidence remains host-local, unsigned evidence,
+   not independent certification or proof of unchanged model latency.
 
 4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
    with yourself as required reviewer and protected-branch deployment only, then
