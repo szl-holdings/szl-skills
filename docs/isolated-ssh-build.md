@@ -69,6 +69,7 @@ general, scientific truth, model quality, or uninterrupted model latency.
 | `tools/ssh_ci_provision.py` | root, owner-run | `plan` (read-only) / `apply` / `uninstall`; writes a provisioning receipt |
 | `tools/ssh_ci_qualify.py` | root, owner-run | Negative controls and an optional real-build rehearsal; writes a qualification receipt |
 | `tools/ssh_ci_owner_issue.py` | owner workstation | Dispatch, bind, observe, sign, install, approve one run, collect evidence |
+| `tools/ssh_ci_bring_up.py` | owner workstation | Runs runbook steps 1-5 in order for one `--release-sha`, asking before every change; `--dry-run` prints the commands |
 
 **Sandbox properties (read back before `GO`).** One aggregate cgroup:
 `CPUQuota=100%`, `MemoryMax=1 GiB`, `MemorySwapMax=0`, `TasksMax=64`,
@@ -145,8 +146,13 @@ the waiting run and protected environment before using that digest.
 the fixed CPU profile, and the exact hostname/boot ID. The UTC window is at most
 900 seconds; admission requires at least 450 seconds remaining (420 execution
 plus 30 margin). Its separate strict observation must be no more than five
-seconds old, not future-dated, and show no competing CPU job. The permitted GPU
-state is either empty or exactly one explicitly pinned PID/start-ticks pair.
+seconds old, not future-dated, and show no competing CPU job. The GPU state is
+pinned as one of three workloads. `idle` means no GPU process (it has no receipt
+profile, so the executor refuses it). `pinned` means exactly one PID/start-ticks
+pair (v1 receipt). `pinned_set` means the exact set of up to eight such pairs,
+sorted and unique, possibly empty (v2 receipt). The owner tool always issues
+`pinned_set`, so a vLLM server plus a training job, or an idle GPU, is pinned
+exactly as observed.
 Unknown fields, duplicate JSON keys, legacy GPU grants, mismatched identities,
 and stale observations are rejected. The function does no I/O: it cannot
 authenticate an owner, clock, observation, or isolation boundary.
@@ -170,8 +176,8 @@ libraries directly does not establish authority.
 `tools/ssh_ci_executor.py::execute` supplies this ordering as a pure,
 dependency-injected state machine, which the broker drives. It requires an
 `OwnerPermit` loader result whose authentication was performed outside the
-module; then it observes and validates, rejects idle permits while the v1
-receipt still requires positive process identity, acquires the claim context,
+module; then it observes and validates, rejects a bare `idle` permit (no receipt
+profile; use an empty `pinned_set`), acquires the claim context,
 claims once, re-observes/revalidates under the lock, and invokes the injected
 executor. Loader, observer, claim-store, revalidation, and executor failures
 return explicit BLOCKED reason codes. A failed revalidation or executor leaves
@@ -192,10 +198,13 @@ the signature loader authenticates the owner before the executor sees the
 envelope, and the budget and checkpoint fields remain the owner's attestations.
 No owner window exists until the owner issues one for a specific waiting run.
 
-**Idle-host execution is still BLOCKED.** The permit validator can describe an
-idle host, but the existing v1 remote receipt contract requires positive pinned
-model PID/start-ticks fields. Supporting an idle host end to end requires a
-versioned receipt contract and qualification; do not invent a PID or relax v1.
+**GPU process sets (receipt v2).** `szl.ssh-cpu-build.receipt.v2` replaces the
+single runtime PID with `{hostname, boot_id, gpu_processes}`, where
+`gpu_processes` is the sorted pinned set. The broker observes the set before the
+claim, again under the lock, and again after the build. Any addition, removal, or
+restart (a changed start-ticks value) yields no envelope and no PASS. v1 receipts
+and `pinned` permits are unchanged and still verify. Pinning a process does not
+pause, signal, or otherwise touch it; it only proves that the set did not change.
 
 The hosted Linux contract job additionally runs real root-owned claim-store,
 signature-spool, and broker integration tests under fresh `/run` test
@@ -208,6 +217,14 @@ job connects to the VM, receives its credentials, or grants live execution.
 Run every VM step yourself, inside one owner-approved window, from the
 workstation that holds the verified admin key and host pin (or a ThinLinc
 terminal). Nothing here touches the model process or the GPU.
+`tools/ssh_ci_bring_up.py` performs steps 1-5 for one merged commit. Start
+with `--dry-run`; without it, it asks before every change:
+
+```sh
+python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
+  --known-hosts <pinned-known-hosts> --window-ref <approval reference> \
+  --hidden-path <model-or-data-dir> --stages keys,provision,qualify,github
+```
 
 1. **Keys (workstation).** Create a dedicated CI key and a separate owner
    permit-signing key; never reuse the admin key for either.
@@ -282,14 +299,16 @@ terminal). Nothing here touches the model process or the GPU.
    ```
 
    It refuses without a required-reviewer gate, when the waiting run is not the
-   commit you named with `--source-sha`, with zero or several GPU compute
-   processes (the v1 receipt pins exactly one), or when more than 300 seconds
+   commit you named with `--source-sha`, with more than eight GPU compute
+   processes, or when more than 300 seconds
    pass between observation and approval. It approves only the run whose title
-   carries the fresh permit. Its verdict does not trust the job's client receipt,
+   carries the fresh permit, pinning every GPU process it observed. Its verdict
+   does not trust the job's client receipt,
    because that code comes from the commit under test: it re-verifies the raw
    response with your local contract code for the request you signed and requires
    the broker's public receipt on the VM to name the same request and response
-   hash with a PASS execution.
+   hash with a PASS execution, and the remote receipt to pin exactly the GPU
+   process set you signed.
 
 6. Only after one such run returns PASS with matching hashes and an unchanged
    model identity, describe the lane as operational for that qualified CPU

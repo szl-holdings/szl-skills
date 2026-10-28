@@ -151,6 +151,32 @@ class BrokerHandleTests(unittest.TestCase):
         self.assertEqual(fetch[-2:], [broker.SOURCE_URL, self.request["source_sha"]])
         self.assertIn("core.hooksPath=/dev/null", fetch)
 
+    def use_pinned_set(self, processes):
+        self.permit = dict(self.permit, workload={"mode": "pinned_set",
+                                                  "processes": copy.deepcopy(processes)})
+        self.observation = dict(self.observation, gpu_compute_processes=copy.deepcopy(processes))
+        self.after = copy.deepcopy(self.observation)
+
+    def test_pinned_set_emits_a_verified_v2_envelope(self):
+        for processes in ([{"pid": 123, "start_ticks": 4567}, {"pid": 900, "start_ticks": 77}], []):
+            with self.subTest(processes=processes):
+                self.setUp()
+                self.use_pinned_set(processes)
+                status, body, _record = self.handle()
+                self.assertEqual(status, b"0", body[:200])
+                envelope = contract.strict_json_loads(body)
+                contract.verify_response(self.request, envelope)
+                receipt = envelope["receipt"]
+                self.assertEqual(receipt["schema"], contract.RECEIPT_SCHEMA_V2)
+                self.assertEqual(receipt["runtime_before"]["gpu_processes"], processes)
+
+    def test_pinned_set_change_during_build_blocks_without_envelope(self):
+        self.use_pinned_set([{"pid": 123, "start_ticks": 4567}, {"pid": 900, "start_ticks": 77}])
+        self.after["gpu_compute_processes"] = [{"pid": 123, "start_ticks": 4567}]
+        status, body, _record = self.handle()
+        self.assertEqual(status, b"1")
+        self.assertEqual(contract.strict_json_loads(body)["detail"], "MODEL_IDENTITY_CHANGED")
+
     def test_failed_step_is_a_retained_blocked_envelope(self):
         self.codes = (0, 0, 1, 0)
         status, body, _record = self.handle()

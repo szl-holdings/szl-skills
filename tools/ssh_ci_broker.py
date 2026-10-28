@@ -34,7 +34,8 @@ if __package__ in (None, ""):
 
 from tools.ssh_ci_claims import ClaimStore
 from tools.ssh_ci_contract import (BINDING_FIELDS, CPU_PROFILE, MAX_OUTPUT_BYTES,
-                                   MAX_REQUEST_BYTES, RECEIPT_SCHEMA, REPOSITORY,
+                                   MAX_REQUEST_BYTES, RECEIPT_SCHEMA, RECEIPT_SCHEMA_V2,
+                                   REPOSITORY,
                                    RESPONSE_SCHEMA, STEP_NAMES, ContractError, canonical,
                                    sha256, strict_json_loads, validate_request,
                                    verify_response)
@@ -239,12 +240,18 @@ def collect_outputs(out_dir):
     return files, problems
 
 
-def runtime_identity(observation):
+def runtime_identity(observation, mode="pinned"):
+    """v1 identity for a single pinned PID; v2 identity for a pinned set."""
     processes = observation["gpu_compute_processes"]
+    host = observation["host"]
+    if mode == "pinned_set":
+        return {"hostname": host["hostname"], "boot_id": host["boot_id"],
+                "gpu_processes": sorted(({"pid": item["pid"], "start_ticks": item["start_ticks"]}
+                                         for item in processes), key=lambda item: item["pid"])}
     if len(processes) != 1:
         raise BrokerError("RUNTIME_IDENTITY_UNAVAILABLE")
-    return {"hostname": observation["host"]["hostname"], "pid": processes[0]["pid"],
-            "start_ticks": processes[0]["start_ticks"], "boot_id": observation["host"]["boot_id"]}
+    return {"hostname": host["hostname"], "pid": processes[0]["pid"],
+            "start_ticks": processes[0]["start_ticks"], "boot_id": host["boot_id"]}
 
 
 def parse_runner(stdout):
@@ -279,7 +286,7 @@ class Build:
 
     def __call__(self, request, permit, binding, observation):
         try:
-            return self._build(request, binding, observation)
+            return self._build(request, permit, binding, observation)
         except BrokerError as error:
             self.details.setdefault("failure", error.reason)
             raise
@@ -315,8 +322,9 @@ class Build:
             # rmtree never follows payload symlinks; a still-mounted root stays visible.
             shutil.rmtree(root, ignore_errors=True)
 
-    def _build(self, request, binding, observation):
-        runtime_before = runtime_identity(observation)
+    def _build(self, request, permit, binding, observation):
+        mode = permit["workload"]["mode"]
+        runtime_before = runtime_identity(observation, mode)
         with self.workspace(request["request_id"]) as (source, out):
             stage_source(source, request["source_sha"], self.run)
             scanned, problems = self.scan()
@@ -332,7 +340,7 @@ class Build:
                                     popen=self.popen, run=self.run)
             runner = parse_runner(outcome["runner_stdout"])
             files, problems = collect_outputs(out)
-            runtime_after = runtime_identity(self.observer())
+            runtime_after = runtime_identity(self.observer(), mode)
         verified = bool(outcome["readback"] and outcome["readback"].get("verified"))
         self.details = {
             "readback": outcome["readback"], "go_sent": outcome["go_sent"],
@@ -358,7 +366,8 @@ class Build:
         self.files = files
         receipt = {field: request[field] for field in BINDING_FIELDS}
         receipt.update({
-            "schema": RECEIPT_SCHEMA, "request_sha256": binding["request_sha256"],
+            "schema": RECEIPT_SCHEMA_V2 if mode == "pinned_set" else RECEIPT_SCHEMA,
+            "request_sha256": binding["request_sha256"],
             "result": "PASS" if passed else "BLOCKED", "evidence_class": "DECLARED",
             "signed": False, "independent_witness": False, "gpu_requests": 0,
             "actual_cpu_profile": dict(CPU_PROFILE), "isolation_verified": True,

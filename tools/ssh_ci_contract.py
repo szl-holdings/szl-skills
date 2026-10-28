@@ -18,6 +18,9 @@ import uuid
 REQUEST_SCHEMA = "szl.ssh-cpu-build.request.v1"
 RESPONSE_SCHEMA = "szl.ssh-cpu-build.response.v1"
 RECEIPT_SCHEMA = "szl.ssh-cpu-build.receipt.v1"
+# v2 pins the whole observed GPU process set (possibly empty) instead of one PID.
+RECEIPT_SCHEMA_V2 = "szl.ssh-cpu-build.receipt.v2"
+MAX_PINNED_PROCESSES = 8
 REPOSITORY = "szl-holdings/szl-skills"
 WORKFLOW_REF = (
     REPOSITORY + "/.github/workflows/isolated-ssh-build.yml@refs/heads/main"
@@ -206,15 +209,38 @@ def validate_request(request):
     return dict(request)
 
 
-def _runtime(identity, label):
-    _fields(identity, {"hostname", "pid", "start_ticks", "boot_id"}, label)
-    hostname = identity["hostname"]
+def _hostname(hostname, label):
     if type(hostname) is not str or not re.fullmatch(
             r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", hostname):
         raise ContractError(label + " has invalid hostname")
+
+
+def _runtime(identity, label):
+    _fields(identity, {"hostname", "pid", "start_ticks", "boot_id"}, label)
+    _hostname(identity["hostname"], label)
     _integer(identity["pid"], 1, (1 << 31) - 1, label + " pid")
     _integer(identity["start_ticks"], 1, (1 << 63) - 1, label + " start_ticks")
     _uuid(identity["boot_id"], label + " boot_id")
+
+
+def validate_pinned_processes(processes, label):
+    """A pinned GPU process set: at most 8 {pid, start_ticks}, unique, sorted by pid."""
+    if type(processes) is not list or len(processes) > MAX_PINNED_PROCESSES:
+        raise ContractError(label + " must list at most %d GPU processes" % MAX_PINNED_PROCESSES)
+    for process in processes:
+        _fields(process, {"pid", "start_ticks"}, label + " process")
+        _integer(process["pid"], 1, (1 << 31) - 1, label + " pid")
+        _integer(process["start_ticks"], 1, (1 << 63) - 1, label + " start_ticks")
+    pids = [process["pid"] for process in processes]
+    if pids != sorted(set(pids)):
+        raise ContractError(label + " processes must be unique and sorted by pid")
+
+
+def _runtime_v2(identity, label):
+    _fields(identity, {"hostname", "boot_id", "gpu_processes"}, label)
+    _hostname(identity["hostname"], label)
+    _uuid(identity["boot_id"], label + " boot_id")
+    validate_pinned_processes(identity["gpu_processes"], label)
 
 
 def verify_response(request, envelope):
@@ -233,7 +259,10 @@ def verify_response(request, envelope):
     _literal(envelope["request_sha256"], request_hash, "response request_sha256")
     receipt = envelope["receipt"]
     _fields(receipt, RECEIPT_FIELDS, "receipt")
-    _literal(receipt["schema"], RECEIPT_SCHEMA, "receipt schema")
+    runtime = {RECEIPT_SCHEMA: _runtime, RECEIPT_SCHEMA_V2: _runtime_v2}.get(
+        receipt["schema"] if type(receipt["schema"]) is str else None)
+    if runtime is None:
+        raise ContractError("receipt schema does not match the required value")
     _literal(receipt["request_sha256"], request_hash, "receipt request_sha256")
     for field in BINDING_FIELDS:
         _literal(receipt[field], request[field], "receipt " + field)
@@ -250,8 +279,8 @@ def verify_response(request, envelope):
     _fields(profile, CPU_PROFILE, "actual_cpu_profile")
     for field, expected in CPU_PROFILE.items():
         _literal(profile[field], expected, "actual_cpu_profile " + field)
-    _runtime(receipt["runtime_before"], "runtime_before")
-    _runtime(receipt["runtime_after"], "runtime_after")
+    runtime(receipt["runtime_before"], "runtime_before")
+    runtime(receipt["runtime_after"], "runtime_after")
     if receipt["runtime_before"] != receipt["runtime_after"]:
         raise ContractError("runtime identity changed")
     steps = receipt["steps"]
