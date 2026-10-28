@@ -67,6 +67,8 @@ DIRECTORIES = (
     ("/var/lib/szl-cpu-broker/qualification", 0o700), ("/run/szl-cpu-build", 0o700),
 )
 SSHD_FILES = ("/etc/ssh/sshd_config.d/60-szl-cpu-ci.conf", "/etc/ssh/szl-ci/authorized_keys")
+# Group owner of a managed file other than root; every other file is root:root.
+FILE_GROUPS = {"/etc/ssh/szl-ci/authorized_keys": CI_USER}
 # Ctrl-C over ``ssh -t`` and a dropped session (SIGHUP through sudo); Windows has no SIGHUP.
 INTERRUPTS = tuple(getattr(signal, name) for name in ("SIGINT", "SIGHUP") if hasattr(signal, name))
 SSHD_EXPECTED = {
@@ -145,15 +147,16 @@ def render(options):
         "OOMScoreAdjust=500\n"
         "# No PrivateTmp/Protect*/Private*: the broker must share the host mount\n"
         "# namespace so its per-run tmpfs is visible to the build unit it starts.\n")
+    # Only root reads these, except authorized_keys, which sshd opens as szl-ci.
     return {
-        "/etc/ssh/sshd_config.d/60-szl-cpu-ci.conf": (sshd.encode("ascii"), 0o644),
+        "/etc/ssh/sshd_config.d/60-szl-cpu-ci.conf": (sshd.encode("ascii"), 0o600),
         "/etc/ssh/szl-ci/authorized_keys": ((MANAGED + 'restrict,command="' + RELAY_COMMAND
-                                             + '" ' + ci_key + " szl-cpu-ci\n").encode("ascii"), 0o644),
+                                             + '" ' + ci_key + " szl-cpu-ci\n").encode("ascii"), 0o640),
         "/etc/szl-cpu-broker/allowed_signers": ((MANAGED + principal + ' namespaces="' + NAMESPACE
-                                                 + '" ' + owner_key + "\n").encode("ascii"), 0o644),
-        CONFIG_PATH: (json.dumps(config, indent=2, sort_keys=True).encode("ascii") + b"\n", 0o644),
-        "/etc/systemd/system/szl-cpu-broker.socket": (socket_unit.encode("ascii"), 0o644),
-        "/etc/systemd/system/szl-cpu-broker@.service": (service_unit.encode("ascii"), 0o644),
+                                                 + '" ' + owner_key + "\n").encode("ascii"), 0o600),
+        CONFIG_PATH: (json.dumps(config, indent=2, sort_keys=True).encode("ascii") + b"\n", 0o600),
+        "/etc/systemd/system/szl-cpu-broker.socket": (socket_unit.encode("ascii"), 0o600),
+        "/etc/systemd/system/szl-cpu-broker@.service": (service_unit.encode("ascii"), 0o600),
     }
 
 
@@ -264,8 +267,19 @@ def _stage(name):
         raise ProvisionError("%s failed: %s: %s" % (name, type(error).__name__, error)) from error
 
 
+def _group_id(path):
+    if path not in FILE_GROUPS:
+        return 0
+    import grp
+    try:
+        return grp.getgrnam(FILE_GROUPS[path]).gr_gid
+    except KeyError:
+        raise ProvisionError("group %s does not exist for %s" % (FILE_GROUPS[path], path)) from None
+
+
 def _write(path, data, mode):
     temporary = Path(str(path) + ".szl-tmp")
+    group = _group_id(str(path))
     with _stage("write " + str(path)):
         try:
             leftover = temporary.lstat()
@@ -280,7 +294,7 @@ def _write(path, data, mode):
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-        os.chown(temporary, 0, 0)
+        os.chown(temporary, 0, group)
         os.chmod(temporary, mode)
         os.replace(temporary, path)
 

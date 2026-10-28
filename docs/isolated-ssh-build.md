@@ -277,6 +277,9 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
      --owner-window-ref <your approval reference>
    ```
 
+   Every file it manages is root-only `0600`, except
+   `/etc/ssh/szl-ci/authorized_keys`, which is `0640 root:szl-ci` because sshd
+   opens it with the `szl-ci` user's identity.
    `apply` refuses unmanaged files and hidden paths that would cover the unit's
    own mount points, then, in this order, writes the SSH entry point, validates
    `sshd -t`, checks the `szl-ci` effective settings, compares the admin user's

@@ -10,6 +10,7 @@ from pathlib import Path
 import posixpath
 import shutil
 import signal
+import stat
 import subprocess
 import tempfile
 import types
@@ -140,7 +141,7 @@ class FileWriteTests(unittest.TestCase):
             target = Path(scratch) / "authorized_keys"
             leftover = Path(str(target) + ".szl-tmp")
             leftover.write_bytes(b"half")
-            provision._write(str(target), b"whole\n", 0o644)
+            provision._write(str(target), b"whole\n", 0o600)
             self.assertEqual(target.read_bytes(), b"whole\n")
             self.assertFalse(os.path.lexists(leftover))
             decoy = Path(scratch) / "decoy"
@@ -149,10 +150,42 @@ class FileWriteTests(unittest.TestCase):
                                (lambda: os.symlink(decoy, leftover), leftover.unlink)):
                 make()
                 with self.assertRaisesRegex(provision.ProvisionError, "not a regular file"):
-                    provision._write(str(target), b"other\n", 0o644)
+                    provision._write(str(target), b"other\n", 0o600)
                 self.assertEqual(target.read_bytes(), b"whole\n")
                 self.assertEqual(decoy.read_bytes(), b"keep")
                 undo()
+
+    def test_managed_files_are_root_only_except_the_ci_key_file(self):
+        modes = {path: mode for path, (_data, mode) in provision.render(options()).items()}
+        keys = "/etc/ssh/szl-ci/authorized_keys"
+        self.assertEqual(modes.pop(keys), 0o640)
+        self.assertEqual(set(modes.values()), {0o600})
+        self.assertEqual(provision.FILE_GROUPS, {keys: provision.CI_USER})
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"), "POSIX writes only")
+    def test_ci_key_file_is_group_owned_by_szl_ci_and_a_missing_group_writes_nothing(self):
+        keys = "/etc/ssh/szl-ci/authorized_keys"
+        with tempfile.TemporaryDirectory() as scratch:
+            target = Path(scratch) / "authorized_keys"
+            owners = []
+            group = mock.Mock(gr_gid=4321)
+            with mock.patch.dict(provision.FILE_GROUPS, {str(target): provision.CI_USER}), \
+                    mock.patch("grp.getgrnam", return_value=group) as lookup, \
+                    mock.patch.object(provision.os, "chown",
+                                      side_effect=lambda _path, uid, gid: owners.append((uid, gid))):
+                provision._write(str(target), b"key\n", 0o640)
+                lookup.assert_called_once_with(provision.CI_USER)
+                self.assertEqual(owners, [(0, 4321)])
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o640)
+                missing = Path(scratch) / "missing"
+                with mock.patch.dict(provision.FILE_GROUPS, {str(missing): "no-such-group"}), \
+                        mock.patch("grp.getgrnam", side_effect=KeyError("no-such-group")), \
+                        self.assertRaisesRegex(provision.ProvisionError, "group no-such-group"):
+                    provision._write(str(missing), b"key\n", 0o640)
+                self.assertFalse(os.path.lexists(missing))
+                self.assertFalse(os.path.lexists(str(missing) + ".szl-tmp"))
+            self.assertIn(keys, provision.FILE_GROUPS)
+            self.assertEqual(provision._group_id(str(Path(scratch) / "other")), 0)
 
     def test_remove_clears_the_file_and_its_leftover_temporary(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -213,7 +246,7 @@ class ApplyOrderTests(unittest.TestCase):
                 stack.enter_context(mock.patch.object(provision, name, value))
             try:
                 outcome = provision.apply(options(), run=run)
-            except BaseException as error:
+            except (Exception, KeyboardInterrupt) as error:
                 outcome = error
         self.assertEqual([signal.getsignal(number) for number in provision.INTERRUPTS], before)
         return outcome, events, quiet
