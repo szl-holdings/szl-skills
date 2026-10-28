@@ -2,6 +2,12 @@
 
 ## Unreleased source guidance (after v0.5.0-rc.3)
 
+- Close a figure-data-contract scope gap: a row with a censored relation (`>`) or a
+  unit other than the axis unit was drawn as an exact point and verified as MATCH.
+  Axes may declare optional `relation_column` and `unit_column`; any row that is not
+  `=` in the axis unit, or an undeclared relation, qualifier or unit(s) column, is now
+  UNKNOWN. Captions and plotted data use fixed notation (10000, not 1E+4). Raise the
+  aggregate `skills/` source budget from 1,082,000 to 1,083,000 bytes for this change.
 - Add szl-reporting-guideline-audit as its own bounded import family. It accounts for
   every frozen PRISMA 2020, CONSORT 2025, or combined STROBE 2007 item id. Conditional
   items need an explicit applicability. A locator is not visual confirmation, and

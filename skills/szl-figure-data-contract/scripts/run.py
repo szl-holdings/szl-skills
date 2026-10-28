@@ -17,6 +17,9 @@ SCHEMA = "szl.figure-data-contract.v1"
 RECEIPT_SCHEMA = "szl.figure-data-receipt.v1"
 MAX_BYTES = 262144
 MAX_ROWS = 10000
+AXIS_OPTIONAL = {"relation_column", "unit_column"}
+# Undeclared censoring or unit columns would otherwise plot as exact, same-unit values.
+QUALIFIER = re.compile(r"(?i)(relation|qualifier|units?)\Z")
 SVG_NS = "http://www.w3.org/2000/svg"
 RECEIPT_KEYS = {"schema", "spec", "data", "spec_sha256", "data_sha256", "generator_sha256",
                 "outputs", "signed", "independent_witness", "scientific_claims_verified", "receipt_sha256"}
@@ -112,7 +115,7 @@ def number(value):
 def decimal_text(value):
     with localcontext() as context:
         context.prec = 50
-        return str(value.normalize()) if value else "0"
+        return format(value.normalize(), "f") if value else "0"
 
 
 def load_contract(root, spec_path, *, raw_spec=None, raw_data=None):
@@ -128,24 +131,30 @@ def load_contract(root, spec_path, *, raw_spec=None, raw_data=None):
         raise ContractError("only scatter and line are supported")
     for axis in ("x", "y"):
         a = spec[axis]
-        if not isinstance(a, dict) or set(a) != {"column", "unit"}:
+        if not isinstance(a, dict) or not {"column", "unit"} <= set(a) <= {"column", "unit"} | AXIS_OPTIONAL:
             raise ContractError("axis requires column and unit")
         if any(not isinstance(a[k], str) or not 1 <= len(a[k]) <= 80 or
                any(not (32 <= ord(c) <= 0xD7FF or 0xE000 <= ord(c) <= 0xFFFD or
                         0x10000 <= ord(c) <= 0x10FFFF) for c in a[k]) for k in a):
             raise ContractError("invalid axis text")
     columns = (spec["id_column"], spec["x"]["column"], spec["y"]["column"])
-    if any(not isinstance(c, str) for c in columns) or len(set(columns)) != 3:
-        raise ContractError("id, x and y require distinct columns")
+    guards = [(spec[a][k], "=" if k == "relation_column" else spec[a]["unit"])
+              for a in ("x", "y") for k in sorted(AXIS_OPTIONAL) if k in spec[a]]
+    named = columns + tuple(c for c, _ in guards)
+    if any(not isinstance(c, str) for c in named) or len(set(named)) != len(named):
+        raise ContractError("declared columns must be distinct")
     if not isinstance(spec["data"], str) or not spec["data"].endswith(".csv"):
         raise ContractError("data must name a CSV file")
     if raw_data is None:
         raw_data = read_bytes(safe_path(root, spec["data"]))
     reader = csv.reader(io.StringIO(raw_data.decode("utf-8"), newline=""), strict=True)
     header = next(reader, None)
-    if not header or len(header) > 64 or len(set(header)) != len(header) or any(not c for c in header) or not set(columns) <= set(header):
+    if not header or len(header) > 64 or len(set(header)) != len(header) or any(not c for c in header) or not set(named) <= set(header):
         raise ContractError("invalid CSV header")
+    if any(QUALIFIER.search(c) for c in set(header) - set(named)):
+        raise ContractError("undeclared relation or unit column")
     indices = [header.index(c) for c in columns]
+    checks = [(header.index(c), expected) for c, expected in guards]
     points, seen = [], set()
     for row in reader:
         if len(points) >= MAX_ROWS or len(row) != len(header):
@@ -154,6 +163,8 @@ def load_contract(root, spec_path, *, raw_spec=None, raw_data=None):
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", row_id) or row_id in seen:
             raise ContractError("row IDs must be unique safe identifiers")
         seen.add(row_id)
+        if any(row[i] != expected for i, expected in checks):
+            raise ContractError("censored relation or unit differing from axis")
         points.append({"id": row_id, "x": number(x), "y": number(y)})
     if not points:
         raise ContractError("CSV has no observations")
