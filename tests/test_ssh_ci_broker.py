@@ -28,11 +28,16 @@ ROOT_POSIX = POSIX and os.geteuid() == 0
 SSH_KEYGEN = shutil.which("ssh-keygen")
 
 
+def json_load(path):
+    return contract.strict_json_loads(Path(path).read_bytes())
+
+
 def config(root):
     return {
         "schema": broker.CONFIG_SCHEMA, "owner_principal": "stephen",
         "allowed_signers": str(root / "allowed_signers"), "permit_dir": str(root / "permits"),
         "claim_dir": str(root / "claims"), "receipt_dir": str(root / "receipts"),
+        "public_receipt_dir": str(root / "public"),
         "run_root": str(root / "run"), "build_user": "szl-build",
         "build_python": "/usr/bin/python3",
         "runner": "/opt/szl-cpu-broker/current/tools/ssh_ci_step_runner.py",
@@ -57,6 +62,12 @@ def write_outputs(out, codes=(0, 0, 0, 0), extra=None):
 
 
 class TestBuild(broker.Build):
+    scan_result = ([], [])
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.scan = lambda: TestBuild.scan_result
+
     def _build_ids(self):
         return os.getuid(), os.getgid()
 
@@ -163,6 +174,72 @@ class BrokerHandleTests(unittest.TestCase):
         status, body, _record = self.handle()
         self.assertEqual(status, b"1")
         self.assertEqual(contract.strict_json_loads(body)["detail"], "OUTPUT_FILE_REJECTED")
+
+    def test_unhideable_host_path_blocks_before_the_unit_starts(self):
+        TestBuild.scan_result = ([], ["unhideable host path name"])
+        try:
+            status, body, _record = self.handle()
+        finally:
+            TestBuild.scan_result = ([], [])
+        self.assertEqual(status, b"1")
+        self.assertEqual(contract.strict_json_loads(body)["detail"], "UNHIDEABLE_HOST_PATH")
+
+    def test_scanned_paths_are_hidden_in_the_unit(self):
+        TestBuild.scan_result = (["/data", "/run/snapd.socket"], [])
+        seen = []
+        original = self.fake_unit
+
+        def capture(request_id, argv, user, **kwargs):
+            seen.extend(argv)
+            return original(request_id, argv, user, **kwargs)
+        self.fake_unit = capture
+        try:
+            status, _body, _record = self.handle()
+        finally:
+            TestBuild.scan_result = ([], [])
+        self.assertEqual(status, b"0")
+        self.assertIn("--property=InaccessiblePaths=-/data", seen)
+        self.assertIn("--property=InaccessiblePaths=-/run/snapd.socket", seen)
+
+    def test_stale_run_directories_from_a_killed_broker_are_removed(self):
+        stale = self.root / "run" / "11111111-2222-4333-8444-555555555555"
+        (stale / "out").mkdir(parents=True)
+        status, _body, _record = self.handle()
+        self.assertEqual(status, b"0")
+        self.assertFalse(stale.exists())
+        self.assertIn([broker.UMOUNT, str(stale)], [argv[:2] for argv in self.commands])
+
+    def test_package_entry_flood_is_rejected(self):
+        def flood(out):
+            for index in range(broker.MAX_PACKAGE_ENTRIES + 5):
+                (out / "packages" / ("a%d.zip" % index)).write_bytes(b"")
+        self.extra = flood
+        status, body, _record = self.handle()
+        self.assertEqual(status, b"1")
+        self.assertEqual(contract.strict_json_loads(body)["detail"], "OUTPUT_FILE_REJECTED")
+
+    def test_receipts_are_written_and_a_receipt_failure_withholds_the_envelope(self):
+        for name in ("receipts", "public"):
+            (self.root / name).mkdir()
+        status, body, record = self.handle()
+        broker.write_receipts(self.config, record)
+        public = json_load(self.root / "public" / (self.request["request_id"] + ".json"))
+        self.assertEqual(public["response_sha256"], contract.sha256(body))
+        self.assertEqual(public["execution"]["result"], "PASS")
+        self.assertNotIn("files", public)
+        broker.write_receipts(self.config, record)  # A replay never overwrites the first.
+        self.assertEqual(len(list((self.root / "public").iterdir())), 2)
+        output = io.BytesIO()
+        original_load, original_handle = broker.load_config, broker.handle
+        broker.load_config = lambda _path: dict(self.config, receipt_dir=str(self.root / "missing"))
+        broker.handle = lambda *_args, **_kwargs: (status, body, record)
+        try:
+            code = broker.main([], stdin=io.BytesIO(b"{}"), stdout=output)
+        finally:
+            broker.load_config, broker.handle = original_load, original_handle
+        self.assertEqual(code, 1)
+        notice = contract.strict_json_loads(output.getvalue()[1:])
+        self.assertEqual(notice["reason"], "BROKER_RECEIPT_UNAVAILABLE")
 
     def test_invalid_request_is_blocked_before_any_component(self):
         for bad in (b"", b"{}", contract.canonical(dict(self.request, operation="shell")),

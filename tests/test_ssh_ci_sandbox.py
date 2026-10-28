@@ -1,10 +1,13 @@
 """Offline sandbox tests: fixed unit properties, readback gate, GO ordering."""
 
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from tools import ssh_ci_contract as contract
 from tools import ssh_ci_sandbox as sandbox
@@ -37,10 +40,15 @@ class PropertyTests(unittest.TestCase):
                          "BindPaths=/run/szl-cpu-build/x/out:/out",
                          "InaccessiblePaths=-/opt/models",
                          "InaccessiblePaths=-/etc/szl-cpu-broker",
-                         "InaccessiblePaths=-/var/lib/szl-cpu-broker"):
+                         "InaccessiblePaths=-/var/lib", "InaccessiblePaths=-/etc/systemd"):
             self.assertIn(required, values)
         self.assertTrue(any(value.startswith("TemporaryFileSystem=/tmp:") for value in values))
         self.assertFalse(any("PrivateTmp" in value for value in values))
+        # Hiding a directory that holds mount sources would break namespace setup.
+        for source_parent in ("/run", "/run/systemd", "/run/szl-cpu-build"):
+            self.assertNotIn("InaccessiblePaths=-" + source_parent, values)
+        self.assertIn("SystemCallFilter=~@privileged @resources @keyring io_uring_setup "
+                      "io_uring_enter io_uring_register", values)
 
     def test_privileged_users_bad_paths_and_longer_runtime_are_rejected(self):
         for overrides in ({"user": "root"}, {"user": "ubuntu"}, {"user": "Bad"},
@@ -77,8 +85,27 @@ class ReadbackTests(unittest.TestCase):
         for name, value in sandbox.EXPECTED_CGROUP.items():
             (base / name).write_text(value + "\n")
         (base / "cgroup.procs").write_text("4242\n")
+        self.proc = self.cgroup / "proc"
+        self.write_process()
         self.shown = dict(sandbox.EXPECTED_PROPERTIES, ControlGroup="/system.slice/" + UNIT,
                           User="szl-build", RuntimeMaxUSec="7min")
+
+    def write_process(self, seccomp="2", caps=sandbox.ZERO_CAPS, shared=()):
+        if os.name != "posix":
+            patcher = mock.patch.object(sandbox, "process_readback",
+                                        return_value={"failures": []})
+            patcher.start()
+            self.addCleanup(patcher.stop)
+            return
+        shutil.rmtree(self.proc, ignore_errors=True)
+        for pid in ("4242", "self"):
+            (self.proc / pid / "ns").mkdir(parents=True)
+            for index, name in enumerate(sandbox.NAMESPACES):
+                identity = "host" if pid == "self" or name in shared else "unit"
+                os.symlink("%s:[%s-%d]" % (name, identity, index), self.proc / pid / "ns" / name)
+        (self.proc / "4242" / "status").write_text(
+            "Name:\tpython3\nSeccomp:\t%s\nNoNewPrivs:\t1\nCapEff:\t%s\nCapPrm:\t%s\n"
+            "CapBnd:\t%s\nCapAmb:\t%s\n" % (seccomp, caps, caps, caps, caps))
 
     def fake_run(self, argv, **_kwargs):
         self.assertEqual(argv[:3], [sandbox.SYSTEMCTL, "show", UNIT])
@@ -86,7 +113,8 @@ class ReadbackTests(unittest.TestCase):
         return subprocess.CompletedProcess(argv, 0, text.encode("ascii"), b"")
 
     def readback(self):
-        return sandbox.readback(UNIT, "szl-build", run=self.fake_run, cgroup_root=self.cgroup)
+        return sandbox.readback(UNIT, "szl-build", run=self.fake_run, cgroup_root=self.cgroup,
+                                proc_root=self.proc)
 
     def test_exact_kernel_and_systemd_values_verify(self):
         value = self.readback()
@@ -106,6 +134,19 @@ class ReadbackTests(unittest.TestCase):
         self.setUp()
         (self.cgroup / "system.slice" / UNIT / "pids.max").write_text("max\n")
         self.assertIn("pids.max", self.readback()["mismatched"])
+
+    @unittest.skipUnless(os.name == "posix", "namespace links need POSIX symlinks")
+    def test_kernel_process_view_must_show_seccomp_no_caps_and_private_namespaces(self):
+        value = self.readback()
+        self.assertEqual(value["process"]["separate_namespaces"], sorted(sandbox.NAMESPACES))
+        for kwargs, expected in (({"seccomp": "0"}, "seccomp"),
+                                 ({"caps": "000001ffffffffff"}, "capabilities"),
+                                 ({"shared": ("net",)}, "host namespace")):
+            with self.subTest(kwargs=kwargs):
+                self.write_process(**kwargs)
+                result = self.readback()
+                self.assertIs(result["verified"], False)
+                self.assertTrue(any(expected in item for item in result["mismatched"]))
 
     def test_missing_cgroup_is_unavailable(self):
         ticks = iter(range(1000))
@@ -164,8 +205,42 @@ class RunUnitTests(unittest.TestCase):
             REQUEST_ID, ["unused"], "szl-build", popen=sleeper, run=self.fake_run,
             wall_seconds=-9, readback_fn=lambda *_args, **_kwargs: {"verified": True})
         self.assertTrue(outcome["timed_out"])
-        self.assertIn([sandbox.SYSTEMCTL, "kill", "--kill-whom=all", "--signal=SIGKILL", UNIT],
+        self.assertIn([sandbox.SYSTEMCTL, "kill", "--kill-who=all", "--signal=SIGKILL", UNIT],
                       self.commands)
+
+
+@unittest.skipUnless(os.name == "posix", "host scan uses POSIX sockets and symlinks")
+class HostScanTests(unittest.TestCase):
+    def test_unknown_top_level_opt_var_and_run_sockets_are_hidden(self):
+        import socket
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            for directory in ("usr/bin", "etc", "data/models", "opt/szl-cpu-broker", "opt/vllm",
+                              "var/lib/secrets", "var/tmp", "run/snapd", "run/systemd/inaccessible",
+                              "run/szl-cpu-build/x"):
+                (root / directory).mkdir(parents=True)
+            os.symlink("usr/bin", root / "bin")
+            os.symlink("/run", root / "var" / "run")
+            sockets = []
+            for path in ("run/snapd.socket", "run/systemd/inaccessible/sock",
+                         "run/szl-cpu-build/x/s"):
+                server = socket.socket(socket.AF_UNIX)
+                server.bind(str(root / path))
+                sockets.append(server)
+            try:
+                hidden, problems = sandbox.host_hidden_paths(root)
+            finally:
+                for server in sockets:
+                    server.close()
+        self.assertEqual(problems, [])
+        self.assertEqual(hidden, ["/data", "/opt/vllm", "/run/snapd.socket", "/var/lib"])
+
+    def test_unsafe_names_are_problems_not_silently_visible(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            (Path(scratch) / "model weights").mkdir()
+            hidden, problems = sandbox.host_hidden_paths(Path(scratch))
+        self.assertEqual(hidden, [])
+        self.assertEqual(problems, ["unhideable host path name"])
 
 
 class ProfileAgreementTests(unittest.TestCase):

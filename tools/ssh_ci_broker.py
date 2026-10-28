@@ -47,18 +47,22 @@ from tools import ssh_ci_sandbox as sandbox
 CONFIG_SCHEMA = "szl.ssh-cpu-broker.config.v1"
 BLOCKED_SCHEMA = "szl.ssh-cpu-build.broker-blocked.v1"
 BROKER_RECEIPT_SCHEMA = "szl.ssh-cpu-build.broker-receipt.v1"
+PUBLIC_RECEIPT_SCHEMA = "szl.ssh-cpu-build.public-receipt.v1"
 DEFAULT_CONFIG = "/etc/szl-cpu-broker/broker.json"
 SOURCE_URL = "https://github.com/" + REPOSITORY
 GIT = "/usr/bin/git"
 MOUNT = "/usr/bin/mount"
 UMOUNT = "/usr/bin/umount"
-RUN_TMPFS_OPTIONS = "size=268435456,mode=0755,nosuid,nodev,noexec"
+# nr_inodes bounds entry counts the root broker must later list and collect.
+RUN_TMPFS_OPTIONS = "size=268435456,nr_inodes=16384,mode=0755,nosuid,nodev,noexec"
+MAX_PACKAGE_ENTRIES = 256
 STAGE_TIMEOUT_SECONDS = 30  # Total for all staging commands, within the client deadline.
 MAX_CONFIG_BYTES = 8192
 MAX_PACKAGE_FILE_BYTES = 4 * 1024 * 1024
 PACKAGE_NAME = r"[a-z0-9][a-z0-9.-]{0,95}\.zip"
 MANIFEST_NAME = "science-package-manifest.json"
-CONFIG_PATHS = ("allowed_signers", "permit_dir", "claim_dir", "receipt_dir", "run_root",
+CONFIG_PATHS = ("allowed_signers", "permit_dir", "claim_dir", "receipt_dir",
+                "public_receipt_dir", "run_root",
                 "build_python", "runner", "nvidia_smi")
 CONFIG_FIELDS = frozenset({"schema", "owner_principal", "build_user", "hidden_paths",
                            *CONFIG_PATHS})
@@ -139,7 +143,7 @@ def stage_source(directory, source_sha, run=subprocess.run, source_url=SOURCE_UR
         raise BrokerError("SOURCE_IDENTITY_MISMATCH")
 
 
-def _read_regular_at(directory_fd, name, limit):
+def _read_regular_at(directory_fd, name, limit, budget=None):
     flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
     try:
         handle = os.open(name, flags, dir_fd=directory_fd)
@@ -151,6 +155,11 @@ def _read_regular_at(directory_fd, name, limit):
         metadata = os.fstat(handle)
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > limit:
             raise BrokerError("OUTPUT_FILE_REJECTED")
+        if budget is not None:
+            # Charge declared sizes before reading so the total stays bounded.
+            budget[0] -= metadata.st_size
+            if budget[0] < 0:
+                raise BrokerError("OUTPUT_LIMIT_EXCEEDED")
         data = os.read(handle, limit + 1)
         if len(data) > limit:
             raise BrokerError("OUTPUT_FILE_REJECTED")
@@ -176,12 +185,13 @@ def collect_outputs(out_dir):
     """Collect the ten contract files without following links; return (files, problems)."""
     problems = []
     files = {}
+    budget = [MAX_OUTPUT_BYTES]
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     out_fd = os.open(out_dir, flags)
     try:
         for name in STEP_NAMES:
             for suffix in (".stdout", ".stderr"):
-                data = _read_regular_at(out_fd, name + suffix, 1024 * 1024)
+                data = _read_regular_at(out_fd, name + suffix, 1024 * 1024, budget)
                 if data is None:
                     problems.append("MISSING:" + name + suffix)
                 files[name + suffix] = data or b""
@@ -196,11 +206,18 @@ def collect_outputs(out_dir):
             raise BrokerError("OUTPUT_FILE_REJECTED") from error
         if packages_fd is not None:
             try:
-                for entry in sorted(os.listdir(packages_fd)):
+                names = os.listdir(packages_fd)
+                if len(names) > MAX_PACKAGE_ENTRIES + 1:
+                    raise BrokerError("OUTPUT_FILE_REJECTED")
+                # Leave room for the tar headers (512 bytes per member plus trailer).
+                budget[0] -= 512 * (len(names) + 2)
+                for entry in sorted(names):
                     if entry == MANIFEST_NAME:
-                        manifest = _read_regular_at(packages_fd, entry, MAX_PACKAGE_FILE_BYTES) or b""
+                        manifest = _read_regular_at(packages_fd, entry, MAX_PACKAGE_FILE_BYTES,
+                                                    budget) or b""
                     elif re.fullmatch(PACKAGE_NAME, entry):
-                        packages[entry] = _read_regular_at(packages_fd, entry, MAX_PACKAGE_FILE_BYTES)
+                        packages[entry] = _read_regular_at(packages_fd, entry,
+                                                           MAX_PACKAGE_FILE_BYTES, budget)
                     else:
                         problems.append("UNEXPECTED_PACKAGE_ENTRY")
             finally:
@@ -250,8 +267,9 @@ class Build:
     """The executor callback; keeps file bytes outside the bounded executor result."""
 
     def __init__(self, config, *, run=subprocess.run, popen=subprocess.Popen,
-                 observer=None, run_unit=sandbox.run_unit):
+                 observer=None, run_unit=sandbox.run_unit, scan=sandbox.host_hidden_paths):
         self.config, self.run, self.popen, self.run_unit = config, run, popen, run_unit
+        self.scan = scan
         self.observer = observer
         self.files = None
         self.details = {}
@@ -269,8 +287,15 @@ class Build:
     @contextlib.contextmanager
     def workspace(self, request_id):
         """Yield (source, out) on a per-run tmpfs; always unmount and remove it."""
-        root = Path(self.config["run_root"]) / request_id
-        Path(self.config["run_root"]).mkdir(mode=0o700, exist_ok=True)  # /run is per boot.
+        run_root = Path(self.config["run_root"])
+        root = run_root / request_id
+        run_root.mkdir(mode=0o700, exist_ok=True)  # /run is per boot.
+        # The claim lock is held and no build unit runs, so anything left here is
+        # from a killed broker: unmount and remove it before starting.
+        for stale in sorted(run_root.iterdir()):
+            if not stale.is_symlink():
+                self.run([UMOUNT, str(stale)], capture_output=True, timeout=30, check=False)
+            shutil.rmtree(stale, ignore_errors=True)
         root.mkdir(mode=0o700, parents=False, exist_ok=False)
         mounted = False
         try:
@@ -291,9 +316,12 @@ class Build:
         runtime_before = runtime_identity(observation)
         with self.workspace(request["request_id"]) as (source, out):
             stage_source(source, request["source_sha"], self.run)
+            scanned, problems = self.scan()
+            if problems:
+                raise BrokerError("UNHIDEABLE_HOST_PATH")
             properties = sandbox.unit_properties(
                 user=self.config["build_user"], source_dir=source, output_dir=out,
-                hidden_paths=self.config["hidden_paths"])
+                hidden_paths=[*self.config["hidden_paths"], *scanned])
             argv = sandbox.launch_argv(request["request_id"], properties,
                                        self.config["build_python"], self.config["runner"],
                                        request["source_sha"])
@@ -351,16 +379,45 @@ class Build:
         return entry.pw_uid, entry.pw_gid
 
 
-def _write_broker_receipt(directory, request_id, record):
-    stamp = utc_now().strftime("%Y%m%dT%H%M%S%fZ")
-    name = stamp + "-" + (request_id or "invalid-request") + ".json"
+def _write_exclusive(path, data, mode):
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
-    descriptor = os.open(Path(directory) / name, flags, 0o600)
+    descriptor = os.open(path, flags, mode)
     with os.fdopen(descriptor, "wb") as stream:
-        stream.write(canonical(record) + b"\n")
+        stream.write(data)
         stream.flush()
         os.fsync(stream.fileno())
-    return name
+
+
+def public_summary(record):
+    """Admin-readable, secret-free subset the owner compares with GitHub evidence."""
+    build = record.get("build") or {}
+    readback = build.get("readback") or {}
+    runner = build.get("runner") or {}
+    return {
+        "schema": PUBLIC_RECEIPT_SCHEMA, "evidence_class": "DECLARED",
+        "request_id": record["request_id"], "request_sha256": record["request_sha256"],
+        "response_sha256": record["response_sha256"], "execution": record["execution"],
+        "build_failure": build.get("failure"), "isolation_verified": readback.get("verified"),
+        "go_sent": build.get("go_sent"), "unit_gone": build.get("unit_gone"),
+        "steps": runner.get("steps"), "runtime_before": build.get("runtime_before"),
+        "runtime_after": build.get("runtime_after"), "signed": False,
+        "independent_witness": False,
+    }
+
+
+def write_receipts(config, record):
+    """Write the root-only receipt and, for a valid request, the public summary."""
+    stamp = utc_now().strftime("%Y%m%dT%H%M%S%fZ")
+    request_id = record["request_id"]
+    _write_exclusive(Path(config["receipt_dir"]) / (stamp + "-" + (request_id or "invalid-request")
+                                                    + ".json"), canonical(record) + b"\n", 0o600)
+    if request_id is not None:
+        public = Path(config["public_receipt_dir"])
+        data = canonical(public_summary(record)) + b"\n"
+        try:
+            _write_exclusive(public / (request_id + ".json"), data, 0o644)
+        except FileExistsError:  # A replayed request never overwrites the first record.
+            _write_exclusive(public / (request_id + "." + stamp + ".json"), data, 0o644)
 
 
 def handle(request_bytes, config, *, clock=utc_now, run=subprocess.run,
@@ -448,9 +505,15 @@ def main(argv=None, stdin=None, stdout=None):
         return 1
     status, body, record = handle(request_bytes, config)
     try:
-        _write_broker_receipt(config["receipt_dir"], record["request_id"], record)
+        write_receipts(config, record)
     except OSError:
-        print("broker receipt write failed", file=sys.stderr)
+        # No receipt, no envelope: the claim stays consumed and nothing retries.
+        status = b"1"
+        body = canonical({"schema": BLOCKED_SCHEMA, "request_sha256": record["request_sha256"],
+                          "result": "BLOCKED", "stage": "RECEIPT",
+                          "reason": "BROKER_RECEIPT_UNAVAILABLE",
+                          "claim_status": record["execution"]["claim_status"],
+                          "detail": None, "retry": False})
     stdout.write(status + body)
     stdout.flush()
     return 0 if status == b"0" else 1

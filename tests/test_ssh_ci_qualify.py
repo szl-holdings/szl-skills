@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -18,7 +19,9 @@ CONFINED_ISOLATION = {
     "write:/src/.probe": "DENIED:OSError", "write:/etc/.probe": "DENIED:OSError",
     "write:/out/.probe": "ALLOWED", "write:/tmp/.probe": "ALLOWED",
     "setuid_root": "DENIED:PermissionError", "cap_eff": "0000000000000000",
-    "no_new_privs": "1", "uid": 999,
+    "no_new_privs": "1", "uid": 999, "read:/etc/systemd/system/vllm.service": "DENIED:PermissionError",
+    "syscall:io_uring_setup": "DENIED:EPERM", "syscall:add_key": "DENIED:EPERM",
+    "reachable_unix_sockets": [],
 }
 
 
@@ -44,11 +47,14 @@ class EvaluationTests(unittest.TestCase):
         leaky = dict(CONFINED_ISOLATION, inet_socket="ALLOWED", **{
             "tcp:8000": "ALLOWED", "write:/etc/.probe": "ALLOWED", "list:/home": "ALLOWED"},
             gpu_devices=["nvidia0"], dev_shm_entries=3, model_pid_visible=[445607],
-            cap_eff="00000000a80425fb", uid=0)
+            cap_eff="00000000a80425fb", uid=0, reachable_unix_sockets=["/run/snapd.socket"],
+            **{"syscall:io_uring_setup": "ALLOWED:14",
+               "read:/etc/systemd/system/vllm.service": "ALLOWED"})
         failures = "\n".join(qualify.evaluate("isolation", leaky, outcome(), self.context))
         for expected in ("inet_socket allowed", "tcp:8000 allowed", "write:/etc/.probe",
                          "list:/home allowed", "GPU devices", "/dev/shm", "host processes",
-                         "capabilities", "build user"):
+                         "capabilities", "build user", "/run/snapd.socket",
+                         "syscall:io_uring_setup not filtered", "read:/etc/systemd/system/vllm.service"):
             self.assertIn(expected, failures)
         self.assertTrue(qualify.evaluate("tasks", {"threads_started": 512}, outcome(), self.context))
         self.assertTrue(qualify.evaluate("tmpfs", {"bytes_written": 805306368}, outcome(), self.context))
@@ -84,9 +90,21 @@ class HostReadTests(unittest.TestCase):
                 "7f02-7f03 r-xp 00000000 08:01 2 /usr/lib/libc.so.6\n")
             if os.name == "posix":
                 os.symlink("/srv/vllm", pid / "cwd")
-            paths = qualify.model_paths([4242], proc)
-            self.assertIn("/data/models/llm", paths)
-            self.assertNotIn("/usr/lib", paths)
+            (pid / "cmdline").write_bytes(b"python3\0-m\0vllm.entrypoints\0--model\0"
+                                          b"/models/Nemotron\0--download-dir=/cache/hf\0"
+                                          b"--chat-template\0/opt/t/template.jinja\0")
+            (pid / "environ").write_bytes(b"PATH=/usr/bin\0HF_HOME=/var/hf\0HF_TOKEN=secret\0")
+            (pid / "cgroup").write_text("0::/system.slice/vllm.service\n")
+
+            def run(argv, **_kwargs):
+                return subprocess.CompletedProcess(argv, 0, b"/etc/systemd/system/vllm.service\n", b"")
+            directories, files = qualify.model_paths([4242], proc, run)
+            for expected in ("/data/models/llm", "/models/Nemotron", "/cache/hf", "/var/hf"):
+                self.assertIn(expected, directories)
+            self.assertNotIn("/usr/lib", directories)
+            self.assertIn("/opt/t/template.jinja", files)
+            self.assertIn("/etc/systemd/system/vllm.service", files)
+            self.assertFalse(any("secret" in path for path in directories + files))
 
     def test_unit_result_and_last_json(self):
         self.assertEqual(qualify.unit_result(b"x\nFinished with result: oom-kill\n"), "oom-kill")
@@ -103,6 +121,10 @@ class QualifyFlowTests(unittest.TestCase):
 
         class FakeBuild:
             run = popen = None
+
+            @staticmethod
+            def scan():
+                return ["/data", "/run/snapd.socket"], []
 
         def fake_control(_build, _config, mode, _arguments, **_kwargs):
             probes = {"isolation": CONFINED_ISOLATION, "tasks": {"threads_started": 3},

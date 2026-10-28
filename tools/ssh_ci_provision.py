@@ -57,7 +57,7 @@ DIRECTORIES = (
     ("/etc/szl-cpu-broker", 0o755), ("/etc/szl-cpu-broker/permits", 0o700),
     ("/etc/ssh/szl-ci", 0o755), (INSTALL_ROOT, 0o755), (INSTALL_ROOT + "/releases", 0o755),
     ("/var/lib/szl-cpu-broker", 0o755), ("/var/lib/szl-cpu-broker/claims", 0o700),
-    ("/var/lib/szl-cpu-broker/receipts", 0o700),
+    ("/var/lib/szl-cpu-broker/receipts", 0o700), ("/var/lib/szl-cpu-broker/public", 0o755),
     ("/var/lib/szl-cpu-broker/qualification", 0o700), ("/run/szl-cpu-build", 0o700),
 )
 SSHD_EXPECTED = {
@@ -102,7 +102,8 @@ def render(options):
         "allowed_signers": "/etc/szl-cpu-broker/allowed_signers",
         "permit_dir": "/etc/szl-cpu-broker/permits",
         "claim_dir": "/var/lib/szl-cpu-broker/claims",
-        "receipt_dir": "/var/lib/szl-cpu-broker/receipts", "run_root": "/run/szl-cpu-build",
+        "receipt_dir": "/var/lib/szl-cpu-broker/receipts",
+        "public_receipt_dir": "/var/lib/szl-cpu-broker/public", "run_root": "/run/szl-cpu-build",
         "build_user": BUILD_USER, "build_python": options["build_python"],
         "runner": CURRENT + "/tools/ssh_ci_step_runner.py",
         "nvidia_smi": options["nvidia_smi"], "hidden_paths": sorted(options["hidden_paths"]),
@@ -126,7 +127,7 @@ def render(options):
         "[Unit]\nDescription=SZL CPU build broker (one request)\nCollectMode=inactive-or-failed\n\n"
         "[Service]\nType=simple\nExecStart=" + BROKER_COMMAND + "\nStandardInput=socket\n"
         "StandardOutput=socket\nStandardError=journal\nUser=root\nNoNewPrivileges=yes\n"
-        "RuntimeMaxSec=600\nKillMode=control-group\n"
+        "RuntimeMaxSec=900\nKillMode=control-group\n"
         "# No PrivateTmp/Protect*/Private*: the broker must share the host mount\n"
         "# namespace so its per-run tmpfs is visible to the build unit it starts.\n")
     return {

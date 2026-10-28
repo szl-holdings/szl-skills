@@ -31,7 +31,8 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.ssh_ci_admission import PERMIT_SCHEMA, validate_permit
-from tools.ssh_ci_contract import CPU_PROFILE, ContractError, canonical, sha256, strict_json_loads
+from tools.ssh_ci_contract import (CPU_PROFILE, MAX_RESPONSE_BYTES, ContractError, canonical,
+                                   sha256, strict_json_loads, verify_response)
 from tools.ssh_ci_owner_signature import (BUNDLE_SUFFIX, MAX_ALLOWED_SIGNERS_BYTES, NAMESPACE,
                                           SIGNATURE_SUFFIX, bundle, read_protected,
                                           verify_bundle)
@@ -44,6 +45,7 @@ WORKFLOW = "isolated-ssh-build.yml"
 ENVIRONMENT = "massed-cpu-build"
 OWNER_CONFIG_SCHEMA = "szl.ssh-cpu-build.owner-config.v1"
 REMOTE_TOOLS = "/opt/szl-cpu-broker/current/tools"
+PUBLIC_RECEIPTS = "/var/lib/szl-cpu-broker/public"
 WINDOW_SECONDS = 900
 MAX_APPROVAL_DELAY_SECONDS = 300  # Leaves >=600s for runner pickup and the >=450s claim floor.
 REQUIRED_VARIABLES = {"SZL_CPU_CI_ENABLED", "SZL_CPU_SSH_HOST", "SZL_CPU_SSH_PORT",
@@ -235,14 +237,51 @@ class Owner:
                      "approve deployment")
 
     def collect(self, run_id, out):
+        """Download evidence; return the raw broker response bytes only (bounded)."""
         self.command([self.args.gh, "run", "watch", str(run_id), "-R", REPOSITORY, "--interval", "10"],
                      "watch run", check=False)
         self.command([self.args.gh, "run", "download", str(run_id), "-R", REPOSITORY,
                       "-n", "ssh-cpu-build-%d-1" % run_id, "-D", str(out)], "download evidence")
-        receipt = json.loads((out / "client-receipt.json").read_text(encoding="utf-8"))
-        mismatched = [name for name, meta in receipt.get("verified_files", {}).items()
-                      if sha256((out / "artifacts" / name).read_bytes()) != meta["sha256"]]
-        return receipt, mismatched
+        path = out / "response.raw.json"
+        if path.is_symlink() or not path.is_file():
+            raise IssueError("evidence has no regular response.raw.json")
+        with open(path, "rb") as stream:
+            raw = stream.read(MAX_RESPONSE_BYTES + 1)
+        if len(raw) > MAX_RESPONSE_BYTES:
+            raise IssueError("response.raw.json exceeds the response limit")
+        return raw
+
+    def public_receipt(self, request_id):
+        """The broker's own summary, read from the VM rather than from GitHub."""
+        if str(uuid.UUID(request_id)) != request_id:
+            raise IssueError("invalid request_id")
+        output = self.ssh("cat %s/%s.json" % (PUBLIC_RECEIPTS, request_id),
+                          "read broker public receipt").stdout
+        return strict_json_loads(output.strip(), 65536)
+
+
+def verify_outcome(request, raw, public):
+    """Owner-side verdict from the owner's own contract code, not the job's.
+
+    The GitHub job runs code from the commit under test, so its client receipt
+    and artifact list are not trusted here. PASS needs the raw response to pass
+    ``verify_response`` for the request the owner signed, a PASS remote receipt,
+    and the broker's public receipt on the VM naming the same request and the
+    same response hash with a PASS execution.
+    """
+    digest = sha256(canonical(request))
+    files = verify_response(request, strict_json_loads(raw))
+    remote = strict_json_loads(raw)["receipt"]
+    failures = []
+    if remote["result"] != "PASS":
+        failures.append("remote receipt is BLOCKED")
+    if public.get("request_sha256") != digest:
+        failures.append("VM receipt names another request")
+    if public.get("response_sha256") != sha256(raw):
+        failures.append("VM receipt response hash differs from the downloaded response")
+    if (public.get("execution") or {}).get("result") != "PASS":
+        failures.append("VM receipt execution is not PASS")
+    return files, remote, failures
 
 
 def new_record():
@@ -262,6 +301,9 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
     record.update(permit_id=permit_id, run_id=run_id)
     plan = plan_request(owner.waiting_run(run_id), permit_id)
     request, digest = plan["request"], plan["request_sha256"]
+    if request["source_sha"] != args.source_sha:
+        raise IssueError("waiting run builds %s, not the commit you named (%s); not signing"
+                         % (request["source_sha"], args.source_sha))
     environment_id = owner.pending_environment_id(run_id)
     record.update(request_sha256=digest, source_sha=request["source_sha"])
     record["stages"].append("waiting-run-bound")
@@ -281,12 +323,23 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
     record["stages"].append("approved")
     out = Path(args.evidence_dir) / ("run-%d" % run_id)
     out.mkdir(parents=True, exist_ok=False)
-    receipt, mismatched = owner.collect(run_id, out)
-    record.update(client_result=receipt.get("result"), client_failures=receipt.get("failures"),
-                  artifact_hash_mismatches=mismatched,
-                  remote_result=(receipt.get("remote_receipt") or {}).get("result"))
-    record["result"] = "PASS" if receipt.get("result") == "PASS" and not mismatched else "BLOCKED"
+    raw = owner.collect(run_id, out)
     record["stages"].append("collected")
+    try:
+        files, remote, failures = verify_outcome(request, raw,
+                                                 owner.public_receipt(request["request_id"]))
+    except ContractError as error:
+        raise IssueError("downloaded response failed owner-side verification: " + str(error))
+    verified = out / "owner-verified"
+    verified.mkdir()
+    for name, content in sorted(files.items()):  # Fixed contract names only.
+        (verified / name).write_bytes(content)
+    record.update(response_sha256=sha256(raw), remote_result=remote["result"],
+                  remote_steps=remote["steps"], runtime_before=remote["runtime_before"],
+                  runtime_after=remote["runtime_after"], verification_failures=failures,
+                  verified_files={name: sha256(data) for name, data in sorted(files.items())})
+    record["result"] = "PASS" if not failures else "BLOCKED"
+    record["stages"].append("owner-verified")
     return record
 
 
@@ -318,6 +371,8 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="action", required=True)
     run = sub.add_parser("run", help="owner workstation: issue and run one CPU build")
     run.add_argument("--owner-config", required=True)
+    run.add_argument("--source-sha", required=True,
+                     help="the full main commit you intend to build; any other is refused")
     run.add_argument("--signing-key", required=True, help="owner permit-signing private key")
     run.add_argument("--admin-target", required=True, help="for example Ubuntu@209.137.198.191")
     run.add_argument("--admin-known-hosts", help="independently verified host-key pin file")
@@ -331,6 +386,8 @@ def main(argv=None):
     install.add_argument("--signature-b64", required=True)
     install.add_argument("--config", default="/etc/szl-cpu-broker/broker.json")
     args = parser.parse_args(argv)
+    if args.action == "run" and re.fullmatch(r"[0-9a-f]{40}", args.source_sha) is None:
+        parser.error("--source-sha must be a full lowercase commit")
     try:
         if args.action == "install-permit":
             result = install_permit(args.bundle_b64, args.signature_b64, args.config)

@@ -77,27 +77,43 @@ general, scientific truth, model quality, or uninterrupted model latency.
 `PrivateUsers`, `PrivateIPC`, mount namespace with `ProtectSystem=strict`,
 `ProtectHome`, read-only `/src`, writable `/out`, and tmpfs `/tmp`, `/var/tmp`,
 and `/dev/shm` charged to the cgroup. `PrivateDevices` and `DevicePolicy=closed`
-remove GPU devices. Broker, SSH, container-runtime, D-Bus, systemd, log, and
-owner-listed model paths are inaccessible. `NoNewPrivileges`, an empty capability
-bounding set, `RestrictNamespaces`, and the `@system-service` minus
-`@privileged @resources` syscall filter apply. Host processes are hidden with
+remove GPU devices. Hidden paths are recomputed for every run: every top-level
+entry an OS does not need (for example `/data`, `/workspace`, `/snap`), every
+`/var` and `/opt` entry except the tmpfs and the broker release, every socket under
+`/run`, `/usr/local`, sensitive `/etc` directories (including systemd unit files,
+which can carry tokens), broker and SSH configuration, and owner-listed model
+paths. A host name that cannot be expressed safely blocks the build. Directories
+that hold mount sources (`/run/systemd/inaccessible`, `/run/szl-cpu-build`) are
+never hidden wholesale, because systemd resolves those inside the namespace it
+builds. `NoNewPrivileges`, an empty capability bounding set, `RestrictNamespaces`,
+and the `@system-service` syscall set minus `@privileged @resources @keyring` and
+`io_uring_*` apply. Host processes are hidden with
 `ProtectProc=invisible` and the user namespace, **not** a separate PID namespace
 (systemd 249 on Ubuntu 22.04 has no `PrivatePIDs=`); qualification measures that
-the model PID is invisible. The kernel files `cpu.max`, `memory.max`,
-`memory.swap.max`, and `pids.max` and the systemd properties must read back
-exactly or the runner never receives `GO`.
+the model PID is invisible. Before `GO`, the broker reads back the kernel files `cpu.max`,
+`memory.max`, `memory.swap.max`, and `pids.max`, the systemd properties, and the
+waiting runner process itself from `/proc`: seccomp mode 2, `NoNewPrivs`, empty
+effective/permitted/bounding/ambient capabilities, and network, mount, user, IPC,
+and UTS namespaces distinct from the host's. Any mismatch withholds `GO`.
 
 **Broker behaviour.** The broker shares the host mount namespace, so its per-run
-256 MiB `noexec` tmpfs is visible to the unit it starts. It stages exactly one
+256 MiB, 16384-inode `noexec` tmpfs is visible to the unit it starts. While it
+holds the claim lock and no build unit runs, it first unmounts and removes any
+run directory a killed broker left behind. It stages exactly one
 commit with `git fetch --depth=1` (hooks disabled, HTTPS only, 30 seconds total)
 and verifies the object ID. The build performs no dependency install. Collection
 opens files without following links, accepts only flat `*.zip` archives and the
-manifest, and builds a deterministic `packages.tar`. Status byte `0` precedes a
+manifest (at most 256 entries, sizes charged before reading against the 16 MiB
+budget), and builds a deterministic `packages.tar`. Status byte `0` precedes a
 contract-checked v1 envelope (PASS or BLOCKED result); `1` precedes a BLOCKED
 notice with reason codes only. A model-identity change, unverified readback, a
-still-present unit, or a rejected output file yields no envelope. Every outcome
-leaves a root-only broker receipt outside payload control. The claim stays
-consumed after any failure, and nothing retries.
+still-present unit, or a rejected output file yields no envelope. After the
+configuration loads, every outcome writes a root-only broker receipt and, for a
+valid request, an admin-readable public summary (`/var/lib/szl-cpu-broker/public`,
+hashes and reason codes only) *before* replying; if either write fails, the
+envelope is withheld and a BLOCKED notice is sent instead. The claim stays
+consumed after any failure, and nothing retries. The client allows 600 seconds
+end to end (staging, readback, the 420-second unit, and a 24 MiB transfer).
 
 **Python.** Ubuntu 22.04 ships Python 3.10. The VM components and the full test
 suite are exercised on 3.10; `tests/test_ssh_ci_workflow.py` no longer uses the
@@ -225,9 +241,11 @@ terminal). Nothing here touches the model process or the GPU.
 
    Proceed only on `"result": "QUALIFIED"`. A readback mismatch (for example a
    systemd property printed differently on this host) is a reviewed source
-   change, never a local relaxation. Model paths found in the model process's
-   memory maps are probed automatically; add any that are visible with
-   `--hidden-path` and re-provision.
+   change, never a local relaxation. The model process's working directory,
+   mapped weights, command-line paths, Hugging Face/vLLM cache variables, and
+   systemd unit file are probed from inside the sandbox, as is every reachable
+   UNIX socket and the io_uring and keyring syscalls (x86_64 numbers); add any
+   visible model path with `--hidden-path` and re-provision.
 
 4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
    with yourself as required reviewer and protected-branch deployment only, then
@@ -258,14 +276,19 @@ terminal). Nothing here touches the model process or the GPU.
 
    ```sh
    python tools/ssh_ci_owner_issue.py run --owner-config owner-cpu-window.json \
-     --signing-key szl-owner-permit --admin-target Ubuntu@<vm-ip> \
-     --admin-known-hosts <pinned-known-hosts>
+     --source-sha <main-sha> --signing-key szl-owner-permit \
+     --admin-target Ubuntu@<vm-ip> --admin-known-hosts <pinned-known-hosts>
    ```
 
-   It refuses without a required-reviewer gate, with zero or several GPU compute
+   It refuses without a required-reviewer gate, when the waiting run is not the
+   commit you named with `--source-sha`, with zero or several GPU compute
    processes (the v1 receipt pins exactly one), or when more than 300 seconds
    pass between observation and approval. It approves only the run whose title
-   carries the fresh permit, then downloads and re-hashes the evidence.
+   carries the fresh permit. Its verdict does not trust the job's client receipt,
+   because that code comes from the commit under test: it re-verifies the raw
+   response with your local contract code for the request you signed and requires
+   the broker's public receipt on the VM to name the same request and response
+   hash with a PASS execution.
 
 6. Only after one such run returns PASS with matching hashes and an unchanged
    model identity, describe the lane as operational for that qualified CPU

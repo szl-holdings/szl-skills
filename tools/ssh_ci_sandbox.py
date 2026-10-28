@@ -10,7 +10,9 @@ namespace isolation inside the model VM, not a separate kernel or VM.
 """
 
 from pathlib import Path
+import os
 import re
+import stat
 import subprocess
 import threading
 import time
@@ -29,11 +31,23 @@ READBACK_SECONDS = 10
 STOP_SECONDS = 20
 MAX_RUNNER_STDOUT = 64 * 1024
 MAX_RUNNER_STDERR = 64 * 1024
+# Never hide a directory that holds a mount source (/run/systemd/inaccessible,
+# /run/szl-cpu-build): systemd resolves those inside the namespace it builds.
 HIDDEN_ALWAYS = (
-    "/etc/szl-cpu-broker", "/var/lib/szl-cpu-broker", "/etc/ssh", "/run/szl-cpu-broker.sock",
-    "/run/docker.sock", "/run/containerd", "/var/lib/docker", "/var/lib/containerd",
-    "/var/log", "/boot", "/mnt", "/media", "/srv", "/run/dbus", "/run/systemd",
+    "/boot", "/mnt", "/media", "/srv", "/snap", "/run/dbus", "/run/containerd",
+    "/run/szl-cpu-broker.sock", "/etc/szl-cpu-broker", "/etc/ssh", "/etc/systemd",
+    "/etc/default", "/etc/environment", "/etc/profile.d", "/etc/security", "/etc/sudoers",
+    "/etc/sudoers.d", "/etc/cron.d", "/etc/netplan", "/etc/NetworkManager", "/etc/docker",
+    "/etc/containerd", "/etc/ssl/private", "/etc/letsencrypt", "/etc/wireguard",
+    "/etc/cloud", "/usr/local", "/var/lib", "/var/log", "/var/cache", "/var/spool",
+    "/var/mail", "/var/backups", "/var/opt", "/var/www", "/var/snap", "/var/crash",
 )
+# Top-level names an OS needs; every other top-level entry is hidden per run.
+TOP_LEVEL_VISIBLE = frozenset({"bin", "dev", "etc", "home", "lib", "lib32", "lib64", "libx32",
+                               "opt", "proc", "root", "run", "sbin", "sys", "tmp", "usr", "var"})
+VAR_VISIBLE = frozenset({"tmp"})
+SCAN_LIMIT = 4096
+SCAN_SKIP = ("/run/systemd/inaccessible", "/run/szl-cpu-build", "/run/user")
 SHM_OPTIONS = "mode=1777,size=67108864,nosuid,nodev,noexec"
 EXPECTED_CGROUP = {
     "cpu.max": "100000 100000",
@@ -89,6 +103,60 @@ def _absolute(path, label):
     return text
 
 
+def host_hidden_paths(root=Path("/"), keep_opt=("szl-cpu-broker",)):
+    """Scan the host at launch: return (paths to hide, problems).
+
+    Hidden: unknown top-level entries, every /var and /opt entry except the
+    tmpfs and the broker release, and every socket under /run. Symlinks are
+    never hidden (their target could be /run itself); their targets are covered
+    by the same rules. A name that cannot be expressed safely is a problem, and
+    the caller must refuse to build rather than leave it visible.
+    """
+    root = Path(root)
+    hidden, problems = set(), []
+
+    def add(path):
+        text = "/" + str(path.relative_to(root)).replace("\\", "/")
+        if re.fullmatch(r"/[A-Za-z0-9._/@+-]{0,254}", text) is None:
+            problems.append("unhideable host path name")
+        else:
+            hidden.add(text)
+
+    def entries(directory):
+        try:
+            return sorted(directory.iterdir())
+        except OSError:
+            return []
+    for entry in entries(root):
+        if not entry.is_symlink() and entry.name not in TOP_LEVEL_VISIBLE:
+            add(entry)
+    for parent, keep in (("var", VAR_VISIBLE), ("opt", frozenset(keep_opt))):
+        for entry in entries(root / parent):
+            if not entry.is_symlink() and entry.name not in keep:
+                add(entry)
+    visited = 0
+    stack = [root / "run"]
+    while stack:
+        directory = stack.pop()
+        for entry in entries(directory):
+            visited += 1
+            if visited > SCAN_LIMIT:
+                problems.append("socket scan limit reached under /run")
+                return sorted(hidden), problems
+            relative = "/" + str(entry.relative_to(root)).replace("\\", "/")
+            if any(relative == skip or relative.startswith(skip + "/") for skip in SCAN_SKIP):
+                continue
+            try:
+                mode = entry.lstat().st_mode
+            except OSError:
+                continue
+            if stat.S_ISSOCK(mode):
+                add(entry)
+            elif stat.S_ISDIR(mode) and len(entry.relative_to(root).parts) < 6:
+                stack.append(entry)
+    return sorted(hidden), problems
+
+
 def unit_properties(*, user, source_dir, output_dir, hidden_paths=(),
                     runtime_seconds=CPU_PROFILE["wall_seconds"]):
     """Return the fixed property list; only paths and the build user vary."""
@@ -115,7 +183,9 @@ def unit_properties(*, user, source_dir, output_dir, hidden_paths=(),
         "NoNewPrivileges=yes", "CapabilityBoundingSet=", "AmbientCapabilities=",
         "RestrictSUIDSGID=yes", "RestrictRealtime=yes", "RestrictNamespaces=yes",
         "LockPersonality=yes", "SystemCallArchitectures=native",
-        "SystemCallFilter=@system-service", "SystemCallFilter=~@privileged @resources",
+        "SystemCallFilter=@system-service",
+        "SystemCallFilter=~@privileged @resources @keyring io_uring_setup io_uring_enter "
+        "io_uring_register",
         "SystemCallErrorNumber=EPERM", "UMask=0077",
         "TemporaryFileSystem=/tmp:" + TMPFS_OPTIONS,
         "TemporaryFileSystem=/var/tmp:" + TMPFS_OPTIONS,
@@ -155,7 +225,34 @@ def _read_cgroup(unit, cgroup_root):
         with open(base / name, "rb") as stream:
             values[name] = stream.read(256).decode("ascii").strip()
     with open(base / "cgroup.procs", "rb") as stream:
-        values["procs"] = len(stream.read(65536).split())
+        values["procs"] = [int(pid) for pid in stream.read(65536).split()]
+    return values
+
+
+NAMESPACES = ("net", "mnt", "user", "ipc", "uts")
+ZERO_CAPS = "0000000000000000"
+
+
+def process_readback(pid, proc_root=Path("/proc")):
+    """Kernel view of one unit process: seccomp, no_new_privs, caps, namespaces."""
+    proc_root = Path(proc_root)
+    with open(proc_root / str(pid) / "status", "r", encoding="ascii", errors="replace") as stream:
+        status = dict(line.split(":", 1) for line in stream.read(65536).splitlines() if ":" in line)
+    values = {key: status.get(key, "").strip() for key in
+              ("Seccomp", "NoNewPrivs", "CapEff", "CapPrm", "CapBnd", "CapAmb")}
+    host = {name: os.readlink(proc_root / "self" / "ns" / name) for name in NAMESPACES}
+    unit = {name: os.readlink(proc_root / str(pid) / "ns" / name) for name in NAMESPACES}
+    values["separate_namespaces"] = sorted(name for name in NAMESPACES if unit[name] != host[name])
+    failures = []
+    if values["Seccomp"] != "2":
+        failures.append("seccomp filter not active")
+    if values["NoNewPrivs"] != "1":
+        failures.append("no_new_privs not set")
+    if any(values[key] != ZERO_CAPS for key in ("CapEff", "CapPrm", "CapBnd", "CapAmb")):
+        failures.append("capabilities not empty")
+    if values["separate_namespaces"] != sorted(NAMESPACES):
+        failures.append("shares a host namespace")
+    values["failures"] = failures
     return values
 
 
@@ -175,7 +272,7 @@ def _show(unit, run):
 
 def readback(unit, user, *, run=subprocess.run, cgroup_root=CGROUP_ROOT,
              clock=time.monotonic, sleep=time.sleep, seconds=READBACK_SECONDS,
-             runtime_seconds=CPU_PROFILE["wall_seconds"]):
+             runtime_seconds=CPU_PROFILE["wall_seconds"], proc_root=Path("/proc")):
     """Wait for the unit's cgroup, then return measured values and a verdict."""
     deadline = clock() + seconds
     cgroup = None
@@ -195,8 +292,14 @@ def readback(unit, user, *, run=subprocess.run, cgroup_root=CGROUP_ROOT,
                     RuntimeMaxUSec=format_timespan(runtime_seconds))
     mismatched = sorted(key for key, value in expected.items() if properties.get(key) != value)
     mismatched += sorted(key for key, value in EXPECTED_CGROUP.items() if cgroup.get(key) != value)
+    try:
+        process = process_readback(cgroup["procs"][0], proc_root)
+    except (OSError, ValueError) as error:
+        process = {"failures": ["process readback unavailable: " + type(error).__name__]}
+    mismatched += ["process: " + failure for failure in process["failures"]]
     return {"verified": not mismatched, "failure": "READBACK_MISMATCH" if mismatched else None,
-            "mismatched": mismatched, "cgroup": cgroup,
+            "mismatched": mismatched, "cgroup": cgroup, "process": process,
+            "pid_namespace": "shared; host processes hidden by ProtectProc=invisible",
             "properties": {key: properties.get(key) for key in sorted(expected)}}
 
 
@@ -215,7 +318,7 @@ def _bounded_reader(stream, limit, sink, flags, name):
 
 def stop_unit(unit, run=subprocess.run):
     """Kill and stop only this build unit; never touch any other process."""
-    for argv in ([SYSTEMCTL, "kill", "--kill-whom=all", "--signal=SIGKILL", unit],
+    for argv in ([SYSTEMCTL, "kill", "--kill-who=all", "--signal=SIGKILL", unit],
                  [SYSTEMCTL, "stop", unit]):
         try:
             run(argv, capture_output=True, timeout=STOP_SECONDS, check=False, shell=False)

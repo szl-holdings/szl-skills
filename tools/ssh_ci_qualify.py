@@ -68,6 +68,29 @@ if mode == "isolation":
     for path in ("/out/.probe", "/tmp/.probe"):
         attempt("write:" + path, lambda p=path: open(p, "x").close())
     attempt("setuid_root", lambda: os.setuid(0))
+    for path in args["secret_files"]:
+        attempt("read:" + path, lambda p=path: open(p, "rb").read(1))
+    import ctypes
+    libc = ctypes.CDLL(None, use_errno=True)
+    for name, number, argv in (("io_uring_setup", 425, (1, None)), ("add_key", 248, (None, None, None, 0, 0))):
+        result = libc.syscall(number, *argv)
+        r["syscall:" + name] = "DENIED:EPERM" if result == -1 and ctypes.get_errno() == 1 else "ALLOWED:" + str(ctypes.get_errno())
+    reachable, seen = [], 0
+    for top in ("/run", "/var", "/opt", "/etc", "/srv", "/mnt", "/usr/local", "/tmp", "/dev"):
+        for directory, subdirectories, names in os.walk(top):
+            for name in names:
+                seen += 1
+                path = os.path.join(directory, name)
+                try:
+                    if not __import__("stat").S_ISSOCK(os.lstat(path).st_mode):
+                        continue
+                    s = socket.socket(socket.AF_UNIX); s.settimeout(2); s.connect(path); s.close()
+                    reachable.append(path)
+                except OSError:
+                    pass
+            if seen > 50000:
+                break
+    r["reachable_unix_sockets"] = reachable
     status = dict(line.split(":", 1) for line in open("/proc/self/status") if ":" in line)
     r["cap_eff"] = status["CapEff"].strip(); r["no_new_privs"] = status["NoNewPrivs"].strip()
     r["uid"] = os.getuid()
@@ -113,20 +136,59 @@ def listening_ports(proc=Path("/proc")):
     return sorted(ports)[:64]
 
 
-def model_paths(pids, proc=Path("/proc")):
-    """Directories the model process runs from or maps weights from (read-only)."""
-    paths = set()
+MODEL_SUFFIXES = (".safetensors", ".bin", ".gguf", ".pt", ".pth")
+MODEL_ENV = ("HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE",
+             "VLLM_CACHE_ROOT", "XDG_CACHE_HOME", "TORCH_HOME")
+
+
+def model_paths(pids, proc=Path("/proc"), run=subprocess.run):
+    """Read-only: directories and files the model process uses, for probing.
+
+    Sources: cwd, mapped weight files, absolute paths on its command line,
+    Hugging Face/vLLM cache variables in its environment, and its systemd unit
+    file (which may carry tokens in Environment=). Returns (dirs, files).
+    """
+    directories, files = set(), set()
     for pid in pids:
         base = Path(proc) / str(pid)
         try:
-            paths.add(str(Path(base / "cwd").resolve()))
+            directories.add(str(Path(base / "cwd").resolve()))
+        except OSError:
+            pass
+        try:
             for line in (base / "maps").read_text(errors="replace").splitlines():
-                name = line.split(maxsplit=5)[5] if len(line.split(maxsplit=5)) == 6 else ""
-                if name.endswith((".safetensors", ".bin", ".gguf", ".pt", ".pth")):
-                    paths.add(str(Path(name).parent))
-        except (OSError, IndexError):
-            continue
-    return sorted(path for path in paths if path not in ("/", "/proc"))[:32]
+                fields = line.split(maxsplit=5)
+                if len(fields) == 6 and fields[5].endswith(MODEL_SUFFIXES):
+                    directories.add(str(Path(fields[5]).parent))
+        except OSError:
+            pass
+        try:
+            for argument in (base / "cmdline").read_bytes().split(b"\0"):
+                text = argument.decode("utf-8", "replace").split("=", 1)[-1]
+                if text.startswith("/") and not text.startswith(("/usr/", "/proc", "/dev")):
+                    target = Path(text)
+                    (directories if not target.suffix else files).add(text)
+        except OSError:
+            pass
+        try:
+            for entry in (base / "environ").read_bytes().split(b"\0"):
+                key, _, value = entry.decode("utf-8", "replace").partition("=")
+                if key in MODEL_ENV and value.startswith("/"):
+                    directories.add(value)
+        except OSError:
+            pass
+        try:
+            cgroup = (base / "cgroup").read_text().strip().rsplit("/", 1)[-1]
+            if cgroup.endswith(".service"):
+                shown = run([sandbox.SYSTEMCTL, "show", cgroup, "--property=FragmentPath",
+                             "--value"], capture_output=True, timeout=15, check=False)
+                fragment = shown.stdout.decode("utf-8", "replace").strip()
+                if fragment.startswith("/"):
+                    files.add(fragment)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    keep = sorted(path for path in directories if path not in ("/", "/proc"))[:32]
+    return keep, sorted(files)[:32]
 
 
 def last_json(stdout):
@@ -177,10 +239,15 @@ def evaluate(mode, probe, outcome, context):
             failures.append("GPU devices visible")
         if probe["dev_shm_entries"]:
             failures.append("host /dev/shm visible")
+        if probe.get("reachable_unix_sockets"):
+            failures.append("reachable unix sockets: " + ", ".join(probe["reachable_unix_sockets"][:8]))
         for key, value in probe.items():
-            if key.startswith(("tcp:", "unix:", "list:")) or key in ("inet_socket", "setuid_root"):
+            if key.startswith(("tcp:", "unix:", "list:", "read:")) or key in ("inet_socket",
+                                                                              "setuid_root"):
                 if value == "ALLOWED":
                     failures.append(key + " allowed")
+            if key.startswith("syscall:") and value != "DENIED:EPERM":
+                failures.append(key + " not filtered: " + value)
             if key.startswith("write:"):
                 expected_allowed = key in ("write:/out/.probe", "write:/tmp/.probe")
                 if (value == "ALLOWED") != expected_allowed:
@@ -194,11 +261,12 @@ def evaluate(mode, probe, outcome, context):
 
 def run_control(build, config, mode, arguments, *, runtime_seconds, run_unit=sandbox.run_unit):
     request_id = str(uuid.uuid4())
+    scanned, _problems = build.scan()  # Same per-run hiding as a real build.
     with build.workspace(request_id) as (source, out):
         source.mkdir(mode=0o755)
         properties = sandbox.unit_properties(
             user=config["build_user"], source_dir=source, output_dir=out,
-            hidden_paths=config["hidden_paths"], runtime_seconds=runtime_seconds)
+            hidden_paths=[*config["hidden_paths"], *scanned], runtime_seconds=runtime_seconds)
         argv = sandbox.systemd_run_argv(request_id, properties, [
             config["build_python"], "-I", "-B", "-c", PROBE, mode, json.dumps(arguments)],
             quiet=False)
@@ -212,10 +280,12 @@ def run_control(build, config, mode, arguments, *, runtime_seconds, run_unit=san
 def rehearse(build, config, source_sha, *, run_unit=sandbox.run_unit):
     """Run the real staged four-step build in the sandbox without any permit."""
     request_id = str(uuid.uuid4())
+    scanned, _problems = build.scan()
     with build.workspace(request_id) as (source, out):
         stage_source(source, source_sha, build.run)
         properties = sandbox.unit_properties(user=config["build_user"], source_dir=source,
-                                             output_dir=out, hidden_paths=config["hidden_paths"])
+                                             output_dir=out,
+                                             hidden_paths=[*config["hidden_paths"], *scanned])
         argv = sandbox.launch_argv(request_id, properties, config["build_python"],
                                    config["runner"], source_sha)
         outcome = run_unit(request_id, argv, config["build_user"], run=build.run, popen=build.popen)
@@ -244,11 +314,15 @@ def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.
     before = observer()
     model_pids = [item["pid"] for item in before["gpu_compute_processes"]]
     context = {"build_uid": build_uid if build_uid is not None else build._build_ids()[0]}
+    model_dirs, model_files = model_paths(model_pids, proc, run)
+    scanned, scan_problems = build.scan()
+    sockets = [path for path in scanned if path.startswith("/run/")]
     hidden = sorted({*sandbox.HIDDEN_ALWAYS, *config["hidden_paths"], "/home", "/root",
-                     *model_paths(model_pids, proc)})
+                     *model_dirs, *(path for path in scanned if path not in sockets)})
     arguments = {"model_pids": model_pids, "ports": listening_ports(proc), "hidden": hidden,
-                 "unix_sockets": ["/run/szl-cpu-broker.sock", "/run/docker.sock",
-                                  "/run/dbus/system_bus_socket"]}
+                 "secret_files": model_files,
+                 "unix_sockets": sorted({"/run/szl-cpu-broker.sock",
+                                         "/run/dbus/system_bus_socket", *sockets})}
     controls = []
     for mode, runtime in (("isolation", 60), ("tasks", 60), ("memory", 60), ("tmpfs", 60),
                           ("deadline", DEADLINE_SECONDS)):
@@ -263,6 +337,7 @@ def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.
     after = observer()
     failures = [control["control"] + ": " + failure for control in controls
                 for failure in control["failures"]]
+    failures += ["host scan: " + problem for problem in scan_problems]
     if rehearsal:
         failures += ["rehearsal: " + failure for failure in rehearsal["failures"]]
     if (before["host"], before["gpu_compute_processes"]) != (after["host"], after["gpu_compute_processes"]):

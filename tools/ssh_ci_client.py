@@ -34,7 +34,8 @@ WORKFLOW_REF = REPOSITORY + "/.github/workflows/isolated-ssh-build.yml@refs/head
 REQUEST_NAMESPACE = uuid.UUID("0f50e2ba-c13c-5af1-8e77-e07149d9d0b4")
 SSH_BINARY = "/usr/bin/ssh"
 FORCED_COMMAND = "szl-cpu-build-v1"
-TIMEOUT_SECONDS = 480
+# Staging (30 s) + readback + the 420 s unit + observations + a 24 MiB transfer.
+TIMEOUT_SECONDS = 600
 MAX_STDERR_BYTES = 1024 * 1024
 
 

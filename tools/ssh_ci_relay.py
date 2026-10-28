@@ -20,7 +20,7 @@ BROKER_SOCKET = "/run/szl-cpu-broker.sock"
 MAX_REQUEST_BYTES = 4096
 MAX_RESPONSE_BYTES = 24 * 1024 * 1024
 STDIN_SECONDS = 30
-BROKER_SECONDS = 560
+BROKER_SECONDS = 620  # Outlives the client's 600 s deadline.
 
 
 def read_request(fd, limit=MAX_REQUEST_BYTES, seconds=STDIN_SECONDS, clock=time.monotonic):

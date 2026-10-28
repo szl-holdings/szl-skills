@@ -33,16 +33,46 @@ ROOT_POSIX = os.name == "posix" and os.geteuid() == 0
 SSH_KEYGEN = shutil.which("ssh-keygen")
 
 
+RUN_METADATA = {"id": 777, "status": "waiting", "event": "workflow_dispatch",
+                "head_branch": "main", "head_sha": SHA, "run_attempt": 1,
+                "path": plan.WORKFLOW_PATH,
+                "repository": {"id": plan.REPOSITORY_ID, "full_name": owner_issue.REPOSITORY}}
+
+
+def envelope_for(request, result="PASS"):
+    """A contract-valid v1 response, as the VM broker would send it."""
+    digest = contract.sha256(contract.canonical(request))
+    files = {name: name.encode() for name in sorted(contract.REQUIRED_FILES)}
+    runtime = dict(HOST, pid=445607, start_ticks=98765)
+    receipt = {field: request[field] for field in contract.BINDING_FIELDS}
+    receipt.update(schema=contract.RECEIPT_SCHEMA, request_sha256=digest, result=result,
+                   evidence_class="DECLARED", signed=False, independent_witness=False,
+                   gpu_requests=0, actual_cpu_profile=dict(contract.CPU_PROFILE),
+                   isolation_verified=True, runtime_before=runtime, runtime_after=dict(runtime),
+                   steps=[{"name": name, "returncode": 0 if result == "PASS" else 1}
+                          for name in contract.STEP_NAMES],
+                   files={name: {"sha256": contract.sha256(data), "bytes": len(data)}
+                          for name, data in files.items()})
+    return contract.canonical({"schema": contract.RESPONSE_SCHEMA, "request_sha256": digest,
+                               "receipt": receipt,
+                               "files": {name: base64.b64encode(data).decode()
+                                         for name, data in files.items()}})
+
+
 class FakeHost:
-    """Emulates gh and ssh for one dispatched run."""
+    """Emulates gh and ssh for one dispatched run and its VM."""
 
     def __init__(self, root):
         self.root, self.calls, self.permit_id = root, [], None
         self.reviewers = [{"type": "User", "reviewer": {"login": "owner"}}]
         self.processes = [{"pid": 445607, "start_ticks": 98765}]
-        self.tamper = False
+        self.remote_result = "PASS"
+        self.github_response = None  # Replaces what the GitHub artifact carries.
         self.time = 0.0
         self.observe_cost = 0.0
+
+    def request(self):
+        return plan.plan_request(RUN_METADATA, self.permit_id)["request"]
 
     def clock(self):
         return self.time
@@ -56,6 +86,11 @@ class FakeHost:
         out = b""
         if head == "gh":
             out = self.gh(argv[1:])
+        elif head == "ssh" and argv[-1].startswith("cat "):
+            raw = envelope_for(self.request(), self.remote_result)
+            out = json.dumps({"request_sha256": contract.sha256(contract.canonical(self.request())),
+                              "response_sha256": contract.sha256(raw),
+                              "execution": {"result": "PASS"}}).encode()
         elif head == "ssh":
             self.time += self.observe_cost
             out = json.dumps({"schema": "szl.ssh-cpu-build.observation.v1",
@@ -82,11 +117,7 @@ class FakeHost:
             return json.dumps([{"databaseId": 777, "displayTitle": "CPU build permit " + self.permit_id},
                                {"databaseId": 776, "displayTitle": "CPU build permit other"}]).encode()
         if args[:2] == ["api", "repos/%s/actions/runs/777" % owner_issue.REPOSITORY]:
-            return json.dumps({"id": 777, "status": "waiting", "event": "workflow_dispatch",
-                               "head_branch": "main", "head_sha": SHA, "run_attempt": 1,
-                               "path": plan.WORKFLOW_PATH,
-                               "repository": {"id": plan.REPOSITORY_ID,
-                                              "full_name": owner_issue.REPOSITORY}}).encode()
+            return json.dumps(RUN_METADATA).encode()
         if args[:2] == ["api", "repos/%s/actions/runs/777/pending_deployments" % owner_issue.REPOSITORY]:
             return json.dumps([{"environment": {"id": 55, "name": "massed-cpu-build"},
                                 "current_user_can_approve": True}]).encode()
@@ -97,11 +128,10 @@ class FakeHost:
         if args[:2] == ["run", "download"]:
             out = Path(args[args.index("-D") + 1])
             (out / "artifacts").mkdir(parents=True)
-            data = b"packaged"
-            (out / "artifacts" / "packages.tar").write_bytes(b"tampered" if self.tamper else data)
-            (out / "client-receipt.json").write_text(json.dumps({
-                "result": "PASS", "failures": [], "remote_receipt": {"result": "PASS"},
-                "verified_files": {"packages.tar": {"bytes": 8, "sha256": contract.sha256(data)}}}))
+            raw = self.github_response or envelope_for(self.request(), self.remote_result)
+            (out / "response.raw.json").write_bytes(raw)
+            # The job's own client receipt always claims PASS; the owner ignores it.
+            (out / "client-receipt.json").write_text(json.dumps({"result": "PASS"}))
             return b""
         raise AssertionError("unexpected gh call %r" % args)
 
@@ -120,7 +150,8 @@ class IssueFlowTests(unittest.TestCase):
         (self.root / "owner.json").write_text(json.dumps(OWNER_CONFIG))
         self.host = FakeHost(self.root)
         self.args = argparse.Namespace(
-            owner_config=str(self.root / "owner.json"), signing_key="key", gh="gh", ssh="ssh",
+            owner_config=str(self.root / "owner.json"), source_sha=SHA, signing_key="key",
+            gh="gh", ssh="ssh",
             ssh_keygen="ssh-keygen", admin_target="Ubuntu@203.0.113.10",
             admin_known_hosts=str(self.root / "known_hosts"), admin_key=None,
             evidence_dir=str(self.root / "evidence"))
@@ -141,7 +172,10 @@ class IssueFlowTests(unittest.TestCase):
         record, owner = self.issue()
         self.assertEqual(record["result"], "PASS", record)
         self.assertEqual(record["stages"], ["environment", "waiting-run-bound", "permit-installed",
-                                            "approved", "collected"])
+                                            "approved", "collected", "owner-verified"])
+        self.assertEqual(sorted(record["verified_files"]), sorted(contract.REQUIRED_FILES))
+        self.assertTrue((self.root / "evidence" / "run-777" / "owner-verified" /
+                         "packages.tar").is_file())
         value = signature.parse_bundle(owner.signed)
         self.assertEqual(value["permit"]["permit_id"], self.host.permit_id)
         self.assertEqual(value["permit"]["workload"], {"mode": "pinned", "pid": 445607,
@@ -185,11 +219,72 @@ class IssueFlowTests(unittest.TestCase):
         self.assertEqual(self.approvals(), [])
         self.assertIn("permit-installed", record["stages"])
 
-    def test_artifact_hash_mismatch_is_blocked(self):
-        self.host.tamper = True
+    def test_forged_github_side_envelope_is_rejected(self):
+        # A client from the commit under test could ship its own self-consistent
+        # PASS envelope; it is bound to another request, so owner checks reject it.
+        self.host.github_response = envelope_for(
+            plan.plan_request(RUN_METADATA, "00000000-0000-4000-8000-000000000000")["request"])
         record, _owner = self.issue()
         self.assertEqual(record["result"], "BLOCKED")
-        self.assertEqual(record["artifact_hash_mismatches"], ["packages.tar"])
+        self.assertIn("owner-side verification", record["failure"])
+
+    def test_remote_blocked_is_blocked_even_if_the_client_says_pass(self):
+        self.host.remote_result = "BLOCKED"
+        record, _owner = self.issue()
+        self.assertEqual(record["result"], "BLOCKED")
+        self.assertIn("remote receipt is BLOCKED", record["verification_failures"])
+
+    def test_downloaded_bytes_must_hash_to_the_vm_receipt(self):
+        original_gh = self.host.gh
+
+        def gh(args):
+            output = original_gh(args)
+            if args[:2] == ["run", "download"]:
+                path = Path(args[args.index("-D") + 1]) / "response.raw.json"
+                value = json.loads(path.read_bytes())
+                path.write_bytes(json.dumps(value).encode())  # Same content, other bytes.
+            return output
+        self.host.gh = gh
+        record, _owner = self.issue()
+        self.assertEqual(record["result"], "BLOCKED")
+        self.assertTrue(record["failure"] or record["verification_failures"])
+
+    def test_tampered_response_bytes_fail_the_vm_hash(self):
+        original_gh = self.host.gh
+
+        def gh(args):
+            output = original_gh(args)
+            if args[:2] == ["run", "download"]:
+                path = Path(args[args.index("-D") + 1]) / "response.raw.json"
+                path.write_bytes(path.read_bytes() + b"\n")
+            return output
+        self.host.gh = gh
+        record, _owner = self.issue()
+        self.assertEqual(record["result"], "BLOCKED")
+        self.assertIn("VM receipt response hash differs from the downloaded response",
+                      record["verification_failures"])
+
+    @unittest.skipUnless(os.name == "posix", "symlink creation is POSIX-only here")
+    def test_symlinked_response_is_refused(self):
+        original_gh = self.host.gh
+
+        def gh(args):
+            output = original_gh(args)
+            if args[:2] == ["run", "download"]:
+                path = Path(args[args.index("-D") + 1]) / "response.raw.json"
+                path.unlink()
+                os.symlink("/dev/zero", path)
+            return output
+        self.host.gh = gh
+        record, _owner = self.issue()
+        self.assertIn("no regular response.raw.json", record["failure"])
+
+    def test_waiting_run_for_another_commit_is_never_signed(self):
+        self.args.source_sha = "e" * 40
+        record, owner = self.issue()
+        self.assertIn("not the commit you named", record["failure"])
+        self.assertFalse(hasattr(owner, "signed"))
+        self.assertEqual(self.approvals(), [])
 
     def test_owner_attestations_are_required_not_invented(self):
         for change in ({"hf_revision": "UNKNOWN"}, {"checkpoint_manifest_sha256": "x"},
