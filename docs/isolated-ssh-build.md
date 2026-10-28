@@ -69,6 +69,7 @@ general, scientific truth, model quality, or uninterrupted model latency.
 | `tools/ssh_ci_provision.py` | root, owner-run | `plan` (read-only) / `apply` / `uninstall`; writes a provisioning receipt |
 | `tools/ssh_ci_qualify.py` | root, owner-run | Negative controls and an optional real-build rehearsal; writes a qualification receipt |
 | `tools/ssh_ci_owner_issue.py` | owner workstation | Dispatch, bind, observe, sign, install, approve one run, collect evidence |
+| `tools/ssh_ci_bring_up.py` | owner workstation | Runs runbook steps 1-5 in order for one `--release-sha`, asking before every change; `--dry-run` prints the commands |
 
 **Sandbox properties (read back before `GO`).** One aggregate cgroup:
 `CPUQuota=100%`, `MemoryMax=1 GiB`, `MemorySwapMax=0`, `TasksMax=64`,
@@ -216,6 +217,14 @@ job connects to the VM, receives its credentials, or grants live execution.
 Run every VM step yourself, inside one owner-approved window, from the
 workstation that holds the verified admin key and host pin (or a ThinLinc
 terminal). Nothing here touches the model process or the GPU.
+`tools/ssh_ci_bring_up.py` performs steps 1-5 for one merged commit. Start
+with `--dry-run`; without it, it asks before every change:
+
+```sh
+python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
+  --known-hosts <pinned-known-hosts> --window-ref <approval reference> \
+  --hidden-path <model-or-data-dir> --stages keys,provision,qualify,github
+```
 
 1. **Keys (workstation).** Create a dedicated CI key and a separate owner
    permit-signing key; never reuse the admin key for either.
