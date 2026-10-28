@@ -31,6 +31,10 @@ WINDOW_FIELDS = frozenset({
     "expires_at", "provider", "host", "execution", "source", "cpu_profile",
     "budget", "workload", "checkpoint_manifest_sha256", "owner_receipt_ref",
 })
+OWNER_ATTESTATION_FIELDS = frozenset({
+    "provider_instance_uuid", "hf_revision", "budget", "checkpoint_manifest_sha256",
+    "owner_receipt_ref",
+})
 
 
 def _object(value):
@@ -91,6 +95,41 @@ def _nonempty(value, label, maximum):
         raise ContractError(label + " must be a bounded nonempty text value")
 
 
+def validate_owner_attestations(owner):
+    """Check the owner-attested values; the same checks run before dispatch and on the broker.
+
+    Template placeholders (any text starting with FILL) and uppercase digests are
+    refused, never normalized.
+    """
+    _fields(owner, OWNER_ATTESTATION_FIELDS, "owner attestations")
+    budget = owner["budget"]
+    _fields(budget, {"ledger_ref", "remaining_seconds", "remaining_usd"}, "budget")
+    texts = [(field, owner[field]) for field in sorted(OWNER_ATTESTATION_FIELDS - {"budget"})]
+    texts += [("budget " + field, budget[field]) for field in sorted(budget)]
+    for label, text in texts:
+        if type(text) is str and text.lstrip().upper().startswith("FILL"):
+            raise ContractError(label + " is still a template placeholder")
+    _uuid(owner["provider_instance_uuid"], "provider instance_uuid")
+    _nonempty(owner["hf_revision"], "source hf_revision", 128)
+    if owner["hf_revision"] in {"UNKNOWN", "UNAVAILABLE"}:
+        raise ContractError("source hf_revision must be admitted")
+    _nonempty(budget["ledger_ref"], "budget ledger_ref", 256)
+    if type(budget["remaining_seconds"]) is not int \
+            or not MIN_REMAINING_SECONDS <= budget["remaining_seconds"] <= MAX_CAMPAIGN_SECONDS:
+        raise ContractError("budget remaining_seconds is outside the admitted bound")
+    if type(budget["remaining_usd"]) not in (int, float) \
+            or isinstance(budget["remaining_usd"], bool) \
+            or not 0 < budget["remaining_usd"] <= MAX_CAMPAIGN_USD:
+        raise ContractError("budget remaining_usd is outside the admitted bound")
+    checkpoint = owner["checkpoint_manifest_sha256"]
+    if type(checkpoint) is str and re.fullmatch(r"[A-Fa-f0-9]{64}", checkpoint) \
+            and checkpoint != checkpoint.lower():
+        raise ContractError("checkpoint_manifest_sha256 has uppercase hex; it is refused, "
+                            "not normalized (Get-FileHash prints uppercase)")
+    _digest(checkpoint, 64, "checkpoint_manifest_sha256")
+    _nonempty(owner["owner_receipt_ref"], "owner_receipt_ref", 256)
+
+
 def validate_owner_window(request, window, now):
     """Return a detached window if it is internally complete and request-bound.
 
@@ -122,7 +161,6 @@ def validate_owner_window(request, window, now):
     provider = window["provider"]
     _fields(provider, {"name", "instance_uuid"}, "provider")
     _literal(provider["name"], "Massed Compute", "provider name")
-    _uuid(provider["instance_uuid"], "provider instance_uuid")
     _host(window["host"])
 
     execution = window["execution"]
@@ -136,25 +174,11 @@ def validate_owner_window(request, window, now):
     _fields(source, {"github_sha", "hf_revision"}, "source")
     _digest(source["github_sha"], 40, "source github_sha")
     _literal(source["github_sha"], request["source_sha"], "source github_sha")
-    _nonempty(source["hf_revision"], "source hf_revision", 128)
-    if source["hf_revision"] in {"UNKNOWN", "UNAVAILABLE"}:
-        raise ContractError("source hf_revision must be admitted")
 
     profile = window["cpu_profile"]
     _fields(profile, CPU_PROFILE, "cpu_profile")
     for field, expected in CPU_PROFILE.items():
         _literal(profile[field], expected, "cpu_profile " + field)
-
-    budget = window["budget"]
-    _fields(budget, {"ledger_ref", "remaining_seconds", "remaining_usd"}, "budget")
-    _nonempty(budget["ledger_ref"], "budget ledger_ref", 256)
-    if type(budget["remaining_seconds"]) is not int \
-            or not MIN_REMAINING_SECONDS <= budget["remaining_seconds"] <= MAX_CAMPAIGN_SECONDS:
-        raise ContractError("budget remaining_seconds is outside the admitted bound")
-    if type(budget["remaining_usd"]) not in (int, float) \
-            or isinstance(budget["remaining_usd"], bool) \
-            or not 0 < budget["remaining_usd"] <= MAX_CAMPAIGN_USD:
-        raise ContractError("budget remaining_usd is outside the admitted bound")
 
     workload = window["workload"]
     _fields(workload, {"mode", "gpu_devices", "model_interaction", "training", "inference"},
@@ -164,8 +188,10 @@ def validate_owner_window(request, window, now):
     _literal(workload["model_interaction"], "none", "workload model_interaction")
     _literal(workload["training"], False, "workload training")
     _literal(workload["inference"], False, "workload inference")
-    _digest(window["checkpoint_manifest_sha256"], 64,
-            "checkpoint_manifest_sha256")
-    _nonempty(window["owner_receipt_ref"], "owner_receipt_ref", 256)
+    validate_owner_attestations({
+        "provider_instance_uuid": provider["instance_uuid"], "hf_revision": source["hf_revision"],
+        "budget": window["budget"],
+        "checkpoint_manifest_sha256": window["checkpoint_manifest_sha256"],
+        "owner_receipt_ref": window["owner_receipt_ref"]})
     return window
 

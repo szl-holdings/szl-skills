@@ -152,6 +152,46 @@ class OwnerWindowTests(unittest.TestCase):
         with self.assertRaises(contract.ContractError):
             window.validate_owner_window(request, changed, now)
 
+    def test_broker_refuses_template_placeholders_and_uppercase_digests(self):
+        request, value, now = fixtures()
+        for parent, field, bad in (("source", "hf_revision", "FILL: admitted Hugging Face revision"),
+                                   ("budget", "ledger_ref", " fill: your budget ledger reference"),
+                                   ("provider", "instance_uuid", "Fill: instance UUID"),
+                                   (None, "owner_receipt_ref", "FILL"),
+                                   (None, "checkpoint_manifest_sha256", "fill" + "c" * 60)):
+            changed = copy.deepcopy(value)
+            (changed[parent] if parent else changed)[field] = bad
+            with self.subTest(field=field), \
+                    self.assertRaisesRegex(contract.ContractError, "template placeholder"):
+                window.validate_owner_window(request, changed, now)
+        changed = copy.deepcopy(value)
+        changed["checkpoint_manifest_sha256"] = "C" * 64
+        with self.assertRaisesRegex(contract.ContractError, "uppercase"):
+            window.validate_owner_window(request, changed, now)
+
+    def test_owner_attestations_share_the_window_checks(self):
+        _, value, _ = fixtures()
+        owner = {"provider_instance_uuid": value["provider"]["instance_uuid"],
+                 "hf_revision": value["source"]["hf_revision"], "budget": dict(value["budget"]),
+                 "checkpoint_manifest_sha256": value["checkpoint_manifest_sha256"],
+                 "owner_receipt_ref": value["owner_receipt_ref"]}
+        self.assertEqual(set(owner), window.OWNER_ATTESTATION_FIELDS)
+        self.assertIsNone(window.validate_owner_attestations(owner))
+        for field, bad in (("provider_instance_uuid", "not-a-uuid"), ("hf_revision", "UNAVAILABLE"),
+                           ("hf_revision", "x" * 129), ("checkpoint_manifest_sha256", "c" * 63),
+                           ("owner_receipt_ref", "a\nb"),
+                           ("budget", dict(owner["budget"], remaining_seconds=449)),
+                           ("budget", dict(owner["budget"], remaining_seconds=7200.0)),
+                           ("budget", dict(owner["budget"], remaining_usd=True)),
+                           ("budget", dict(owner["budget"], remaining_usd=2000.01)),
+                           ("budget", dict(owner["budget"], extra=1))):
+            with self.subTest(field=field, bad=bad), self.assertRaises(contract.ContractError):
+                window.validate_owner_attestations(dict(owner, **{field: bad}))
+        for bad in (dict(owner, schema="x"), {k: v for k, v in owner.items() if k != "budget"},
+                    None, []):
+            with self.subTest(bad=bad), self.assertRaises(contract.ContractError):
+                window.validate_owner_attestations(bad)
+
 
 if __name__ == "__main__":
     unittest.main()
