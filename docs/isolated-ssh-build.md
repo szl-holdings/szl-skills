@@ -38,7 +38,11 @@ general, scientific truth, model quality, or uninterrupted model latency.
   an arbitrary caller-supplied shell command, branch, or repository.
 - The `massed-cpu-build` environment must be explicitly provisioned and restricted
   to protected `main` before activation. Creating it automatically by dispatching
-  this workflow is not a substitute for configuring protection.
+  this workflow is not a substitute for configuring protection. The restriction
+  is an explicit custom deployment branch policy that names exactly `main`
+  (GitHub documents "protected branches only" in terms of classic protection
+  rules, and whether a ruleset counts is UNKNOWN), and `main` itself must be
+  reported as protected.
 - `SZL_CPU_CI_ENABLED` must remain unset until all qualification gates below pass.
   Missing configuration is BLOCKED, not a skipped remote success.
 - A fresh CPU permit ID is required for each execution. GitHub concurrency does
@@ -67,7 +71,7 @@ general, scientific truth, model quality, or uninterrupted model latency.
 | `tools/ssh_ci_sandbox.py` | root, via `systemd-run` | One transient service per build with the fixed properties below; `GO` only after readback |
 | `tools/ssh_ci_step_runner.py` | `szl-build` inside the unit | Waits for `GO`, copies read-only `/src` to private scratch, requires the exact clean commit, runs the four fixed steps with 1 MiB per stream |
 | `tools/ssh_ci_provision.py` | root, owner-run | `plan` (read-only) / `apply` / `uninstall`; writes a provisioning receipt |
-| `tools/ssh_ci_qualify.py` | root, owner-run | Negative controls and an optional real-build rehearsal; writes a qualification receipt |
+| `tools/ssh_ci_qualify.py` | root, owner-run | Negative controls and an optional real-build rehearsal under the broker's claim lock; writes a qualification receipt |
 | `tools/ssh_ci_owner_issue.py` | owner workstation | Dispatch, bind, observe, sign, install, approve one run, collect evidence |
 | `tools/ssh_ci_bring_up.py` | owner workstation | Runs runbook steps 1-5 in order for one `--release-sha`, asking before every change; `--dry-run` prints the commands |
 
@@ -95,9 +99,11 @@ every later bind. A hidden path that covers one of them is refused. The `/run`
 walk counts only directories and sockets toward its 4096-entry limit and does not
 descend into directories it already hides. `NoNewPrivileges`, an empty capability
 bounding set, `RestrictNamespaces`, and the `@system-service` syscall set minus
-`@privileged @resources @keyring` and `io_uring_*` apply. systemd 249's
+`@privileged @resources @keyring` and `io_uring_*` apply. systemd 249.11's
 `RestrictNamespaces` filters `clone`, `unshare` and `setns` but not `clone3`
-(upstream added that in 250), so `clone3` returns `ENOSYS`; glibc then falls back
+(upstream added that rule in 251 and backported it to stable 249.12; if Ubuntu
+carries the backport the rule below is redundant and harmless), so the unit sets
+`SystemCallFilter=~clone3:ENOSYS` and `clone3` returns `ENOSYS`; glibc then falls back
 to `clone`, whose namespace flags are filtered, and threads keep working. Host
 processes are hidden with
 `ProtectProc=invisible` and the user namespace, **not** a separate PID namespace
@@ -207,7 +213,10 @@ nonce, GitHub source SHA and admitted HF revision, the fixed CPU profile, a
 bounded budget-ledger reference, checkpoint-manifest digest, and an explicit
 no-GPU/no-model/no-training/no-inference workload. GPU-grant-shaped objects,
 unknown revisions, missing backup/budget references, duplicate members, and
-scope-expanding fields are rejected. This validator does not read a provider ledger;
+scope-expanding fields are rejected. The owner-attested fields are checked by
+`validate_owner_attestations`, which the owner tool also runs on its config
+before it dispatches anything; `FILL` placeholders and uppercase digests are
+refused, never normalized. This validator does not read a provider ledger;
 the signature loader authenticates the owner before the executor sees the
 envelope, and the budget and checkpoint fields remain the owner's attestations.
 No owner window exists until the owner issues one for a specific waiting run.
@@ -232,7 +241,16 @@ Run every VM step yourself, inside one owner-approved window, from the
 workstation that holds the verified admin key and host pin (or a ThinLinc
 terminal). Nothing here touches the model process or the GPU.
 `tools/ssh_ci_bring_up.py` performs steps 1-5 for one merged commit. Start
-with `--dry-run`; without it, it asks before every change:
+with `--dry-run`; without it, it asks before every change. Provision first
+proves a non-interactive (`BatchMode`) admin login, then prints exactly what it
+will stage under `~/szl-cpu-lane` on the VM (the two public keys and the source
+at the release SHA) and writes nothing until you type `STAGE`; if staging fails,
+the plan is not ready, or you decline `APPLY` (including Ctrl+C), it removes
+`~/szl-cpu-lane` and says so. If your admin key has a passphrase, load it into
+the agent first (`ssh-add <admin key>`; on Windows,
+`Set-Service ssh-agent -StartupType Manual; Start-Service ssh-agent`), otherwise
+the stage stops before any change. Pass `--port` if SSH is not on 22; it is
+forwarded to every stage, including the owner-issued run:
 
 ```sh
 python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
@@ -259,10 +277,24 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
      --owner-window-ref <your approval reference>
    ```
 
-   `apply` refuses unmanaged files, validates `sshd -t`, checks the `szl-ci`
-   effective settings, compares the admin user's effective sshd settings before
-   and after (rolling back on any change), reloads `ssh`, and enables the socket.
-   `uninstall` removes the SSH entry point and socket and keeps all receipts.
+   `apply` refuses unmanaged files and hidden paths that would cover the unit's
+   own mount points, then, in this order, writes the SSH entry point, validates
+   `sshd -t`, checks the `szl-ci` effective settings, compares the admin user's
+   effective sshd settings before and after, reloads `ssh`, and only then enables
+   the broker socket. From the first sshd write to the receipt it ignores Ctrl+C
+   and a dropped `ssh -t` session. Any failure in that span removes the drop-in,
+   `/etc/ssh/szl-ci/authorized_keys` and their `.szl-tmp` temporaries and
+   disables `szl-cpu-broker.socket`; units, config, release and users stay, and
+   re-running `apply` or `uninstall` is safe. Every refusal prints one
+   `PROVISION BLOCKED: ...` line and exits 1. Keep a second admin SSH session (or
+   the provider's web terminal) open while you type `APPLY`: bring-up retests a
+   fresh admin login afterwards, and if that fails, run
+   `sudo python3 -I -B /opt/szl-cpu-broker/current/tools/ssh_ci_provision.py uninstall`
+   from that session. If logins still fail, an unrelated sshd edit that was never
+   reloaded may have been activated by the reload: check
+   `sudo sshd -T -C user=<admin>,host=localhost,addr=127.0.0.1`, revert that edit,
+   and `sudo systemctl reload ssh`. `uninstall` removes the SSH entry point and
+   socket, keeps going past individual failures, and keeps all receipts.
 
 3. **Qualify (VM, as root).** Rehearse the real build of the same commit.
 
@@ -281,21 +313,30 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
    requires `unshare` and `clone` with `CLONE_NEWUSER` to fail with `EPERM`,
    `clone3` to fail with `ENOSYS`, and a thread to start. Before the isolation
    control, qualification places a root-only marker in the host `/dev/shm` and
-   requires the sandbox not to see it. Qualification holds the broker's claim
-   lock for its whole run, so it refuses to start while a build runs (or while
-   the broker holds the lock), and no build can start during qualification.
+   requires the sandbox not to see it; the marker is removed afterwards, and a
+   stale one from an interrupted run is removed at the next start. Qualification
+   holds the broker's claim lock for its whole run, so it refuses to start
+   (`QUALIFICATION REFUSED: ...`, exit 1, no receipt) while a build runs or the
+   broker holds the lock, and a build request that arrives meanwhile is BLOCKED
+   before its permit is claimed. A dropped `ssh -t` session does not stop it.
 
-4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
-   with yourself as required reviewer and protected-branch deployment only, then
-   add the secret and variables. Set `SZL_CPU_CI_ENABLED` last.
+4. **GitHub environment (workstation, owner login).** Bring-up first checks the
+   host-key pin and that `gh api repos/szl-holdings/szl-skills/branches/main`
+   reports `"protected": true`, and writes nothing to GitHub otherwise. It then
+   creates `massed-cpu-build` with yourself as required reviewer and a custom
+   deployment branch policy naming exactly `main` (it refuses, without deleting
+   anything, if another policy exists), reads both back, and adds the secret and
+   variables. Set `SZL_CPU_CI_ENABLED` last.
 
    ```sh
    gh api -X PUT repos/szl-holdings/szl-skills/environments/massed-cpu-build \
      --input - <<'JSON'
    {"reviewers":[{"type":"User","id":<your-numeric-user-id>}],
     "prevent_self_review":false,
-    "deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}
+    "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
    JSON
+   gh api -X POST repos/szl-holdings/szl-skills/environments/massed-cpu-build/deployment-branch-policies \
+     -f name=main -f type=branch
    gh secret set SZL_CPU_SSH_KEY --env massed-cpu-build -R szl-holdings/szl-skills < szl-cpu-ci
    gh variable set SZL_CPU_SSH_HOST --env massed-cpu-build -R szl-holdings/szl-skills -b <vm-ip>
    gh variable set SZL_CPU_SSH_PORT --env massed-cpu-build -R szl-holdings/szl-skills -b 22
@@ -310,18 +351,33 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
 5. **One build (workstation).** Write your own attestations to an owner config
    (`szl.ssh-cpu-build.owner-config.v1`: provider instance UUID, admitted HF
    revision, budget ledger reference and remaining seconds/USD, checkpoint
-   manifest SHA-256, owner receipt reference). The tool never invents them.
+   manifest SHA-256, owner receipt reference). The tool never invents them. The
+   template bring-up writes marks every one `FILL: ...` and is refused until you
+   replace them all (budget numbers as unquoted JSON numbers). Write the
+   checkpoint digest in lowercase; PowerShell's `Get-FileHash` prints uppercase,
+   so use `(Get-FileHash <file> -Algorithm SHA256).Hash.ToLower()`.
 
    ```sh
    python tools/ssh_ci_owner_issue.py run --owner-config owner-cpu-window.json \
      --source-sha <main-sha> --signing-key szl-owner-permit \
-     --admin-target Ubuntu@<vm-ip> --admin-known-hosts <pinned-known-hosts>
+     --admin-target Ubuntu@<vm-ip> --admin-known-hosts <pinned-known-hosts> [--port <port>]
    ```
 
-   It refuses without a required-reviewer gate, when the waiting run is not the
-   commit you named with `--source-sha`, with more than eight GPU compute
-   processes, or when more than 300 seconds
-   pass between observation and approval. It approves only the run whose title
+   Before it dispatches anything, it checks every owner-config value, that the
+   environment has the reviewer gate and the `main`-only branch policy and that
+   `main` is protected, that no other `isolated-ssh-build.yml` run is waiting,
+   pending, queued, requested or in progress (it names each with its
+   `gh run cancel` command), and that the VM accepts a `BatchMode` admin login.
+   If it stops between dispatch and approval (including Ctrl+C), it cancels its
+   own run (or rejects the gate), records that in the receipt's `unapproved_run`,
+   and otherwise prints the exact command to do it by hand. It refuses when the
+   waiting run is not the commit you named with `--source-sha`, with more than
+   eight GPU compute processes, or when more than 180 seconds pass between
+   observation and approval (the 900-second window minus the 450-second claim
+   floor leaves 270 seconds for runner pickup, checkout, setup and staging).
+   `gh run watch` is bounded at 1200 seconds; a watch timeout does not cancel the
+   run, and its evidence can still be fetched with
+   `gh run download <id> -R szl-holdings/szl-skills`. It approves only the run whose title
    carries the fresh permit, pinning every GPU process it observed. Its verdict
    does not trust the job's client receipt,
    because that code comes from the commit under test: it re-verifies the raw
