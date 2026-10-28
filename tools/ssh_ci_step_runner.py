@@ -10,7 +10,6 @@ one bounded JSON line for the broker; step output goes to bounded files.
 
 import argparse
 import json
-import os
 from pathlib import Path
 import re
 import shutil

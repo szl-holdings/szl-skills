@@ -64,8 +64,8 @@ MANIFEST_NAME = "science-package-manifest.json"
 CONFIG_PATHS = ("allowed_signers", "permit_dir", "claim_dir", "receipt_dir",
                 "public_receipt_dir", "run_root",
                 "build_python", "runner", "nvidia_smi")
-CONFIG_FIELDS = frozenset({"schema", "owner_principal", "build_user", "hidden_paths",
-                           *CONFIG_PATHS})
+CONFIG_FIELDS = frozenset({"schema", "owner_principal", "build_user", "receipt_reader",
+                           "hidden_paths", *CONFIG_PATHS})
 
 
 class BrokerError(RuntimeError):
@@ -100,6 +100,9 @@ def parse_config(data):
             or re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", config["build_user"]) is None
             or config["build_user"] in {"root", "ubuntu"}):
         raise ContractError("build_user must be a dedicated unprivileged account")
+    if (type(config["receipt_reader"]) is not str
+            or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}", config["receipt_reader"]) is None):
+        raise ContractError("receipt_reader must be a plain account name")
     if type(config["owner_principal"]) is not str or not config["owner_principal"]:
         raise ContractError("owner_principal is required")
     hidden = config["hidden_paths"]
@@ -379,9 +382,12 @@ class Build:
         return entry.pw_uid, entry.pw_gid
 
 
-def _write_exclusive(path, data, mode):
+def _write_exclusive(path, data, owner=None):
+    """Create a 0600 file once; ``owner`` (uid, gid) lets one named reader see it."""
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
-    descriptor = os.open(path, flags, mode)
+    descriptor = os.open(path, flags, 0o600)
+    if owner is not None:
+        os.fchown(descriptor, *owner)
     with os.fdopen(descriptor, "wb") as stream:
         stream.write(data)
         stream.flush()
@@ -410,20 +416,24 @@ def write_receipts(config, record):
     stamp = utc_now().strftime("%Y%m%dT%H%M%S%fZ")
     request_id = record["request_id"]
     _write_exclusive(Path(config["receipt_dir"]) / (stamp + "-" + (request_id or "invalid-request")
-                                                    + ".json"), canonical(record) + b"\n", 0o600)
+                                                    + ".json"), canonical(record) + b"\n")
     if request_id is not None:
+        import pwd
+        reader = pwd.getpwnam(config["receipt_reader"])
         public = Path(config["public_receipt_dir"])
         data = canonical(public_summary(record)) + b"\n"
+        owner = (reader.pw_uid, reader.pw_gid)
         try:
-            _write_exclusive(public / (request_id + ".json"), data, 0o644)
+            _write_exclusive(public / (request_id + ".json"), data, owner)
         except FileExistsError:  # A replayed request never overwrites the first record.
-            _write_exclusive(public / (request_id + "." + stamp + ".json"), data, 0o644)
+            _write_exclusive(public / (request_id + "." + stamp + ".json"), data, owner)
 
 
 def handle(request_bytes, config, *, clock=utc_now, run=subprocess.run,
            popen=subprocess.Popen, observer=None, claim_store_factory=None,
            permit_loader=None, run_unit=sandbox.run_unit):
     """Return (status_byte, body_bytes, broker_record) for one request."""
+    build, status, body = None, b"1", None
     record = {"schema": BROKER_RECEIPT_SCHEMA, "evidence_class": "DECLARED",
               "received_at": clock().isoformat(), "request_sha256": None,
               "request_id": None, "execution": None, "build": None,
@@ -453,7 +463,7 @@ def handle(request_bytes, config, *, clock=utc_now, run=subprocess.run,
         record["build"] = build.details or None
     record["execution"] = {key: execution.get(key) for key in
                            ("result", "stage", "reason", "claim_status", "executor_called")}
-    if execution.get("result") == "PASS" and request is not None:
+    if execution.get("result") == "PASS" and request is not None and build is not None:
         receipt = execution["receipt"]
         files = build.files
         envelope = {"schema": RESPONSE_SCHEMA, "request_sha256": record["request_sha256"],
@@ -472,8 +482,6 @@ def handle(request_bytes, config, *, clock=utc_now, run=subprocess.run,
                          "claim_status": execution.get("claim_status")}
             record["execution"].update(execution)
             body = None
-    else:
-        body = None
     if body is None:
         status = b"1"
         body = canonical({"schema": BLOCKED_SCHEMA, "request_sha256": record["request_sha256"],

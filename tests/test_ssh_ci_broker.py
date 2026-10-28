@@ -4,7 +4,6 @@ The root-only integration case uses the real owner-signature verifier, the real
 root-owned claim store, and real file collection, with no VM or network.
 """
 
-import base64
 import copy
 import io
 import os
@@ -24,6 +23,11 @@ from tools import ssh_ci_owner_signature as signature
 
 
 POSIX = os.name == "posix" and hasattr(os, "O_NOFOLLOW")
+if POSIX:
+    import pwd
+    READER = pwd.getpwuid(os.getuid()).pw_name
+else:
+    READER = "reader"
 ROOT_POSIX = POSIX and os.geteuid() == 0
 SSH_KEYGEN = shutil.which("ssh-keygen")
 
@@ -33,12 +37,14 @@ def json_load(path):
 
 
 def config(root):
+    def path(name):  # The broker config holds POSIX paths on every test platform.
+        return (Path(root) / name).as_posix()
     return {
         "schema": broker.CONFIG_SCHEMA, "owner_principal": "stephen",
-        "allowed_signers": str(root / "allowed_signers"), "permit_dir": str(root / "permits"),
-        "claim_dir": str(root / "claims"), "receipt_dir": str(root / "receipts"),
-        "public_receipt_dir": str(root / "public"),
-        "run_root": str(root / "run"), "build_user": "szl-build",
+        "allowed_signers": path("allowed_signers"), "permit_dir": path("permits"),
+        "claim_dir": path("claims"), "receipt_dir": path("receipts"),
+        "public_receipt_dir": path("public"), "receipt_reader": READER,
+        "run_root": path("run"), "build_user": "szl-build",
         "build_python": "/usr/bin/python3",
         "runner": "/opt/szl-cpu-broker/current/tools/ssh_ci_step_runner.py",
         "nvidia_smi": "/usr/bin/nvidia-smi", "hidden_paths": ["/opt/models"],
@@ -298,7 +304,7 @@ class RootIntegrationTests(unittest.TestCase):
         public = (self.root / "owner-key.pub").read_text().split()
         allowed = self.root / "allowed_signers"
         allowed.write_text('stephen namespaces="%s" %s %s\n' % (signature.NAMESPACE, *public[:2]))
-        os.chmod(allowed, 0o644)
+        os.chmod(allowed, 0o600)
         self.request, self.permit, self.observation, self.window, self.now = fixtures()
         self.bundle = self.root / "permits" / (self.request["permit_id"] + signature.BUNDLE_SUFFIX)
         self.bundle.write_bytes(signature.bundle(self.permit, self.window))

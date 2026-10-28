@@ -14,6 +14,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import posixpath
 import re
 import subprocess
 import sys
@@ -154,21 +155,24 @@ def model_paths(pids, proc=Path("/proc"), run=subprocess.run):
         try:
             directories.add(str(Path(base / "cwd").resolve()))
         except OSError:
+            # An unreadable field of a live process is simply not probed.
             pass
         try:
             for line in (base / "maps").read_text(errors="replace").splitlines():
                 fields = line.split(maxsplit=5)
                 if len(fields) == 6 and fields[5].endswith(MODEL_SUFFIXES):
-                    directories.add(str(Path(fields[5]).parent))
+                    directories.add(posixpath.dirname(fields[5]))  # VM paths are POSIX.
         except OSError:
+            # An unreadable field of a live process is simply not probed.
             pass
         try:
             for argument in (base / "cmdline").read_bytes().split(b"\0"):
                 text = argument.decode("utf-8", "replace").split("=", 1)[-1]
                 if text.startswith("/") and not text.startswith(("/usr/", "/proc", "/dev")):
-                    target = Path(text)
-                    (directories if not target.suffix else files).add(text)
+                    has_suffix = "." in posixpath.basename(text)
+                    (files if has_suffix else directories).add(text)
         except OSError:
+            # An unreadable field of a live process is simply not probed.
             pass
         try:
             for entry in (base / "environ").read_bytes().split(b"\0"):
@@ -176,6 +180,7 @@ def model_paths(pids, proc=Path("/proc"), run=subprocess.run):
                 if key in MODEL_ENV and value.startswith("/"):
                     directories.add(value)
         except OSError:
+            # An unreadable field of a live process is simply not probed.
             pass
         try:
             cgroup = (base / "cgroup").read_text().strip().rsplit("/", 1)[-1]
@@ -186,6 +191,7 @@ def model_paths(pids, proc=Path("/proc"), run=subprocess.run):
                 if fragment.startswith("/"):
                     files.add(fragment)
         except (OSError, subprocess.SubprocessError):
+            # No readable unit file means there is nothing extra to probe.
             pass
     keep = sorted(path for path in directories if path not in ("/", "/proc"))[:32]
     return keep, sorted(files)[:32]

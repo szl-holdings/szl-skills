@@ -184,8 +184,7 @@ def unit_properties(*, user, source_dir, output_dir, hidden_paths=(),
         "RestrictSUIDSGID=yes", "RestrictRealtime=yes", "RestrictNamespaces=yes",
         "LockPersonality=yes", "SystemCallArchitectures=native",
         "SystemCallFilter=@system-service",
-        "SystemCallFilter=~@privileged @resources @keyring io_uring_setup io_uring_enter "
-        "io_uring_register",
+        "SystemCallFilter=~@privileged @resources @keyring io_uring_setup io_uring_enter io_uring_register",
         "SystemCallErrorNumber=EPERM", "UMask=0077",
         "TemporaryFileSystem=/tmp:" + TMPFS_OPTIONS,
         "TemporaryFileSystem=/var/tmp:" + TMPFS_OPTIONS,
@@ -323,7 +322,8 @@ def stop_unit(unit, run=subprocess.run):
         try:
             run(argv, capture_output=True, timeout=STOP_SECONDS, check=False, shell=False)
         except (OSError, subprocess.SubprocessError):
-            pass
+            # Best effort; unit_is_gone() decides, and a live unit blocks the result.
+            continue
 
 
 def unit_is_gone(unit, run=subprocess.run, cgroup_root=CGROUP_ROOT):

@@ -72,9 +72,9 @@ class RenderTests(unittest.TestCase):
             unchanged = {e["action"] for e in provision.file_actions(files, root)}
             self.assertEqual(unchanged, {"unchanged"})
             socket_path = Path(root) / "etc/systemd/system/szl-cpu-broker.socket"
-            socket_path.write_text(provision.MANAGED + "[Socket]\n")
+            socket_path.write_bytes((provision.MANAGED + "[Socket]\n").encode("ascii"))
             sshd_path = Path(root) / "etc/ssh/sshd_config.d/60-szl-cpu-ci.conf"
-            sshd_path.write_text("PermitRootLogin yes\n")
+            sshd_path.write_bytes(b"PermitRootLogin yes\n")
             signers = Path(root) / "etc/szl-cpu-broker/allowed_signers"
             signers.unlink()
             if os.name == "posix":

@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -97,6 +98,9 @@ def render(options):
         raise ProvisionError("owner principal must be a plain identifier")
     if ci_key == owner_key:
         raise ProvisionError("the CI key must never be the owner signing key")
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}", options["admin_user"] or "") is None:
+        raise ProvisionError("--admin-user (the owner's VM login, which may read receipts) "
+                             "is required")
     config = {
         "schema": CONFIG_SCHEMA, "owner_principal": principal,
         "allowed_signers": "/etc/szl-cpu-broker/allowed_signers",
@@ -104,7 +108,8 @@ def render(options):
         "claim_dir": "/var/lib/szl-cpu-broker/claims",
         "receipt_dir": "/var/lib/szl-cpu-broker/receipts",
         "public_receipt_dir": "/var/lib/szl-cpu-broker/public", "run_root": "/run/szl-cpu-build",
-        "build_user": BUILD_USER, "build_python": options["build_python"],
+        "build_user": BUILD_USER, "receipt_reader": options["admin_user"],
+        "build_python": options["build_python"],
         "runner": CURRENT + "/tools/ssh_ci_step_runner.py",
         "nvidia_smi": options["nvidia_smi"], "hidden_paths": sorted(options["hidden_paths"]),
     }
@@ -274,10 +279,10 @@ def install_release(sha, run):
             for name in [*subdirectories, *names]:
                 item = Path(directory) / name
                 os.lchown(item, 0, 0)
-                if not item.is_symlink():
-                    os.chmod(item, item.stat().st_mode & 0o755)
+                if not item.is_symlink():  # Keep checkout modes; drop group/other write.
+                    os.chmod(item, stat.S_IMODE(item.lstat().st_mode) & ~0o022)
         os.chown(staging, 0, 0)
-        os.chmod(staging, 0o755)
+        os.chmod(staging, stat.S_IMODE(staging.lstat().st_mode) & ~0o022)
         staging.rename(release)
     link = Path(CURRENT + ".szl-tmp")
     if link.is_symlink():

@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
+import unittest.mock
 
 from tools import ssh_ci_contract as contract
 from tools import ssh_ci_sandbox as sandbox
@@ -92,7 +92,7 @@ class ReadbackTests(unittest.TestCase):
 
     def write_process(self, seccomp="2", caps=sandbox.ZERO_CAPS, shared=()):
         if os.name != "posix":
-            patcher = mock.patch.object(sandbox, "process_readback",
+            patcher = unittest.mock.patch.object(sandbox, "process_readback",
                                         return_value={"failures": []})
             patcher.start()
             self.addCleanup(patcher.stop)

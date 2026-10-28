@@ -318,7 +318,8 @@ class InstallPermitTests(unittest.TestCase):
         config_path.write_bytes(contract.canonical(broker_config(self.root)))
         self.config_path = config_path
         from tests.test_ssh_ci_executor import fixtures
-        _request, self.permit, _observation, self.window, _now = fixtures()
+        values = fixtures()
+        self.permit, self.window = values[1], values[3]
         self.data = signature.bundle(self.permit, self.window)
         bundle_path = self.root / "bundle.json"
         bundle_path.write_bytes(self.data)

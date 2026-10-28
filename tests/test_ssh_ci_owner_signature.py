@@ -41,7 +41,7 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(signature.parse_bundle(data)["permit"]["permit_id"], request["permit_id"])
 
     def test_noncanonical_duplicate_or_extra_bundles_are_rejected(self):
-        _request, permit, _observation, window, _now = fixtures()
+        request, permit, _observation, window, _now = fixtures()
         data = signature.bundle(permit, window)
         spaced = data.replace(b'{"permit"', b'{ "permit"', 1)
         duplicate = data[:-1] + b',"schema":"x"}'
@@ -65,7 +65,8 @@ class RealSignatureTests(unittest.TestCase):
         self.allowed = self.root / "allowed_signers"
         self.allowed.write_text('stephen namespaces="%s" %s %s\n'
                                 % (signature.NAMESPACE, public[0], public[1]), encoding="ascii")
-        _request, self.permit, _observation, self.window, _now = fixtures()
+        values = fixtures()
+        self.permit, self.window = values[1], values[3]
         self.data = signature.bundle(self.permit, self.window)
 
     def test_owner_signature_verifies_exact_bytes(self):
@@ -159,7 +160,7 @@ class ProtectedReadTests(unittest.TestCase):
         os.symlink(target, self.root / "link")
         hard = self.write("hard")
         os.link(hard, self.root / "hard2")
-        cases = [self.root / "link", self.write("writable", mode=0o666), hard,
+        cases = [self.root / "link", self.write("writable", mode=0o620), hard,
                  self.write("large", b"x" * 17), Path("relative"), self.root / "missing"]
         for path in cases:
             with self.subTest(path=path.name), self.assertRaises((contract.ContractError, OSError)):
@@ -173,7 +174,7 @@ class ProtectedReadTests(unittest.TestCase):
         os.symlink(inner, self.root / "alias")
         with self.assertRaises(OSError):
             signature.read_protected(self.root / "alias" / "file", 16)
-        os.chmod(inner, 0o777)
+        os.chmod(inner, 0o770)
         with self.assertRaisesRegex(contract.ContractError, "ancestry"):
             signature.read_protected(inner / "file", 16)
 

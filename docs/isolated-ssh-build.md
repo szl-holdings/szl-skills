@@ -109,8 +109,9 @@ contract-checked v1 envelope (PASS or BLOCKED result); `1` precedes a BLOCKED
 notice with reason codes only. A model-identity change, unverified readback, a
 still-present unit, or a rejected output file yields no envelope. After the
 configuration loads, every outcome writes a root-only broker receipt and, for a
-valid request, an admin-readable public summary (`/var/lib/szl-cpu-broker/public`,
-hashes and reason codes only) *before* replying; if either write fails, the
+valid request, a summary in `/var/lib/szl-cpu-broker/public` (hashes and reason
+codes only, mode 0600, owned by the configured admin account so the owner tool
+can read it without sudo) *before* replying; if either write fails, the
 envelope is withheld and a BLOCKED notice is sent instead. The claim stays
 consumed after any failure, and nothing retries. The client allows 600 seconds
 end to end (staging, readback, the 420-second unit, and a 24 MiB transfer).
