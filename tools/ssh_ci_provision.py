@@ -175,17 +175,19 @@ def preflight(options, *, run=subprocess.run, root="/"):
     base = Path(root)
     if hasattr(os, "geteuid") and os.geteuid() != 0 and root == "/":
         failures.append("must run as root")
-    try:
-        if (base / "proc/1/comm").read_text().strip() != "systemd":
-            failures.append("PID 1 is not systemd")
-        controllers = set((base / "sys/fs/cgroup/cgroup.controllers").read_text().split())
-        if not {"cpu", "memory", "pids"} <= controllers:
-            failures.append("cgroup v2 cpu/memory/pids controllers are unavailable")
-        sshd_config = (base / "etc/ssh/sshd_config").read_text()
-        if re.search(r"^Include /etc/ssh/sshd_config\.d/\*\.conf\s*$", sshd_config, re.M) is None:
-            failures.append("sshd_config does not include sshd_config.d")
-    except OSError as error:
-        failures.append("host file unreadable: " + type(error).__name__)
+    def check(path, accept, message):
+        try:
+            if not accept((base / path).read_text()):
+                failures.append(message)
+        except OSError as error:
+            failures.append(message + " (" + path + ": " + type(error).__name__ + ")")
+    check("proc/1/comm", lambda text: text.strip() == "systemd", "PID 1 is not systemd")
+    check("sys/fs/cgroup/cgroup.controllers",
+          lambda text: {"cpu", "memory", "pids"} <= set(text.split()),
+          "cgroup v2 cpu/memory/pids controllers are unavailable")
+    check("etc/ssh/sshd_config",
+          lambda text: re.search(r"^Include /etc/ssh/sshd_config\.d/\*\.conf\s*$", text, re.M),
+          "sshd_config does not include sshd_config.d")
     for tool in (*REQUIRED_TOOLS, options["build_python"], options["nvidia_smi"]):
         if not (base / tool.lstrip("/")).exists():
             failures.append("missing " + tool)

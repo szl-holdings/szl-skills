@@ -92,7 +92,8 @@ class RenderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             failures = provision.preflight(options(), run=run, root=root)
         joined = "\n".join(failures)
-        for expected in ("host file unreadable", "missing /usr/bin/systemd-run",
+        for expected in ("PID 1 is not systemd", "cgroup v2", "sshd_config does not include",
+                         "missing /usr/bin/systemd-run",
                          "systemd 248", "python must be 3.10"):
             self.assertIn(expected, joined)
 
