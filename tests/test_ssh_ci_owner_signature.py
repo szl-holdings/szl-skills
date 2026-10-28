@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -146,10 +147,12 @@ class ProtectedReadTests(unittest.TestCase):
         self.root.mkdir(mode=0o700)
         self.addCleanup(shutil.rmtree, self.root)
 
-    def write(self, name, data=b"{}", mode=0o600):
+    def write(self, name, data=b"{}", group_writable=False):
         path = self.root / name
         path.write_bytes(data)
-        os.chmod(path, mode)
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+        if group_writable:  # Negative fixture: the reader must refuse this file.
+            os.chmod(path, stat.S_IMODE(path.stat().st_mode) | stat.S_IWGRP)
         return path
 
     def test_reads_bounded_root_owned_regular_file(self):
@@ -160,7 +163,7 @@ class ProtectedReadTests(unittest.TestCase):
         os.symlink(target, self.root / "link")
         hard = self.write("hard")
         os.link(hard, self.root / "hard2")
-        cases = [self.root / "link", self.write("writable", mode=0o620), hard,
+        cases = [self.root / "link", self.write("writable", group_writable=True), hard,
                  self.write("large", b"x" * 17), Path("relative"), self.root / "missing"]
         for path in cases:
             with self.subTest(path=path.name), self.assertRaises((contract.ContractError, OSError)):
@@ -174,7 +177,8 @@ class ProtectedReadTests(unittest.TestCase):
         os.symlink(inner, self.root / "alias")
         with self.assertRaises(OSError):
             signature.read_protected(self.root / "alias" / "file", 16)
-        os.chmod(inner, 0o770)
+        # Negative fixture: a group-writable ancestor must be refused.
+        os.chmod(inner, stat.S_IMODE(inner.stat().st_mode) | stat.S_IWGRP)
         with self.assertRaisesRegex(contract.ContractError, "ancestry"):
             signature.read_protected(inner / "file", 16)
 
