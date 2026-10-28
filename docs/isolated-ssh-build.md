@@ -73,7 +73,9 @@ general, scientific truth, model quality, or uninterrupted model latency.
 
 **Sandbox properties (read back before `GO`).** One aggregate cgroup:
 `CPUQuota=100%`, `MemoryMax=1 GiB`, `MemorySwapMax=0`, `TasksMax=64`,
-`RuntimeMaxSec=420`, `OOMPolicy=kill`, `KillMode=control-group`. Namespaces:
+`RuntimeMaxSec=420`, `OOMPolicy=kill`, `KillMode=control-group`, and
+`OOMScoreAdjust=1000`, so a host-wide OOM kills the build before the model
+server or the training job (the broker service runs at 500). Namespaces:
 `PrivateNetwork` (plus `IPAddressDeny=any` and `RestrictAddressFamilies=AF_UNIX`),
 `PrivateUsers`, `PrivateIPC`, mount namespace with `ProtectSystem=strict`,
 `ProtectHome`, read-only `/src`, writable `/out`, and tmpfs `/tmp`, `/var/tmp`,
@@ -86,16 +88,28 @@ which can carry tokens), broker and SSH configuration, and owner-listed model
 paths. A host name that cannot be expressed safely blocks the build. Directories
 that hold mount sources (`/run/systemd/inaccessible`, `/run/szl-cpu-build`) are
 never hidden wholesale, because systemd resolves those inside the namespace it
-builds. `NoNewPrivileges`, an empty capability bounding set, `RestrictNamespaces`,
-and the `@system-service` syscall set minus `@privileged @resources @keyring` and
-`io_uring_*` apply. Host processes are hidden with
+builds. The unit's own mount points (`/src`, `/out`, `/tmp`, `/var/tmp`,
+`/dev/shm`) are never hidden: systemd 249 leaves empty `/src` and `/out`
+directories on the host root after the first unit, and hiding them would block
+every later bind. A hidden path that covers one of them is refused. The `/run`
+walk counts only directories and sockets toward its 4096-entry limit and does not
+descend into directories it already hides. `NoNewPrivileges`, an empty capability
+bounding set, `RestrictNamespaces`, and the `@system-service` syscall set minus
+`@privileged @resources @keyring` and `io_uring_*` apply. systemd 249's
+`RestrictNamespaces` filters `clone`, `unshare` and `setns` but not `clone3`
+(upstream added that in 250), so `clone3` returns `ENOSYS`; glibc then falls back
+to `clone`, whose namespace flags are filtered, and threads keep working. Host
+processes are hidden with
 `ProtectProc=invisible` and the user namespace, **not** a separate PID namespace
 (systemd 249 on Ubuntu 22.04 has no `PrivatePIDs=`); qualification measures that
-the model PID is invisible. Before `GO`, the broker reads back the kernel files `cpu.max`,
-`memory.max`, `memory.swap.max`, and `pids.max`, the systemd properties, and the
+the model PID is invisible. Before `GO`, the broker waits until the unit is
+`active`/`running` (with `Type=exec`, only after `execve`) and its `MainPID` is in
+the unit cgroup, then reads back the kernel files `cpu.max`,
+`memory.max`, `memory.swap.max`, and `pids.max`, the systemd properties, and that
 waiting runner process itself from `/proc`: seccomp mode 2, `NoNewPrivs`, empty
-effective/permitted/bounding/ambient capabilities, and network, mount, user, IPC,
-and UTS namespaces distinct from the host's. Any mismatch withholds `GO`.
+effective/permitted/bounding/ambient capabilities, `oom_score_adj` 1000, and
+network, mount, user, IPC, and UTS namespaces distinct from the host's. It retries
+until the readback deadline; any remaining mismatch withholds `GO`.
 
 **Broker behaviour.** The broker shares the host mount namespace, so its per-run
 256 MiB, 16384-inode `noexec` tmpfs is visible to the unit it starts. While it
@@ -263,7 +277,13 @@ python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
    mapped weights, command-line paths, Hugging Face/vLLM cache variables, and
    systemd unit file are probed from inside the sandbox, as is every reachable
    UNIX socket and the io_uring and keyring syscalls (x86_64 numbers); add any
-   visible model path with `--hidden-path` and re-provision.
+   visible model path with `--hidden-path` and re-provision. The probe also
+   requires `unshare` and `clone` with `CLONE_NEWUSER` to fail with `EPERM`,
+   `clone3` to fail with `ENOSYS`, and a thread to start. Before the isolation
+   control, qualification places a root-only marker in the host `/dev/shm` and
+   requires the sandbox not to see it. Qualification holds the broker's claim
+   lock for its whole run, so it refuses to start while a build runs (or while
+   the broker holds the lock), and no build can start during qualification.
 
 4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
    with yourself as required reviewer and protected-branch deployment only, then
