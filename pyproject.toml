@@ -1,0 +1,33 @@
+# Standard (PEP 621) project metadata for szl-skills.
+#
+# The skills ship as per-skill ZIP archives (tools/package_science.py) and
+# through .claude-plugin/marketplace.json, not as an importable package. The
+# tools/ helpers are imported from a checkout as the namespace "tools", and
+# each skill's kernel and scripts are loaded by file path. Installing the
+# project therefore installs metadata only.
+#
+# The release version stays in .claude-plugin/marketplace.json. Version 0.0.0
+# marks a distribution that is never published, and the
+# "Private :: Do Not Upload" classifier makes PyPI refuse an upload.
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "szl-skills"
+version = "0.0.0"
+description = "SZL Holdings evidence, decision and reproducible-research skills, with their offline checks"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "SZL Holdings" }]
+dependencies = []
+classifiers = ["Private :: Do Not Upload"]
+
+[tool.setuptools]
+# Explicitly empty: nothing is installed, and automatic package discovery
+# stays off.
+packages = []
+py-modules = []
