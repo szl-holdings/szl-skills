@@ -39,13 +39,14 @@ RUN_METADATA = {"id": 777, "status": "waiting", "event": "workflow_dispatch",
                 "repository": {"id": plan.REPOSITORY_ID, "full_name": owner_issue.REPOSITORY}}
 
 
-def envelope_for(request, result="PASS"):
-    """A contract-valid v1 response, as the VM broker would send it."""
+def envelope_for(request, result="PASS", processes=({"pid": 445607, "start_ticks": 98765},)):
+    """A contract-valid v2 response pinning ``processes``, as the VM broker sends it."""
     digest = contract.sha256(contract.canonical(request))
     files = {name: name.encode() for name in sorted(contract.REQUIRED_FILES)}
-    runtime = dict(HOST, pid=445607, start_ticks=98765)
+    runtime = dict(HOST, gpu_processes=sorted((dict(item) for item in processes),
+                                              key=lambda item: item["pid"]))
     receipt = {field: request[field] for field in contract.BINDING_FIELDS}
-    receipt.update(schema=contract.RECEIPT_SCHEMA, request_sha256=digest, result=result,
+    receipt.update(schema=contract.RECEIPT_SCHEMA_V2, request_sha256=digest, result=result,
                    evidence_class="DECLARED", signed=False, independent_witness=False,
                    gpu_requests=0, actual_cpu_profile=dict(contract.CPU_PROFILE),
                    isolation_verified=True, runtime_before=runtime, runtime_after=dict(runtime),
@@ -68,11 +69,16 @@ class FakeHost:
         self.processes = [{"pid": 445607, "start_ticks": 98765}]
         self.remote_result = "PASS"
         self.github_response = None  # Replaces what the GitHub artifact carries.
+        self.broker_processes = None
         self.time = 0.0
         self.observe_cost = 0.0
 
     def request(self):
         return plan.plan_request(RUN_METADATA, self.permit_id)["request"]
+
+    def remote_processes(self):
+        """What the broker pins: the observed set unless a test makes it drift."""
+        return self.broker_processes if self.broker_processes is not None else self.processes
 
     def clock(self):
         return self.time
@@ -87,7 +93,7 @@ class FakeHost:
         if head == "gh":
             out = self.gh(argv[1:])
         elif head == "ssh" and argv[-1].startswith("cat "):
-            raw = envelope_for(self.request(), self.remote_result)
+            raw = envelope_for(self.request(), self.remote_result, self.remote_processes())
             out = json.dumps({"request_sha256": contract.sha256(contract.canonical(self.request())),
                               "response_sha256": contract.sha256(raw),
                               "execution": {"result": "PASS"}}).encode()
@@ -128,7 +134,8 @@ class FakeHost:
         if args[:2] == ["run", "download"]:
             out = Path(args[args.index("-D") + 1])
             (out / "artifacts").mkdir(parents=True)
-            raw = self.github_response or envelope_for(self.request(), self.remote_result)
+            raw = self.github_response or envelope_for(self.request(), self.remote_result,
+                                                       self.remote_processes())
             (out / "response.raw.json").write_bytes(raw)
             # The job's own client receipt always claims PASS; the owner ignores it.
             (out / "client-receipt.json").write_text(json.dumps({"result": "PASS"}))
@@ -178,8 +185,8 @@ class IssueFlowTests(unittest.TestCase):
                          "packages.tar").is_file())
         value = signature.parse_bundle(owner.signed)
         self.assertEqual(value["permit"]["permit_id"], self.host.permit_id)
-        self.assertEqual(value["permit"]["workload"], {"mode": "pinned", "pid": 445607,
-                                                       "start_ticks": 98765})
+        self.assertEqual(value["permit"]["workload"], {
+            "mode": "pinned_set", "processes": [{"pid": 445607, "start_ticks": 98765}]})
         self.assertEqual(value["permit"]["not_before"], "2030-01-02T03:04:05Z")
         self.assertEqual(value["permit"]["expires_at"], "2030-01-02T03:19:05Z")
         self.assertEqual(value["window"]["source"]["github_sha"], SHA)
@@ -202,15 +209,32 @@ class IssueFlowTests(unittest.TestCase):
         self.assertIn("required reviewer", record["failure"])
         self.assertFalse(any(argv[1:3] == ["workflow", "run"] for argv in self.host.calls))
 
-    def test_idle_or_ambiguous_gpu_stops_before_signing_or_approval(self):
-        for processes in ([], [{"pid": 1, "start_ticks": 2}, {"pid": 3, "start_ticks": 4}]):
+    def test_idle_and_multi_process_gpus_are_pinned_as_a_set(self):
+        # vLLM plus a training job, or no GPU work at all: both are pinned exactly.
+        for processes in ([], [{"pid": 3, "start_ticks": 4}, {"pid": 1, "start_ticks": 2}]):
             with self.subTest(processes=processes):
                 self.setUp()
                 self.host.processes = processes
                 record, owner = self.issue()
-                self.assertIn("exactly one pinned GPU process", record["failure"])
-                self.assertFalse(hasattr(owner, "signed"))
-                self.assertEqual(self.approvals(), [])
+                self.assertEqual(record["result"], "PASS", record)
+                pinned = signature.parse_bundle(owner.signed)["permit"]["workload"]
+                self.assertEqual(pinned, {"mode": "pinned_set", "processes": sorted(
+                    processes, key=lambda item: item["pid"])})
+
+    def test_too_many_gpu_processes_stop_before_signing_or_approval(self):
+        self.host.processes = [{"pid": pid, "start_ticks": pid} for pid in range(1, 10)]
+        record, owner = self.issue()
+        self.assertIn("at most 8 GPU compute processes", record["failure"])
+        self.assertFalse(hasattr(owner, "signed"))
+        self.assertEqual(self.approvals(), [])
+
+    def test_remote_receipt_must_pin_the_signed_process_set(self):
+        self.host.processes = [{"pid": 1, "start_ticks": 2}, {"pid": 3, "start_ticks": 4}]
+        self.host.broker_processes = [{"pid": 1, "start_ticks": 2}]
+        record, _owner = self.issue()
+        self.assertEqual(record["result"], "BLOCKED")
+        self.assertIn("remote receipt does not pin the GPU process set you signed",
+                      record["verification_failures"])
 
     def test_slow_owner_never_approves_a_short_window(self):
         self.host.observe_cost = owner_issue.MAX_APPROVAL_DELAY_SECONDS + 1

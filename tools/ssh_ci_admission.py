@@ -15,10 +15,12 @@ import uuid
 
 from tools.ssh_ci_contract import (
     CPU_PROFILE,
+    MAX_PINNED_PROCESSES,
     ContractError,
     canonical,
     sha256,
     strict_json_loads,
+    validate_pinned_processes,
     validate_request,
 )
 
@@ -156,8 +158,8 @@ def validate_permit(request, permit, observation, now):
         raise ContractError("host identity changed")
     _literal(observation["competing_cpu_jobs"], 0, "competing_cpu_jobs")
     processes = observation["gpu_compute_processes"]
-    if type(processes) is not list or len(processes) > 1:
-        raise ContractError("observation must contain at most one GPU compute process")
+    if type(processes) is not list or len(processes) > MAX_PINNED_PROCESSES:
+        raise ContractError("observation lists too many GPU compute processes")
     for process in processes:
         _process(process, "observed GPU process")
     workload = permit["workload"]
@@ -173,6 +175,12 @@ def validate_permit(request, permit, observation, now):
         _process(expected, "pinned GPU process")
         if processes != [expected]:
             raise ContractError("pinned GPU process identity changed")
+    elif workload.get("mode") == "pinned_set":
+        # Every observed GPU process (possibly none) is pinned; any change denies.
+        _fields(workload, {"mode", "processes"}, "pinned_set workload")
+        validate_pinned_processes(workload["processes"], "pinned_set workload")
+        if sorted(processes, key=lambda item: item["pid"]) != workload["processes"]:
+            raise ContractError("pinned GPU process set changed")
     else:
-        raise ContractError("workload mode must be idle or pinned")
+        raise ContractError("workload mode must be idle, pinned, or pinned_set")
     return permit

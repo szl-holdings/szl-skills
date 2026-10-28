@@ -90,9 +90,9 @@ def execute(request, *, permit_loader, observation_reader, claim_store_factory,
             or window["expires_at"] != permit["expires_at"]):
         return _result("BLOCKED", "ADMISSION", "OWNER_WINDOW_DRIFT")
 
-    # The v1 remote receipt contains positive runtime_before/after identity.
-    # An idle permit waits for a separately versioned receipt profile.
-    if permit["workload"]["mode"] != "pinned":
+    # The v1 receipt pins one positive PID; the v2 receipt pins a process set,
+    # which may be empty. A bare idle permit has no receipt profile.
+    if permit["workload"]["mode"] not in ("pinned", "pinned_set"):
         return _result("BLOCKED", "ADMISSION", "IDLE_RECEIPT_PROFILE_UNSUPPORTED")
 
     request_digest = sha256(canonical(request))

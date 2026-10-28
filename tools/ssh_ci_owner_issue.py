@@ -31,8 +31,9 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.ssh_ci_admission import PERMIT_SCHEMA, validate_permit
-from tools.ssh_ci_contract import (CPU_PROFILE, MAX_RESPONSE_BYTES, ContractError, canonical,
-                                   sha256, strict_json_loads, verify_response)
+from tools.ssh_ci_contract import (CPU_PROFILE, MAX_PINNED_PROCESSES, MAX_RESPONSE_BYTES,
+                                   RECEIPT_SCHEMA_V2, ContractError, canonical, sha256,
+                                   strict_json_loads, verify_response)
 from tools.ssh_ci_owner_signature import (BUNDLE_SUFFIX, MAX_ALLOWED_SIGNERS_BYTES, NAMESPACE,
                                           SIGNATURE_SUFFIX, bundle, read_protected,
                                           verify_bundle)
@@ -80,11 +81,17 @@ def load_owner_config(data):
 
 
 def build_grant(request, observation, owner, new_uuid=uuid.uuid4):
-    """Return (permit, window) bound to one request, host, and pinned model process."""
-    processes = observation["gpu_compute_processes"]
-    if len(processes) != 1:
-        raise IssueError("exactly one pinned GPU process is required by the v1 receipt; observed %d"
-                         % len(processes))
+    """Return (permit, window) bound to one request, host, and the pinned GPU process set.
+
+    Every GPU compute process observed now (vLLM, training, or none) is pinned;
+    the broker refuses to build, or to report success, if that set changes.
+    """
+    processes = sorted(({"pid": item["pid"], "start_ticks": item["start_ticks"]}
+                        for item in observation["gpu_compute_processes"]),
+                       key=lambda item: item["pid"])
+    if len(processes) > MAX_PINNED_PROCESSES:
+        raise IssueError("at most %d GPU compute processes can be pinned; observed %d"
+                         % (MAX_PINNED_PROCESSES, len(processes)))
     start = datetime.strptime(observation["observed_at"], "%Y-%m-%dT%H:%M:%SZ").replace(
         tzinfo=timezone.utc)
     window_bounds = {"not_before": stamp(start),
@@ -92,8 +99,7 @@ def build_grant(request, observation, owner, new_uuid=uuid.uuid4):
     digest = sha256(canonical(request))
     permit = {"schema": PERMIT_SCHEMA, "permit_id": request["permit_id"], "request_sha256": digest,
               "max_runs": 1, "cpu_profile": dict(CPU_PROFILE), "host": dict(observation["host"]),
-              "workload": {"mode": "pinned", "pid": processes[0]["pid"],
-                           "start_ticks": processes[0]["start_ticks"]}, **window_bounds}
+              "workload": {"mode": "pinned_set", "processes": processes}, **window_bounds}
     execution_id, run_nonce = str(new_uuid()), str(new_uuid())
     window = {"schema": WINDOW_SCHEMA, "window_id": str(new_uuid()),
               "permit_id": request["permit_id"], "request_sha256": digest,
@@ -260,7 +266,7 @@ class Owner:
         return strict_json_loads(output.strip(), 65536)
 
 
-def verify_outcome(request, raw, public):
+def verify_outcome(request, raw, public, permit=None):
     """Owner-side verdict from the owner's own contract code, not the job's.
 
     The GitHub job runs code from the commit under test, so its client receipt
@@ -275,6 +281,11 @@ def verify_outcome(request, raw, public):
     failures = []
     if remote["result"] != "PASS":
         failures.append("remote receipt is BLOCKED")
+    if permit is not None and permit["workload"]["mode"] == "pinned_set":
+        expected = {"hostname": permit["host"]["hostname"], "boot_id": permit["host"]["boot_id"],
+                    "gpu_processes": permit["workload"]["processes"]}
+        if remote["schema"] != RECEIPT_SCHEMA_V2 or remote["runtime_before"] != expected:
+            failures.append("remote receipt does not pin the GPU process set you signed")
     if public.get("request_sha256") != digest:
         failures.append("VM receipt names another request")
     if public.get("response_sha256") != sha256(raw):
@@ -327,7 +338,8 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
     record["stages"].append("collected")
     try:
         files, remote, failures = verify_outcome(request, raw,
-                                                 owner.public_receipt(request["request_id"]))
+                                                 owner.public_receipt(request["request_id"]),
+                                                 permit)
     except ContractError as error:
         raise IssueError("downloaded response failed owner-side verification: " + str(error))
     verified = out / "owner-verified"
