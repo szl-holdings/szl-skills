@@ -41,3 +41,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         # This is a temporary filesystem test, never a connection to the VM.
         run: sudo "$(command -v python)" -B -m unittest discover -s tests -p "test_ssh_ci_claims.py" -v
+      - name: Exercise root-owned signature spool and broker integration on the disposable hosted Linux runner
+        if: matrix.os == 'ubuntu-latest'
+        # Real ssh-keygen and root-owned temporary files; the systemd unit is faked. Never the VM.
+        run: |
+          set -euo pipefail
+          for module in test_ssh_ci_owner_signature test_ssh_ci_broker test_ssh_ci_owner_issue; do
+            sudo "$(command -v python)" -B -m unittest -v "tests.$module"
+          done

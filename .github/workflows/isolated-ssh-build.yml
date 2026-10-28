@@ -1,4 +1,6 @@
 name: Isolated SSH CPU build
+# The owner tool finds the exact waiting run by this title; display only.
+run-name: 'CPU build permit ${{ inputs.permit_id }}'
 
 # Deliberately no push, PR, schedule, workflow_run, or pull_request_target trigger.
 on:

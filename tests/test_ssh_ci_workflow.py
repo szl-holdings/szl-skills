@@ -23,6 +23,17 @@ def step(name):
     return TEXT.split(marker, 1)[1].split('\n      - ', 1)[0]
 
 
+@contextlib.contextmanager
+def working_directory(path):
+    """contextlib.chdir is 3.11+; the VM build runs this suite on Ubuntu 22.04's 3.10."""
+    previous = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
+
+
 def bootstrap_source():
     block = step(BOOTSTRAP_NAME)
     match = re.search(r"          python - <<'PY'\n(.*?)\n          PY(?:\n|$)", block, re.S)
@@ -115,7 +126,7 @@ class BootstrapReceiptTests(unittest.TestCase):
         self.temp.cleanup()
 
     def run_bootstrap(self, outcome, failure=True):
-        with contextlib.chdir(self.root), mock.patch.dict(
+        with working_directory(self.root), mock.patch.dict(
                 os.environ, {'CLIENT_STEP_OUTCOME': outcome}, clear=True):
             code = compile(bootstrap_source(), str(WORKFLOW) + ':bootstrap', 'exec')
             if failure:

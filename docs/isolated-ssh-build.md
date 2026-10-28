@@ -2,25 +2,32 @@
 
 ## Status and trust boundary
 
-**BLOCKED for live VM CI execution.** This change provides the GitHub controller,
-bounded SSH client, strict request/receipt contract, offline run planning, pure
-CPU-permit validation, and local POSIX claim-store primitives. It does not install or
-qualify a VM broker, provision an account or key, create an owner permit, or
-establish that isolation exists. Hosted contract tests are offline tests, not a
-remote-build or deployment claim. No consumed GPU grant is accepted or reused.
+**Source-complete; live VM execution BLOCKED until the owner provisions,
+qualifies, and configures it.** This repository now contains every component of
+the path: the GitHub controller and bounded SSH client, the forced-command relay,
+the root broker, the transient-unit sandbox, the fixed step runner, the runtime
+observer, owner-signed permits, provisioning, qualification, and the owner's
+one-command issue flow. None of it is installed on the VM by merging. A merge,
+green hosted tests, or a provider page that says "running" is not a lease, a
+qualification, or permission to run a workload. No consumed GPU grant is
+accepted or reused, and no step here sends a GPU, inference, or training request.
 
-The manually verified science build recipe is useful, but its CPU affinity,
-environmental GPU hiding, and per-process limits are not a CI security boundary.
+The isolation is systemd/kernel namespace and cgroup isolation **inside the live
+model VM**. It is not a separate kernel or VM, and a kernel or systemd escape
+would reach the host. A dedicated CPU VM remains the stronger boundary for
+hostile workloads; this lane builds only reviewed, protected-`main` source.
 Do not register a general-purpose self-hosted Actions runner on the live-model
 VM, and never copy a workstation or administrator SSH key into this workflow.
+GitHub warns that public-repository code can compromise self-hosted runners; see
+its [secure-use reference](https://docs.github.com/en/actions/reference/security/secure-use#hardening-for-self-hosted-runners).
 
-The reviewed design uses a GitHub-hosted controller and a separately provisioned
-forced-command CPU broker. GitHub warns that public-repository code can compromise
-self-hosted runners; see its [secure-use reference](https://docs.github.com/en/actions/reference/security/secure-use#hardening-for-self-hosted-runners).
-[Bubblewrap](https://github.com/containers/bubblewrap) provides useful namespace
-primitives, but is not by itself a complete sandbox policy or aggregate resource
-boundary. This design does not claim a new isolation primitive or a separate
-kernel. A dedicated VM remains the stronger boundary for hostile workloads.
+Evidence classes stay explicit. The broker's response is DECLARED remote
+evidence: unsigned, produced on the host it describes, and not an independent
+witness. Local transport, byte, and hash consistency are MEASURED by the client.
+GitHub run identity sent over SSH is a declaration bound by the owner's signed
+permit, not separately authenticated by the VM. Provisioning and qualification
+receipts are MEASURED on that host only. None of these proves kernel isolation in
+general, scientific truth, model quality, or uninterrupted model latency.
 
 ## GitHub side
 
@@ -45,52 +52,78 @@ kernel. A dedicated VM remains the stronger boundary for hostile workloads.
   `SZL_CPU_SSH_USER`, and independently verified `SZL_CPU_KNOWN_HOSTS`. Host-key
   scanning during the job is not authentication and must not replace pinning.
 
-## Owner-provisioned broker requirements (not installed by this change)
+- The run title is `CPU build permit <permit UUID>` so the owner tool can find
+  the exact waiting run; the title is display-only and never executed.
 
-The SSH entrypoint accepts only literal `szl-cpu-build-v1` and a bounded strict
-JSON request. Its trusted executable, policy, and permit directory must be
-outside the payload's writable tree. The CI identity cannot author permits,
-replace the broker, or modify its isolation profile.
+## VM side (implemented here, installed only by the owner)
 
-Before dispatch, reserve a fresh CPU permit UUID without granting execution.
-Dispatch must pause at a preconfigured protected-environment approval gate:
-GitHub allocates the run ID only after dispatch. While that run is waiting, the
-owner binds a single-use CPU permit to the resulting exact request digest:
-repository, source/controller SHA, workflow reference, run ID, run attempt,
-request/permit IDs, approved window, host/boot/workload identity, and resource
-profile. Only then approve that exact waiting run. An environment name without
-an enforced approval gate does not implement this sequence; leave activation
-disabled if that gate is unavailable. A GPU evaluation grant is a different authority and must be
-rejected. Use a server-wide exclusive lock and durable exclusive claim; a lost
-client connection never permits replay. Status/retrieval cannot execute a build.
-GitHub run identity supplied over SSH is a declaration unless separately verified.
+| Component | Runs as | Role |
+|---|---|---|
+| `tools/ssh_ci_relay.py` | `szl-ci` (sshd forced command) | Admits only the literal `szl-cpu-build-v1` and one <=4096-byte request; relays to the broker socket; strips one status byte |
+| `szl-cpu-broker.socket` / `@.service` | root, one instance per connection | `MaxConnections=1`; the socket is `root:szl-ci 0660` |
+| `tools/ssh_ci_broker.py` | root | Strict request, signed-permit loader, observer, durable claim, source staging, sandbox, bounded collection, contract self-check, broker receipt |
+| `tools/ssh_ci_owner_signature.py` | root (verify) / owner (sign) | `ssh-keygen -Y` signature over one canonical permit+window bundle, namespace `szl-cpu-permit-v1`, root-owned `allowed_signers` |
+| `tools/ssh_ci_observer.py` | root or admin | Hostname, boot ID, `nvidia-smi` compute PIDs with `/proc` start ticks, running build units; any read failure denies |
+| `tools/ssh_ci_sandbox.py` | root, via `systemd-run` | One transient service per build with the fixed properties below; `GO` only after readback |
+| `tools/ssh_ci_step_runner.py` | `szl-build` inside the unit | Waits for `GO`, copies read-only `/src` to private scratch, requires the exact clean commit, runs the four fixed steps with 1 MiB per stream |
+| `tools/ssh_ci_provision.py` | root, owner-run | `plan` (read-only) / `apply` / `uninstall`; writes a provisioning receipt |
+| `tools/ssh_ci_qualify.py` | root, owner-run | Negative controls and an optional real-build rehearsal; writes a qualification receipt |
+| `tools/ssh_ci_owner_issue.py` | owner workstation | Dispatch, bind, observe, sign, install, approve one run, collect evidence |
 
-The fixed CPU profile is one CPU, 1 GiB aggregate memory, zero swap allowance,
-64 tasks, a 420-second execution deadline, and at most 16 MiB of returned files.
-The host must enforce aggregate cgroup limits and bounded scratch/log storage,
-not just report those values or set per-process resource limits. No fallback to
-the old general-shell runner is permitted.
+**Sandbox properties (read back before `GO`).** One aggregate cgroup:
+`CPUQuota=100%`, `MemoryMax=1 GiB`, `MemorySwapMax=0`, `TasksMax=64`,
+`RuntimeMaxSec=420`, `OOMPolicy=kill`, `KillMode=control-group`. Namespaces:
+`PrivateNetwork` (plus `IPAddressDeny=any` and `RestrictAddressFamilies=AF_UNIX`),
+`PrivateUsers`, `PrivateIPC`, mount namespace with `ProtectSystem=strict`,
+`ProtectHome`, read-only `/src`, writable `/out`, and tmpfs `/tmp`, `/var/tmp`,
+and `/dev/shm` charged to the cgroup. `PrivateDevices` and `DevicePolicy=closed`
+remove GPU devices. Hidden paths are recomputed for every run: every top-level
+entry an OS does not need (for example `/data`, `/workspace`, `/snap`), every
+`/var` and `/opt` entry except the tmpfs and the broker release, every socket under
+`/run`, `/usr/local`, sensitive `/etc` directories (including systemd unit files,
+which can carry tokens), broker and SSH configuration, and owner-listed model
+paths. A host name that cannot be expressed safely blocks the build. Directories
+that hold mount sources (`/run/systemd/inaccessible`, `/run/szl-cpu-build`) are
+never hidden wholesale, because systemd resolves those inside the namespace it
+builds. `NoNewPrivileges`, an empty capability bounding set, `RestrictNamespaces`,
+and the `@system-service` syscall set minus `@privileged @resources @keyring` and
+`io_uring_*` apply. Host processes are hidden with
+`ProtectProc=invisible` and the user namespace, **not** a separate PID namespace
+(systemd 249 on Ubuntu 22.04 has no `PrivatePIDs=`); qualification measures that
+the model PID is invisible. Before `GO`, the broker reads back the kernel files `cpu.max`,
+`memory.max`, `memory.swap.max`, and `pids.max`, the systemd properties, and the
+waiting runner process itself from `/proc`: seccomp mode 2, `NoNewPrivs`, empty
+effective/permitted/bounding/ambient capabilities, and network, mount, user, IPC,
+and UTS namespaces distinct from the host's. Any mismatch withholds `GO`.
 
-Build code must have separate PID/mount/user/IPC/network namespaces, a read-only
-reviewed runtime and exact source, minimal private devices, dropped capabilities,
-no privilege escalation, and an appropriate seccomp policy. It must not see GPU
-devices, host processes, the model endpoint, home/model paths, credentials,
-runtime sockets, or the host network. Staging is a separate trusted operation;
-the build performs no dependency installation or network fetch. Only the build's
-own cgroup may be terminated on its deadline. Never stop the model or another job.
+**Broker behaviour.** The broker shares the host mount namespace, so its per-run
+256 MiB, 16384-inode `noexec` tmpfs is visible to the unit it starts. While it
+holds the claim lock and no build unit runs, it first unmounts and removes any
+run directory a killed broker left behind. It stages exactly one
+commit with `git fetch --depth=1` (hooks disabled, HTTPS only, 30 seconds total)
+and verifies the object ID. The build performs no dependency install. Collection
+opens files without following links, accepts only flat `*.zip` archives and the
+manifest (at most 256 entries, sizes charged before reading against the 16 MiB
+budget), and builds a deterministic `packages.tar`. Status byte `0` precedes a
+contract-checked v1 envelope (PASS or BLOCKED result); `1` precedes a BLOCKED
+notice with reason codes only. A model-identity change, unverified readback, a
+still-present unit, or a rejected output file yields no envelope. After the
+configuration loads, every outcome writes a root-only broker receipt and, for a
+valid request, a summary in `/var/lib/szl-cpu-broker/public` (hashes and reason
+codes only, mode 0600, owned by the configured admin account so the owner tool
+can read it without sudo) *before* replying; if either write fails, the
+envelope is withheld and a BLOCKED notice is sent instead. The claim stays
+consumed after any failure, and nothing retries. The client allows 600 seconds
+end to end (staging, readback, the 420-second unit, and a 24 MiB transfer).
 
-The broker must verify actual isolation and cgroup readback, check the approved
-model identity/workload before and after execution, and collect bounded regular
-files without following links. Its receipt must live outside payload control.
-Archive outputs are retained as opaque bytes by the CI client, not extracted or
-executed. An unsigned host response is DECLARED remote evidence; local transport
-and byte consistency can be MEASURED. Hashes do not prove independent witness,
-kernel isolation, scientific truth, or uninterrupted model latency.
+**Python.** Ubuntu 22.04 ships Python 3.10. The VM components and the full test
+suite are exercised on 3.10; `tests/test_ssh_ci_workflow.py` no longer uses the
+3.11-only `contextlib.chdir`, which previously failed the in-VM `unittest` step.
 
-## Implemented offline admission primitives
+## Admission primitives
 
-These modules are independently testable building blocks, **not an installed
-broker**. Their successful tests do not enable the manual workflow.
+These pure modules are the building blocks the broker composes. Their tests,
+like every hosted test here, are offline and do not enable the manual workflow.
 
 `tools/ssh_ci_plan.py` reconstructs the exact controller request from a supplied
 GitHub run API response while that run is waiting for environment approval:
@@ -128,15 +161,14 @@ complete before success. Claims persist after success, failure, disconnect, or
 partial write. Never delete them to retry. Windows and unsupported filesystems
 fail closed. This lock is advisory, not a provider-enforced CPU/GPU reservation.
 
-A future trusted broker must acquire that context, load an owner-authenticated
-permit from protected storage, obtain a fresh independent workload observation,
-validate, durably claim, recheck deadline/workload, and only then execute. It must
-keep the context until cleanup and receipt collection finish. The libraries do
-not provide the protected permit loader, runtime observer, sandbox, or executor;
-passing caller-provided JSON to them does not establish authority.
+The broker acquires that context, loads the owner-signed permit from the
+root-owned spool, obtains a fresh observation, validates, durably claims,
+rechecks deadline and workload, and only then executes, keeping the context until
+cleanup and receipt collection finish. Passing caller-provided JSON to these
+libraries directly does not establish authority.
 
 `tools/ssh_ci_executor.py::execute` supplies this ordering as a pure,
-dependency-injected state machine for a future broker. It requires an
+dependency-injected state machine, which the broker drives. It requires an
 `OwnerPermit` loader result whose authentication was performed outside the
 module; then it observes and validates, rejects idle permits while the v1
 receipt still requires positive process identity, acquires the claim context,
@@ -148,51 +180,118 @@ is only a bounded local receipt handoff and is not promoted to a verified v1
 remote receipt or independent witness.
 
 `tools/ssh_ci_owner_window.py::validate_owner_window` is the closed envelope
-that the future loader must supply alongside `OwnerPermit`. It binds the exact
+that the signed bundle carries alongside the permit. It binds the exact
 request and permit digest, a fresh <=900-second window with >=450 seconds
 remaining, Massed Compute instance and host/boot identity, execution ID and run
 nonce, GitHub source SHA and admitted HF revision, the fixed CPU profile, a
 bounded budget-ledger reference, checkpoint-manifest digest, and an explicit
 no-GPU/no-model/no-training/no-inference workload. GPU-grant-shaped objects,
 unknown revisions, missing backup/budget references, duplicate members, and
-scope-expanding fields are rejected. This validator does not authenticate an
-owner signature or read a provider ledger; a trusted loader must do that before
-the executor sees the envelope. No current owner window exists, so this is a
-future-grant contract, not an activation.
+scope-expanding fields are rejected. This validator does not read a provider ledger;
+the signature loader authenticates the owner before the executor sees the
+envelope, and the budget and checkpoint fields remain the owner's attestations.
+No owner window exists until the owner issues one for a specific waiting run.
 
 **Idle-host execution is still BLOCKED.** The permit validator can describe an
 idle host, but the existing v1 remote receipt contract requires positive pinned
 model PID/start-ticks fields. Supporting an idle host end to end requires a
 versioned receipt contract and qualification; do not invent a PID or relax v1.
 
-The hosted Linux contract job additionally runs real root-owned claim-store
-tests under a fresh `/run` test directory on its disposable runner. Windows
+The hosted Linux contract job additionally runs real root-owned claim-store,
+signature-spool, and broker integration tests under fresh `/run` test
+directories on its disposable runner (real `ssh-keygen`, faked systemd unit). Windows
 explicitly skips POSIX cases and tests unsupported-platform denial. Neither test
 job connects to the VM, receives its credentials, or grants live execution.
 
-## Activation and qualification gates
+## Operator runbook
 
-1. Obtain owner approval for a non-overlapping provisioning/CPU-test window,
-   exact account/credential scope, and resource/storage ceilings. No GPU permit
-   authorizes this work.
-2. Provision the dedicated forced-command identity and audited broker; verify
-   filesystem ownership, SSH restrictions, host-key pin, and server-wide lock.
-3. Qualify namespace/device/network denial and aggregate cgroup enforcement with
-   bounded negative controls. Verify host model paths and loopback are unreachable,
-   fork/memory/output/deadline controls stop only the test job, and no job remains.
-4. Provision and read back the protected GitHub environment, enforced approval
-   gate, and dedicated secret. Verify that an unapproved job cannot start.
-   Preserve all existing protected-main and exact-head checks. Solo owner approval
-   is an authorization step, not an independent witness.
-5. Reserve a new CPU permit UUID and dispatch into the approval wait. Bind the
-   actual run ID and request digest in the owner's permit before approving the
-   exact run. Run one reviewed immutable source build, retain
-   failed as well as successful evidence, independently verify returned hashes,
-   and read back the unchanged model identity. Do not auto-retry a failed permit.
-6. Only then describe the path as operational for that qualified CPU profile and
-   source. Training, inference, arbitrary workloads, and publication remain separate.
+Run every VM step yourself, inside one owner-approved window, from the
+workstation that holds the verified admin key and host pin (or a ThinLinc
+terminal). Nothing here touches the model process or the GPU.
 
-The SSH client refuses broad administrator usernames and missing configuration.
-It preserves a local receipt and bounded raw response on failure. A PASS in the
-remote receipt means its declared fixed build steps passed; it is not model or
-production qualification. The canonical scientific and model gates stay unchanged.
+1. **Keys (workstation).** Create a dedicated CI key and a separate owner
+   permit-signing key; never reuse the admin key for either.
+
+   ```sh
+   ssh-keygen -t ed25519 -N "" -C szl-cpu-ci -f szl-cpu-ci
+   ssh-keygen -t ed25519 -C stephen-szl-permit -f szl-owner-permit
+   ```
+
+2. **Provision (VM, as root).** From a clean checkout of the merged `main`
+   commit, plan first; apply only if the plan is ready and the window is approved.
+
+   ```sh
+   sudo python3 -I -B tools/ssh_ci_provision.py plan --release-sha <main-sha> \
+     --ci-public-key szl-cpu-ci.pub --owner-public-key szl-owner-permit.pub \
+     --admin-user "$USER" --hidden-path <model-or-data-dir>
+   sudo python3 -I -B tools/ssh_ci_provision.py apply <same flags> \
+     --owner-window-ref <your approval reference>
+   ```
+
+   `apply` refuses unmanaged files, validates `sshd -t`, checks the `szl-ci`
+   effective settings, compares the admin user's effective sshd settings before
+   and after (rolling back on any change), reloads `ssh`, and enables the socket.
+   `uninstall` removes the SSH entry point and socket and keeps all receipts.
+
+3. **Qualify (VM, as root).** Rehearse the real build of the same commit.
+
+   ```sh
+   sudo python3 -I -B /opt/szl-cpu-broker/current/tools/ssh_ci_qualify.py \
+     --rehearse-build <main-sha> --owner-window-ref <reference>
+   ```
+
+   Proceed only on `"result": "QUALIFIED"`. A readback mismatch (for example a
+   systemd property printed differently on this host) is a reviewed source
+   change, never a local relaxation. The model process's working directory,
+   mapped weights, command-line paths, Hugging Face/vLLM cache variables, and
+   systemd unit file are probed from inside the sandbox, as is every reachable
+   UNIX socket and the io_uring and keyring syscalls (x86_64 numbers); add any
+   visible model path with `--hidden-path` and re-provision.
+
+4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
+   with yourself as required reviewer and protected-branch deployment only, then
+   add the secret and variables. Set `SZL_CPU_CI_ENABLED` last.
+
+   ```sh
+   gh api -X PUT repos/szl-holdings/szl-skills/environments/massed-cpu-build \
+     --input - <<'JSON'
+   {"reviewers":[{"type":"User","id":<your-numeric-user-id>}],
+    "prevent_self_review":false,
+    "deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}
+   JSON
+   gh secret set SZL_CPU_SSH_KEY --env massed-cpu-build -R szl-holdings/szl-skills < szl-cpu-ci
+   gh variable set SZL_CPU_SSH_HOST --env massed-cpu-build -R szl-holdings/szl-skills -b <vm-ip>
+   gh variable set SZL_CPU_SSH_PORT --env massed-cpu-build -R szl-holdings/szl-skills -b 22
+   gh variable set SZL_CPU_SSH_USER --env massed-cpu-build -R szl-holdings/szl-skills -b szl-ci
+   gh variable set SZL_CPU_KNOWN_HOSTS --env massed-cpu-build -R szl-holdings/szl-skills \
+     -b "<the independently verified host-key line>"
+   gh variable set SZL_CPU_CI_ENABLED --env massed-cpu-build -R szl-holdings/szl-skills -b true
+   ```
+
+   Then delete the local copy of the CI private key.
+
+5. **One build (workstation).** Write your own attestations to an owner config
+   (`szl.ssh-cpu-build.owner-config.v1`: provider instance UUID, admitted HF
+   revision, budget ledger reference and remaining seconds/USD, checkpoint
+   manifest SHA-256, owner receipt reference). The tool never invents them.
+
+   ```sh
+   python tools/ssh_ci_owner_issue.py run --owner-config owner-cpu-window.json \
+     --source-sha <main-sha> --signing-key szl-owner-permit \
+     --admin-target Ubuntu@<vm-ip> --admin-known-hosts <pinned-known-hosts>
+   ```
+
+   It refuses without a required-reviewer gate, when the waiting run is not the
+   commit you named with `--source-sha`, with zero or several GPU compute
+   processes (the v1 receipt pins exactly one), or when more than 300 seconds
+   pass between observation and approval. It approves only the run whose title
+   carries the fresh permit. Its verdict does not trust the job's client receipt,
+   because that code comes from the commit under test: it re-verifies the raw
+   response with your local contract code for the request you signed and requires
+   the broker's public receipt on the VM to name the same request and response
+   hash with a PASS execution.
+
+6. Only after one such run returns PASS with matching hashes and an unchanged
+   model identity, describe the lane as operational for that qualified CPU
+   profile and source. Training, inference, arbitrary workloads, and publication
+   remain separate authorities.
