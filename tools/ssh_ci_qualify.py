@@ -3,16 +3,20 @@
 
 Run as root inside an owner-approved window after provisioning. Each control is
 its own transient unit with the production properties and the same readback
-gate: host-process, GPU-device, network, broker/model path, and privilege
-denial; task, memory, tmpfs, and deadline limits; and, optionally, a rehearsal
-of the real four-step build. No permit or claim is used and no GPU work runs.
-Model identity is observed before and after. The receipt is MEASURED on this
-host only; it is not an independent witness or a remote-CI success.
+gate: host-process, GPU-device, host /dev/shm, network, broker/model path,
+namespace-creation, and privilege denial; task, memory, tmpfs, and deadline
+limits; and, optionally, a rehearsal of the real four-step build. No permit is
+used and no claim is written, but the broker's claim lock is held throughout,
+so no build overlaps it; no GPU work runs. Model identity is observed before
+and after. The receipt is MEASURED on this host only; it is not an
+independent witness or a remote-CI success.
 """
 
 import argparse
+import contextlib
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import posixpath
 import re
@@ -26,6 +30,7 @@ if __package__ in (None, ""):
 
 from tools.ssh_ci_broker import (DEFAULT_CONFIG, Build, collect_outputs, load_config,
                                  parse_runner, stage_source)
+from tools.ssh_ci_claims import ClaimError, ClaimStore
 from tools.ssh_ci_contract import canonical
 from tools.ssh_ci_observer import observe
 from tools import ssh_ci_sandbox as sandbox
@@ -34,8 +39,13 @@ from tools import ssh_ci_sandbox as sandbox
 QUALIFICATION_SCHEMA = "szl.ssh-cpu-build.qualification.v1"
 DEADLINE_SECONDS = 5
 TMPFS_LIMIT = 536870912
+SHM_ROOT = Path("/dev/shm")
+# RestrictNamespaces= filters clone/unshare flags with EPERM; clone3 must fail
+# with ENOSYS, the only error on which glibc falls back to clone for threads.
+NAMESPACE_DENIALS = {"namespace:unshare": "DENIED:EPERM", "namespace:clone": "DENIED:EPERM",
+                     "namespace:clone3": "DENIED:ENOSYS"}
 PROBE = r"""
-import json, os, socket, sys, threading, time
+import errno, json, os, socket, sys, threading, time
 if sys.stdin.buffer.read(3) != b"GO\n":
     print(json.dumps({"go": False})); sys.exit(125)
 mode, args = sys.argv[1], json.loads(sys.argv[2])
@@ -53,6 +63,7 @@ if mode == "isolation":
     r["proc_pids"] = sorted(int(p) for p in os.listdir("/proc") if p.isdigit())
     r["model_pid_visible"] = [pid for pid in args["model_pids"] if os.path.exists("/proc/" + str(pid))]
     r["dev_shm_entries"] = len(os.listdir("/dev/shm"))
+    attempt("dev_shm_marker", lambda: os.lstat("/dev/shm/" + args["shm_marker"]))
     r["gpu_devices"] = sorted(n for n in os.listdir("/dev") if n.startswith("nvidia"))
     attempt("inet_socket", lambda: socket.socket(socket.AF_INET, socket.SOCK_STREAM).close())
     for port in args["ports"]:
@@ -76,6 +87,40 @@ if mode == "isolation":
     for name, number, argv in (("io_uring_setup", 425, (1, None)), ("add_key", 248, (None, None, None, 0, 0))):
         result = libc.syscall(number, *argv)
         r["syscall:" + name] = "DENIED:EPERM" if result == -1 and ctypes.get_errno() == 1 else "ALLOWED:" + str(ctypes.get_errno())
+    def reap(pid):
+        # Bounded: a child still running after 5 seconds is killed; it is always reaped.
+        for _ in range(500):
+            done, status = os.waitpid(pid, os.WNOHANG)
+            if done:
+                return status
+            time.sleep(0.01)
+        os.kill(pid, 9)
+        return os.waitpid(pid, 0)[1]
+    def denial(code):
+        return "DENIED:" + errno.errorcode.get(code, str(code))
+    if os.uname().machine == "x86_64":  # Raw x86_64 syscall numbers; elsewhere none is reported.
+        # unshare changes its caller, so it runs in a forked child that exits with its errno.
+        child = os.fork()
+        if child == 0:
+            os._exit(0 if libc.syscall(272, 0x10000000) == 0 else ctypes.get_errno() or 255)
+        status = reap(child)
+        code = os.WEXITSTATUS(status) if os.WIFEXITED(status) else -1
+        r["namespace:unshare"] = "ALLOWED" if code == 0 else denial(code) if code > 0 else "UNKNOWN:killed"
+        # Fork-like (no stack): CLONE_NEWUSER with SIGCHLD; clone_args is 88 bytes.
+        clone_args = (ctypes.c_uint64 * 11)(0x10000000, 0, 0, 0, 17)
+        for name, number, argv in (("clone", 56, (0x10000000 | 17, 0, 0, 0, 0)),
+                                   ("clone3", 435, (ctypes.byref(clone_args), 88))):
+            result = libc.syscall(number, *argv); code = ctypes.get_errno()
+            if result == 0:
+                os._exit(0)  # The child of an allowed call: never let it run on.
+            if result > 0:
+                reap(result)
+            r["namespace:" + name] = "ALLOWED" if result > 0 else denial(code)
+    def thread():
+        worker = threading.Thread(target=int); worker.start(); worker.join(5)
+        if worker.is_alive():
+            raise RuntimeError("thread did not finish")
+    attempt("thread_start", thread)  # Positive control: glibc's clone3 fallback works.
     reachable, seen = [], 0
     for top in ("/run", "/var", "/opt", "/etc", "/srv", "/mnt", "/usr/local", "/tmp", "/dev"):
         for directory, subdirectories, names in os.walk(top):
@@ -121,6 +166,10 @@ elif mode == "deadline":
     r["sleeping"] = True; emit(); time.sleep(120)
 emit()
 """
+
+
+class QualifyError(RuntimeError):
+    """Qualification could not start safely; no receipt is written."""
 
 
 def listening_ports(proc=Path("/proc")):
@@ -245,6 +294,13 @@ def evaluate(mode, probe, outcome, context):
             failures.append("GPU devices visible")
         if probe["dev_shm_entries"]:
             failures.append("host /dev/shm visible")
+        if probe.get("dev_shm_marker") != "ABSENT":
+            failures.append("host /dev/shm marker not hidden: %s" % probe.get("dev_shm_marker"))
+        for key, expected in NAMESPACE_DENIALS.items():
+            if probe.get(key) != expected:
+                failures.append("%s is %s, not %s" % (key, probe.get(key, "missing"), expected))
+        if probe.get("thread_start") != "ALLOWED":
+            failures.append("threads do not start: %s" % probe.get("thread_start"))
         if probe.get("reachable_unix_sockets"):
             failures.append("reachable unix sockets: " + ", ".join(probe["reachable_unix_sockets"][:8]))
         for key, value in probe.items():
@@ -309,38 +365,68 @@ def rehearse(build, config, source_sha, *, run_unit=sandbox.run_unit):
             "failures": failures}
 
 
+def shm_marker(root=SHM_ROOT):
+    """Create a fresh 0600 marker in host /dev/shm that the isolation probe must not see."""
+    path = Path(root) / ("szl-qualify-" + uuid.uuid4().hex)
+    try:
+        os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+    except OSError as error:
+        raise QualifyError("cannot create a fresh host /dev/shm marker: "
+                           + type(error).__name__) from error
+    return path
+
+
 def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.run,
             popen=subprocess.Popen, clock=lambda: datetime.now(timezone.utc),
             run_unit=sandbox.run_unit, proc=Path("/proc"), build_uid=None, observer=None,
-            build=None):
+            build=None, claim_store_factory=None, shm_root=SHM_ROOT):
     build = build or Build(config, run=run, popen=popen)
     if observer is None:
         def observer():
             return observe(clock, nvidia_smi=config["nvidia_smi"], run=run)
-    before = observer()
-    model_pids = [item["pid"] for item in before["gpu_compute_processes"]]
-    context = {"build_uid": build_uid if build_uid is not None else build._build_ids()[0]}
-    model_dirs, model_files = model_paths(model_pids, proc, run)
-    scanned, scan_problems = build.scan()
-    sockets = [path for path in scanned if path.startswith("/run/")]
-    hidden = sorted({*sandbox.HIDDEN_ALWAYS, *config["hidden_paths"], "/home", "/root",
-                     *model_dirs, *(path for path in scanned if path not in sockets)})
-    arguments = {"model_pids": model_pids, "ports": listening_ports(proc), "hidden": hidden,
-                 "secret_files": model_files,
-                 "unix_sockets": sorted({"/run/szl-cpu-broker.sock",
-                                         "/run/dbus/system_bus_socket", *sockets})}
-    controls = []
-    for mode, runtime in (("isolation", 60), ("tasks", 60), ("memory", 60), ("tmpfs", 60),
-                          ("deadline", DEADLINE_SECONDS)):
-        outcome = run_control(build, config, mode, arguments, runtime_seconds=runtime,
-                              run_unit=run_unit)
-        probe = last_json(outcome["runner_stdout"])
-        controls.append({"control": mode, "probe": probe, "elapsed": outcome["elapsed"],
-                         "unit_result": unit_result(outcome["runner_stderr"]),
-                         "readback": outcome["readback"],
-                         "failures": evaluate(mode, probe, outcome, context)})
-    rehearsal = rehearse(build, config, rehearse_sha, run_unit=run_unit) if rehearse_sha else None
-    after = observer()
+    store = (claim_store_factory or (lambda: ClaimStore(Path(config["claim_dir"]))))()
+    with contextlib.ExitStack() as stack:
+        try:
+            # The broker's own lock: no build starts, and its stale-run cleanup never
+            # removes these units' run directories, until qualification ends.
+            stack.enter_context(store)
+        except ClaimError as error:
+            raise QualifyError("the broker claim lock is held or unavailable (a build may be "
+                               "running); qualification not started") from error
+        before = observer()
+        competing = before.get("competing_cpu_jobs")
+        if type(competing) is not int or competing != 0:
+            raise QualifyError("build units are already running (%r); qualification not started"
+                               % (competing,))
+        model_pids = [item["pid"] for item in before["gpu_compute_processes"]]
+        context = {"build_uid": build_uid if build_uid is not None else build._build_ids()[0]}
+        model_dirs, model_files = model_paths(model_pids, proc, run)
+        scanned, scan_problems = build.scan()
+        sockets = [path for path in scanned if path.startswith("/run/")]
+        hidden = sorted({*sandbox.HIDDEN_ALWAYS, *config["hidden_paths"], "/home", "/root",
+                         *model_dirs, *(path for path in scanned if path not in sockets)})
+        arguments = {"model_pids": model_pids, "ports": listening_ports(proc), "hidden": hidden,
+                     "secret_files": model_files,
+                     "unix_sockets": sorted({"/run/szl-cpu-broker.sock",
+                                             "/run/dbus/system_bus_socket", *sockets})}
+        marker = shm_marker(shm_root)
+        try:
+            arguments["shm_marker"] = marker.name
+            controls = []
+            for mode, runtime in (("isolation", 60), ("tasks", 60), ("memory", 60),
+                                  ("tmpfs", 60), ("deadline", DEADLINE_SECONDS)):
+                outcome = run_control(build, config, mode, arguments, runtime_seconds=runtime,
+                                      run_unit=run_unit)
+                probe = last_json(outcome["runner_stdout"])
+                controls.append({"control": mode, "probe": probe, "elapsed": outcome["elapsed"],
+                                 "unit_result": unit_result(outcome["runner_stderr"]),
+                                 "readback": outcome["readback"],
+                                 "failures": evaluate(mode, probe, outcome, context)})
+        finally:
+            os.unlink(marker)
+        rehearsal = (rehearse(build, config, rehearse_sha, run_unit=run_unit)
+                     if rehearse_sha else None)
+        after = observer()
     failures = [control["control"] + ": " + failure for control in controls
                 for failure in control["failures"]]
     failures += ["host scan: " + problem for problem in scan_problems]
@@ -370,8 +456,12 @@ def main(argv=None):
     if args.rehearse_build and re.fullmatch(r"[0-9a-f]{40}", args.rehearse_build) is None:
         parser.error("--rehearse-build must be a full lowercase commit")
     config = load_config(args.config)
-    receipt = qualify(config, rehearse_sha=args.rehearse_build,
-                      owner_window_ref=args.owner_window_ref)
+    try:
+        receipt = qualify(config, rehearse_sha=args.rehearse_build,
+                          owner_window_ref=args.owner_window_ref)
+    except QualifyError as error:
+        print("QUALIFICATION REFUSED: " + str(error), file=sys.stderr)
+        return 1
     data = canonical(receipt) + b"\n"
     name = "qualification-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".json"
     path = Path("/var/lib/szl-cpu-broker/qualification") / name
