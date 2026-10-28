@@ -7,11 +7,15 @@ writes a receipt. ``uninstall`` removes the SSH entry point and socket while
 keeping claims, receipts, and permits. Nothing here touches the GPU, the model
 process, the administrator account, or sshd settings for any other user; the
 admin user's effective sshd configuration is compared before and after, and any
-change rolls the drop-in back. Provisioning is not qualification.
+change rolls the drop-in back. The broker socket is enabled only after sshd has
+accepted and reloaded the drop-in; from the first sshd write to the receipt,
+Ctrl-C and a dropped session are ignored and any failure removes the SSH entry
+point and disables the socket again. Provisioning is not qualification.
 """
 
 import argparse
 import base64
+import contextlib
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -19,6 +23,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -26,8 +31,8 @@ import sys
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.ssh_ci_broker import CONFIG_SCHEMA, parse_config, stage_source
-from tools.ssh_ci_contract import canonical
+from tools.ssh_ci_broker import CONFIG_SCHEMA, BrokerError, parse_config, stage_source
+from tools.ssh_ci_contract import ContractError, canonical
 from tools.ssh_ci_owner_signature import NAMESPACE
 
 try:
@@ -61,6 +66,9 @@ DIRECTORIES = (
     ("/var/lib/szl-cpu-broker/receipts", 0o700), ("/var/lib/szl-cpu-broker/public", 0o755),
     ("/var/lib/szl-cpu-broker/qualification", 0o700), ("/run/szl-cpu-build", 0o700),
 )
+SSHD_FILES = ("/etc/ssh/sshd_config.d/60-szl-cpu-ci.conf", "/etc/ssh/szl-ci/authorized_keys")
+# Ctrl-C over ``ssh -t`` and a dropped session (SIGHUP through sudo); Windows has no SIGHUP.
+INTERRUPTS = tuple(getattr(signal, name) for name in ("SIGINT", "SIGHUP") if hasattr(signal, name))
 SSHD_EXPECTED = {
     "forcecommand": RELAY_COMMAND, "authorizedkeysfile": "/etc/ssh/szl-ci/authorized_keys",
     "authenticationmethods": "publickey", "passwordauthentication": "no",
@@ -133,6 +141,8 @@ def render(options):
         "[Service]\nType=simple\nExecStart=" + BROKER_COMMAND + "\nStandardInput=socket\n"
         "StandardOutput=socket\nStandardError=journal\nUser=root\nNoNewPrivileges=yes\n"
         "RuntimeMaxSec=900\nKillMode=control-group\n"
+        "# A host-wide OOM should take the broker before the model processes.\n"
+        "OOMScoreAdjust=500\n"
         "# No PrivateTmp/Protect*/Private*: the broker must share the host mount\n"
         "# namespace so its per-run tmpfs is visible to the build unit it starts.\n")
     return {
@@ -158,11 +168,14 @@ def _managed(path, data):
 
 def file_actions(files, root="/"):
     """Classify each managed file as create, unchanged, replace, or refuse."""
+    def irregular(item):
+        return item.is_symlink() or (item.exists() and not item.is_file())
     actions = []
     for path, (data, mode) in sorted(files.items()):
         target = Path(root) / path.lstrip("/")
         entry = {"path": path, "mode": oct(mode), "sha256": hashlib.sha256(data).hexdigest()}
-        if target.is_symlink() or (target.exists() and not target.is_file()):
+        # A regular leftover temporary is replaced on write; anything else there is refused.
+        if irregular(target) or irregular(Path(str(target) + ".szl-tmp")):
             entry["action"] = "refuse"
         elif not target.exists():
             entry["action"] = "create"
@@ -235,30 +248,62 @@ def plan(options, *, run=subprocess.run, root="/"):
         "release_sha": options["release_sha"], "ready": not failures, "failures": failures,
         "users": users, "directories": [{"path": p, "mode": oct(m)} for p, m in DIRECTORIES],
         "files": actions, "release": INSTALL_ROOT + "/releases/" + options["release_sha"],
-        "commands": ["sshd -t", "systemctl daemon-reload",
-                     "systemctl enable --now szl-cpu-broker.socket", "systemctl reload ssh"],
+        "commands": ["systemctl daemon-reload", "sshd -t", "systemctl reload ssh",
+                     "systemctl enable --now szl-cpu-broker.socket"],
         "untouched": ["GPU and model processes", "administrator account",
                       "sshd settings for other users", "existing services"],
     }
 
 
+@contextlib.contextmanager
+def _stage(name):
+    """Turn an OS, subprocess, or broker failure into a refusal that names its stage."""
+    try:
+        yield
+    except (BrokerError, ContractError, subprocess.SubprocessError, OSError) as error:
+        raise ProvisionError("%s failed: %s: %s" % (name, type(error).__name__, error)) from error
+
+
 def _write(path, data, mode):
     temporary = Path(str(path) + ".szl-tmp")
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
-    with os.fdopen(descriptor, "wb") as stream:
-        stream.write(data)
-        stream.flush()
-        os.fsync(stream.fileno())
-    os.chown(temporary, 0, 0)
-    os.chmod(temporary, mode)
-    os.replace(temporary, path)
+    with _stage("write " + str(path)):
+        try:
+            leftover = temporary.lstat()
+        except FileNotFoundError:
+            leftover = None
+        if leftover is not None:  # An interrupted earlier write; never follow or reuse it.
+            if not stat.S_ISREG(leftover.st_mode):
+                raise ProvisionError("refuse " + str(temporary) + ": not a regular file")
+            temporary.unlink()
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chown(temporary, 0, 0)
+        os.chmod(temporary, mode)
+        os.replace(temporary, path)
+
+
+def _remove(path):
+    """Remove a managed file and any temporary an interrupted write left beside it."""
+    for item in (Path(path), Path(str(path) + ".szl-tmp")):
+        item.unlink(missing_ok=True)
 
 
 def _checked(run, argv, stage):
-    completed = run(argv, capture_output=True, timeout=120, check=False)
+    with _stage(stage):
+        completed = run(argv, capture_output=True, timeout=120, check=False)
     if completed.returncode != 0:
         raise ProvisionError(stage + " failed: " + completed.stderr.decode("utf-8", "replace")[-400:])
     return completed.stdout.decode("utf-8", "replace")
+
+
+def _ssh_active(run):
+    with _stage("systemctl is-active ssh"):
+        active = run([SYSTEMCTL, "is-active", "ssh.service"], capture_output=True, timeout=15,
+                     check=False)
+    return active.stdout.strip() == b"active"
 
 
 def effective_sshd(run, user):
@@ -292,6 +337,22 @@ def install_release(sha, run):
     return str(release)
 
 
+def _rollback(run, socket_enabled):
+    """Remove the SSH entry point, then the socket once enabled; return what was not undone."""
+    incomplete = []
+    for path in SSHD_FILES:
+        try:
+            _remove(path)
+        except OSError as error:
+            incomplete.append("remove %s: %s" % (path, type(error).__name__))
+    if socket_enabled:
+        try:
+            _checked(run, [SYSTEMCTL, "disable", "--now", "szl-cpu-broker.socket"], "disable socket")
+        except ProvisionError as error:
+            incomplete.append(str(error))
+    return incomplete
+
+
 def apply(options, *, run=subprocess.run):
     report = plan(options, run=run)
     if not report["ready"]:
@@ -303,20 +364,26 @@ def apply(options, *, run=subprocess.run):
             _checked(run, [USERADD, "--system", "--user-group", "--shell", entry["shell"],
                            "--home-dir", entry["home"], "--no-create-home", entry["user"]],
                      "useradd " + entry["user"])
-    for path, mode in DIRECTORIES:
-        os.makedirs(path, mode=mode, exist_ok=True)
-        os.chown(path, 0, 0)
-        os.chmod(path, mode)
-    release = install_release(options["release_sha"], run)
-    sshd_files = ("/etc/ssh/sshd_config.d/60-szl-cpu-ci.conf", "/etc/ssh/szl-ci/authorized_keys")
+    with _stage("create directories"):
+        for path, mode in DIRECTORIES:
+            os.makedirs(path, mode=mode, exist_ok=True)
+            os.chown(path, 0, 0)
+            os.chmod(path, mode)
+    with _stage("install release"):
+        release = install_release(options["release_sha"], run)
     for path, (data, mode) in sorted(files.items()):
-        if path not in sshd_files:
+        if path not in SSHD_FILES:
             _write(path, data, mode)
     _checked(run, [SYSTEMCTL, "daemon-reload"], "daemon-reload")
-    _checked(run, [SYSTEMCTL, "enable", "--now", "szl-cpu-broker.socket"], "enable socket")
-    for path in sshd_files:
-        _write(path, *files[path])
+    # From the first sshd write to the receipt, neither Ctrl-C nor a dropped ``ssh -t``
+    # session can stop apply halfway, and any failure (even an interrupt raised as an
+    # exception) removes the SSH entry point and, once enabled, the socket. The socket is
+    # enabled only after sshd accepted, enforced, and reloaded the drop-in.
+    enabled = False
+    previous = {number: signal.signal(number, signal.SIG_IGN) for number in INTERRUPTS}
     try:
+        for path in SSHD_FILES:
+            _write(path, *files[path])
         _checked(run, [SSHD, "-t"], "sshd -t")
         ci = effective_sshd(run, CI_USER)
         wrong = sorted(key for key, value in SSHD_EXPECTED.items() if ci.get(key) != value)
@@ -324,29 +391,35 @@ def apply(options, *, run=subprocess.run):
             raise ProvisionError("szl-ci sshd settings are not enforced: " + ", ".join(wrong))
         if effective_sshd(run, options["admin_user"]) != admin_before:
             raise ProvisionError("drop-in changed the administrator's sshd settings")
-    except ProvisionError:
-        for path in sshd_files:
-            Path(path).unlink(missing_ok=True)
+        if _ssh_active(run):
+            _checked(run, [SYSTEMCTL, "reload", "ssh.service"], "reload ssh")
+        enabled = True  # Set first: a failed or timed-out enable may still have enabled it.
+        _checked(run, [SYSTEMCTL, "enable", "--now", "szl-cpu-broker.socket"], "enable socket")
+        receipt = dict(report, schema="szl.ssh-cpu-build.provision-receipt.v1",
+                       applied_at=datetime.now(timezone.utc).isoformat(), release=release,
+                       owner_window_ref=options["owner_window_ref"],
+                       socket=SOCKET_PATH, qualification="NOT_RUN", signed=False)
+        name = "provision-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".json"
+        _write("/var/lib/szl-cpu-broker/" + name, canonical(receipt) + b"\n", 0o600)
+    except BaseException as error:
+        incomplete = _rollback(run, enabled)
+        if incomplete:
+            raise ProvisionError("%s (%s); rollback incomplete: %s" % (
+                type(error).__name__, error, "; ".join(incomplete))) from error
         raise
-    active = run([SYSTEMCTL, "is-active", "ssh.service"], capture_output=True, timeout=15, check=False)
-    if active.stdout.strip() == b"active":
-        _checked(run, [SYSTEMCTL, "reload", "ssh.service"], "reload ssh")
-    receipt = dict(report, schema="szl.ssh-cpu-build.provision-receipt.v1",
-                   applied_at=datetime.now(timezone.utc).isoformat(), release=release,
-                   owner_window_ref=options["owner_window_ref"],
-                   socket=SOCKET_PATH, qualification="NOT_RUN", signed=False)
-    name = "provision-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".json"
-    _write("/var/lib/szl-cpu-broker/" + name, canonical(receipt) + b"\n", 0o600)
+    finally:
+        for number, handler in previous.items():
+            if handler is not None:  # None: set outside Python; leave it ignored.
+                signal.signal(number, handler)
     return receipt
 
 
 def uninstall(*, run=subprocess.run):
     """Remove the SSH entry point and socket; keep claims, receipts, and permits."""
-    for path in ("/etc/ssh/sshd_config.d/60-szl-cpu-ci.conf", "/etc/ssh/szl-ci/authorized_keys"):
-        Path(path).unlink(missing_ok=True)
+    for path in SSHD_FILES:
+        _remove(path)
     _checked(run, [SSHD, "-t"], "sshd -t")
-    active = run([SYSTEMCTL, "is-active", "ssh.service"], capture_output=True, timeout=15, check=False)
-    if active.stdout.strip() == b"active":
+    if _ssh_active(run):
         _checked(run, [SYSTEMCTL, "reload", "ssh.service"], "reload ssh")
     run([SYSTEMCTL, "disable", "--now", "szl-cpu-broker.socket"], capture_output=True,
         timeout=60, check=False)
@@ -393,8 +466,11 @@ def main(argv=None):
                 if not args.admin_user or not args.owner_window_ref:
                     raise ProvisionError("apply needs --admin-user and --owner-window-ref")
                 result = apply(options)
-    except (ProvisionError, OSError) as error:
-        print("PROVISION BLOCKED: " + str(error), file=sys.stderr)
+    except (ProvisionError, BrokerError, ContractError, subprocess.SubprocessError,
+            OSError) as error:
+        stage = "" if isinstance(error, ProvisionError) else "%s: %s: " % (
+            args.action, type(error).__name__)
+        print("PROVISION BLOCKED: " + stage + str(error), file=sys.stderr)
         return 1
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result.get("ready", True) else 1
