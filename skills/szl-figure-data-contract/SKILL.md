@@ -15,8 +15,12 @@ python -I -B scripts/run.py verify figure-bundle --root .
 
 The specification in `assets/spec.json` names a local UTF-8 CSV, distinct ID/x/y
 columns, axis units, scatter or line geometry, and count/minimum/maximum caption
-assertions. Decimal observations and extrema are strings. Line points retain CSV
-row order; no sorting, aggregation, interpolation or hidden filtering occurs.
+assertions. Decimal observations and extrema are strings, shown in fixed notation
+(10000, not 1E+4). An axis may name `relation_column` and `unit_column`; each row
+must then hold `=` and the axis unit. Censored or other-unit rows, and undeclared
+relation, qualifier or unit(s) columns, are `UNKNOWN`; units are never converted.
+Line points retain CSV row order; no sorting, aggregation, interpolation or hidden
+filtering occurs.
 The synthetic example uses `assets/data.csv`.
 
 Rendering refuses incorrect caption assertions before writing a bundle. Output
