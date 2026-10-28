@@ -26,12 +26,16 @@ if __package__ in (None, ""):
 
 from tools.ssh_ci_broker import (DEFAULT_CONFIG, Build, collect_outputs, load_config,
                                  parse_runner, stage_source)
-from tools.ssh_ci_contract import canonical
+from tools.ssh_ci_contract import ContractError, canonical, sha256
 from tools.ssh_ci_observer import observe
 from tools import ssh_ci_sandbox as sandbox
 
 
 QUALIFICATION_SCHEMA = "szl.ssh-cpu-build.qualification.v1"
+ACTIVATION_STATE_SCHEMA = "szl.ssh-cpu-build.activation-state.v1"
+RELEASE_ROOT = Path("/opt/szl-cpu-broker/releases")
+CURRENT_RELEASE = Path("/opt/szl-cpu-broker/current")
+MAX_ACTIVATION_STATE_BYTES = 16384
 DEADLINE_SECONDS = 5
 TMPFS_LIMIT = 536870912
 PROBE = r"""
@@ -121,6 +125,57 @@ elif mode == "deadline":
     r["sleeping"] = True; emit(); time.sleep(120)
 emit()
 """
+
+
+class QualificationError(ValueError):
+    """Qualification or read-only activation binding was not established."""
+
+
+def verify_release(config, expected_release, *, source_file=None, release_root=None,
+                   current_path=None):
+    """Bind this executable, the configured runner and current link to one release.
+
+    This checks installed paths and the strict configuration digest, not a
+    cryptographic attestation of installed file contents. Root ownership and
+    configuration authentication remain the provisioner/loader's boundaries.
+    """
+    if type(expected_release) is not str or re.fullmatch(r"[0-9a-f]{40}", expected_release) is None:
+        raise QualificationError("expected release must be a full lowercase commit")
+    try:
+        root = Path(release_root if release_root is not None else RELEASE_ROOT).resolve(strict=True)
+        release = root / expected_release
+        if release.is_symlink() or not release.is_dir():
+            raise QualificationError("expected release is not an immutable release directory")
+        source = Path(source_file if source_file is not None else __file__).resolve(strict=True)
+        if source != release / "tools" / "ssh_ci_qualify.py" or not source.is_file():
+            raise QualificationError("qualifier source is not the expected installed release")
+        current = Path(current_path if current_path is not None else CURRENT_RELEASE)
+        if current.resolve(strict=True) != release:
+            raise QualificationError("current installed release does not match expected release")
+        runner = Path(config["runner"]).resolve(strict=True)
+        if runner != release / "tools" / "ssh_ci_step_runner.py" or not runner.is_file():
+            raise QualificationError("configured runner is not the expected installed release")
+    except (OSError, KeyError, TypeError) as error:
+        raise QualificationError("installed release binding is unavailable") from error
+    return {"release_sha": expected_release, "config_sha256": sha256(canonical(config))}
+
+
+def activation_state(config_path, expected_release, *, loader=None, verifier=None,
+                     observer=None, clock=lambda: datetime.now(timezone.utc)):
+    """Read current release/configuration and workload state without probes or writes."""
+    loader = loader or load_config
+    verifier = verifier or verify_release
+    config = loader(config_path)
+    binding = verifier(config, expected_release)
+    observation = (observer() if observer is not None else
+                   observe(clock, nvidia_smi=config["nvidia_smi"]))
+    after = verifier(loader(config_path), expected_release)
+    if after != binding:
+        raise QualificationError("release or configuration changed during readiness read")
+    state = {"schema": ACTIVATION_STATE_SCHEMA, **binding, "observation": observation}
+    if len(canonical(state)) > MAX_ACTIVATION_STATE_BYTES:
+        raise QualificationError("activation state exceeds output bound")
+    return state
 
 
 def listening_ports(proc=Path("/proc")):
@@ -365,13 +420,43 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--rehearse-build", help="full commit to rehearse with the real runner")
-    parser.add_argument("--owner-window-ref", required=True)
+    parser.add_argument("--owner-window-ref")
+    parser.add_argument("--expected-release", help="full installed release commit to bind")
+    parser.add_argument("--readiness", action="store_true",
+                        help="read release/config/workload identity only; no probes or writes")
     args = parser.parse_args(argv)
     if args.rehearse_build and re.fullmatch(r"[0-9a-f]{40}", args.rehearse_build) is None:
         parser.error("--rehearse-build must be a full lowercase commit")
-    config = load_config(args.config)
-    receipt = qualify(config, rehearse_sha=args.rehearse_build,
-                      owner_window_ref=args.owner_window_ref)
+    if args.expected_release is not None and re.fullmatch(r"[0-9a-f]{40}", args.expected_release) is None:
+        parser.error("--expected-release must be a full lowercase commit")
+    if args.readiness and (not args.expected_release or args.rehearse_build):
+        parser.error("--readiness requires --expected-release and forbids --rehearse-build")
+    if not args.readiness and not args.owner_window_ref:
+        parser.error("qualification requires --owner-window-ref")
+    if args.expected_release and args.rehearse_build and args.expected_release != args.rehearse_build:
+        parser.error("rehearsal source must match --expected-release")
+    try:
+        if args.readiness:
+            print(canonical(activation_state(args.config, args.expected_release)).decode("utf-8"))
+            return 0
+        config = load_config(args.config)
+        binding = verify_release(config, args.expected_release) if args.expected_release is not None else None
+        receipt = qualify(config, rehearse_sha=args.rehearse_build,
+                          owner_window_ref=args.owner_window_ref)
+        if binding is not None:
+            receipt.update(binding)
+            try:
+                after = verify_release(load_config(args.config), args.expected_release)
+                if binding != after:
+                    raise QualificationError("release or configuration changed during qualification")
+            except (QualificationError, ContractError, OSError, ValueError) as error:
+                # Preserve the failed run's evidence rather than dropping its
+                # receipt after the controls have already executed.
+                receipt["failures"].append("activation binding: " + str(error))
+                receipt["result"] = "BLOCKED"
+    except (QualificationError, ContractError, OSError, ValueError) as error:
+        print("QUALIFICATION BLOCKED: " + str(error), file=sys.stderr)
+        return 1
     data = canonical(receipt) + b"\n"
     name = "qualification-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".json"
     path = Path("/var/lib/szl-cpu-broker/qualification") / name

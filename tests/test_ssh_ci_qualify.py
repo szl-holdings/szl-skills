@@ -1,11 +1,15 @@
 """Offline qualification tests: probe parsing and pass/fail evaluation only."""
 
 from datetime import datetime, timezone
+import contextlib
+import io
+import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from tools import ssh_ci_qualify as qualify
 
@@ -148,6 +152,165 @@ class QualifyFlowTests(unittest.TestCase):
         self.assertEqual(receipt["result"], "BLOCKED")
         self.assertEqual(receipt["failures"], ["model identity changed during qualification"])
         self.assertFalse(receipt["independent_witness"])
+
+
+class ReleaseBindingTests(unittest.TestCase):
+    sha = "a" * 40
+
+    def fixture(self, scratch, sha=None):
+        release = Path(scratch) / (sha or self.sha)
+        tools = release / "tools"
+        tools.mkdir(parents=True)
+        source = tools / "ssh_ci_qualify.py"
+        runner = tools / "ssh_ci_step_runner.py"
+        source.write_text("# Synthetic qualification fixture\n")
+        runner.write_text("# Synthetic runner fixture\n")
+        return release, source, {"runner": str(runner), "nvidia_smi": "/usr/bin/nvidia-smi"}
+
+    def test_binding_requires_exact_source_current_and_runner_release(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            release, source, config = self.fixture(scratch)
+            other, other_source, other_config = self.fixture(scratch, "b" * 40)
+            kwargs = {"source_file": source, "release_root": scratch, "current_path": release}
+            binding = qualify.verify_release(config, self.sha, **kwargs)
+            self.assertEqual(binding, {"release_sha": self.sha,
+                                      "config_sha256": qualify.sha256(qualify.canonical(config))})
+            cases = (
+                (config, dict(kwargs, source_file=other_source), "qualifier source"),
+                (config, dict(kwargs, current_path=other), "current installed release"),
+                (other_config, kwargs, "configured runner"),
+            )
+            for value, paths, reason in cases:
+                with self.subTest(reason=reason), self.assertRaisesRegex(qualify.QualificationError, reason):
+                    qualify.verify_release(value, self.sha, **paths)
+
+    def test_invalid_or_missing_release_refuses(self):
+        for sha in (None, "main", "A" * 40, "../" + "a" * 40):
+            with self.subTest(sha=sha), self.assertRaises(qualify.QualificationError):
+                qualify.verify_release({}, sha)
+        with tempfile.TemporaryDirectory() as scratch:
+            with self.assertRaisesRegex(qualify.QualificationError, "immutable release directory"):
+                qualify.verify_release({}, self.sha, release_root=scratch)
+
+    def test_readiness_is_bounded_and_refuses_configuration_change(self):
+        observation = {"schema": "szl.ssh-cpu-build.observation.v1",
+                       "observed_at": "2030-01-01T00:00:00Z",
+                       "host": {"hostname": "fixture", "boot_id": "90941c8a-32c2-45c3-a526-381429617329"},
+                       "gpu_compute_processes": [], "competing_cpu_jobs": 0}
+        with tempfile.TemporaryDirectory() as scratch:
+            release, source, config = self.fixture(scratch)
+
+            def verifier(value, expected):
+                return qualify.verify_release(value, expected, source_file=source,
+                                               release_root=scratch, current_path=release)
+
+            loader = mock.Mock(return_value=config)
+            observer = mock.Mock(return_value=observation)
+            with mock.patch.object(qualify, "qualify", side_effect=AssertionError("no probes")), \
+                    mock.patch("builtins.open", side_effect=AssertionError("no receipt writes")):
+                state = qualify.activation_state("fixture-config", self.sha, loader=loader,
+                                                  verifier=verifier, observer=observer)
+            self.assertEqual(state["schema"], qualify.ACTIVATION_STATE_SCHEMA)
+            self.assertEqual(state["release_sha"], self.sha)
+            self.assertEqual(state["observation"], observation)
+            self.assertEqual(loader.call_count, 2)
+            observer.assert_called_once_with()
+            changed = dict(config, nvidia_smi="/different/nvidia-smi")
+            with self.assertRaisesRegex(qualify.QualificationError, "configuration changed"):
+                qualify.activation_state("fixture-config", self.sha,
+                                         loader=mock.Mock(side_effect=[config, changed]),
+                                         verifier=verifier, observer=observer)
+            with self.assertRaisesRegex(qualify.QualificationError, "output bound"):
+                qualify.activation_state("fixture-config", self.sha, loader=loader,
+                                         verifier=verifier,
+                                         observer=lambda: {"large": "x" * qualify.MAX_ACTIVATION_STATE_BYTES})
+
+    def test_readiness_cli_never_qualifies_or_writes_a_receipt(self):
+        state = {"schema": qualify.ACTIVATION_STATE_SCHEMA, "release_sha": self.sha,
+                 "config_sha256": "b" * 64, "observation": {"fixture": True}}
+        output = io.StringIO()
+        with mock.patch.object(qualify, "activation_state", return_value=state) as read, \
+                mock.patch.object(qualify, "qualify", side_effect=AssertionError("no probes")), \
+                mock.patch("builtins.open", side_effect=AssertionError("no receipt writes")), \
+                contextlib.redirect_stdout(output):
+            self.assertEqual(qualify.main(["--readiness", "--expected-release", self.sha]), 0)
+        read.assert_called_once_with(qualify.DEFAULT_CONFIG, self.sha)
+        self.assertEqual(json.loads(output.getvalue()), state)
+
+    def test_readiness_cli_requires_release_and_refuses_rehearsal(self):
+        for argv in (["--readiness"],
+                     ["--expected-release", "", "--owner-window-ref", "fixture"],
+                     ["--readiness", "--expected-release", self.sha, "--rehearse-build", self.sha],
+                     ["--expected-release", self.sha, "--rehearse-build", "b" * 40,
+                      "--owner-window-ref", "fixture"]):
+            with self.subTest(argv=argv), self.assertRaises(SystemExit), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                qualify.main(argv)
+
+    def test_qualification_keeps_failed_receipt_on_post_run_configuration_change(self):
+        binding = {"release_sha": self.sha, "config_sha256": "b" * 64}
+        changed = dict(binding, config_sha256="c" * 64)
+        receipt = {"schema": qualify.QUALIFICATION_SCHEMA, "result": "QUALIFIED", "failures": []}
+        output = io.StringIO()
+        with mock.patch.object(qualify, "load_config", return_value={}), \
+                mock.patch.object(qualify, "verify_release", side_effect=[binding, changed]), \
+                mock.patch.object(qualify, "qualify", return_value=receipt) as run, \
+                mock.patch("builtins.open", mock.mock_open()) as opened, \
+                contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+            code = qualify.main(["--expected-release", self.sha, "--rehearse-build", self.sha,
+                                 "--owner-window-ref", "fixture-window"])
+        self.assertEqual(code, 1)
+        run.assert_called_once_with({}, rehearse_sha=self.sha, owner_window_ref="fixture-window")
+        actual = json.loads(output.getvalue())
+        self.assertEqual(actual["result"], "BLOCKED")
+        self.assertEqual(actual["release_sha"], self.sha)
+        self.assertEqual(actual["config_sha256"], binding["config_sha256"])
+        self.assertIn("configuration changed", actual["failures"][0])
+        opened().write.assert_called_once()
+
+    def test_qualification_binds_success_and_records_post_run_release_failure(self):
+        binding = {"release_sha": self.sha, "config_sha256": "b" * 64}
+        for after, expected_result in ((binding, "QUALIFIED"),
+                                       (qualify.QualificationError("current release drift"), "BLOCKED")):
+            receipt = {"schema": qualify.QUALIFICATION_SCHEMA, "result": "QUALIFIED", "failures": []}
+            output = io.StringIO()
+            with self.subTest(expected_result=expected_result), \
+                    mock.patch.object(qualify, "load_config", return_value={}), \
+                    mock.patch.object(qualify, "verify_release", side_effect=[binding, after]), \
+                    mock.patch.object(qualify, "qualify", return_value=receipt), \
+                    mock.patch("builtins.open", mock.mock_open()) as opened, \
+                    contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                code = qualify.main(["--expected-release", self.sha, "--rehearse-build", self.sha,
+                                     "--owner-window-ref", "fixture-window"])
+            self.assertEqual(code, 0 if expected_result == "QUALIFIED" else 1)
+            actual = json.loads(output.getvalue())
+            self.assertEqual(actual["result"], expected_result)
+            self.assertEqual(actual["release_sha"], self.sha)
+            self.assertEqual(actual["config_sha256"], binding["config_sha256"])
+            opened().write.assert_called_once()
+
+    @unittest.skipUnless(os.name == "posix", "symlink behavior exercised on hosted POSIX")
+    def test_current_symlink_resolves_but_release_alias_is_refused(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            release, source, config = self.fixture(scratch)
+            current = Path(scratch) / "current"
+            current.symlink_to(release, target_is_directory=True)
+            kwargs = {"source_file": source, "release_root": scratch, "current_path": current}
+            self.assertEqual(qualify.verify_release(config, self.sha, **kwargs)["release_sha"], self.sha)
+            alias = Path(scratch) / ("b" * 40)
+            alias.symlink_to(release, target_is_directory=True)
+            with self.assertRaisesRegex(qualify.QualificationError, "immutable release directory"):
+                qualify.verify_release(config, "b" * 40, **kwargs)
+
+    def test_release_mismatch_before_qualification_performs_no_probes_or_write(self):
+        with mock.patch.object(qualify, "load_config", return_value={}), \
+                mock.patch.object(qualify, "verify_release", side_effect=qualify.QualificationError("wrong release")), \
+                mock.patch.object(qualify, "qualify") as run, \
+                mock.patch("builtins.open", side_effect=AssertionError("no receipt writes")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            code = qualify.main(["--expected-release", self.sha, "--owner-window-ref", "fixture"])
+        self.assertEqual(code, 1)
+        run.assert_not_called()
 
 
 if __name__ == "__main__":
