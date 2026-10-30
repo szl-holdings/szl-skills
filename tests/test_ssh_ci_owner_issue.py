@@ -549,6 +549,89 @@ class IssueFlowTests(unittest.TestCase):
         self.assertEqual(record["unapproved_run"]["cancelled"], [777])
         self.assertEqual(self.approvals(), [])
 
+    def approval_response(self, argv):
+        return argv[1:4] == ["api", "-X", "POST"] and "state=approved" in argv
+
+    def test_lost_approval_response_is_not_withdrawn(self):
+        """A failed approval response must not cancel a run that may already be approved."""
+        cases = (
+            ("timeout", subprocess.TimeoutExpired(["gh"], 600)),
+            ("connection", ConnectionResetError("connection lost")),
+            ("os", OSError(5, "Input/output error")),
+        )
+        for name, error in cases:
+            with self.subTest(name=name):
+                self.setUp()
+                self.host.interrupt = lambda argv, error=error: (
+                    error if self.approval_response(argv) else None)
+                record, _owner = self.issue()
+                self.assertEqual(self.cancels(), [], record.get("failure"))
+                self.assertEqual(len(self.approvals()), 1)
+                self.assertIn("state=approved", self.approvals()[0])
+                self.assertEqual(record["run_id"], 777)
+                self.assertEqual(record["approval_outcome"], "UNKNOWN")
+                self.assertEqual(record["result"], "UNKNOWN")
+                self.assertFalse(record["retry"])
+                self.assertTrue(record["reconciliation_required"])
+                self.assertNotIn("unapproved_run", record)
+                self.assertIn("reconcile that run before retrying", record["failure"])
+                self.assertIn("777", record["failure"])
+
+    def test_interrupt_during_approval_response_is_unknown_and_not_withdrawn(self):
+        owner = self.owner()
+        self.host.interrupt = lambda argv: (
+            KeyboardInterrupt() if self.approval_response(argv) else None)
+        record = owner_issue.new_record()
+        with self.assertRaises(KeyboardInterrupt):
+            owner_issue.issue(self.args, record, owner=owner)
+        self.assertEqual(self.cancels(), [])
+        self.assertEqual(record["run_id"], 777)
+        self.assertEqual(record["approval_outcome"], "UNKNOWN")
+        self.assertEqual(record["result"], "UNKNOWN")
+        self.assertFalse(record["retry"])
+        self.assertTrue(record["reconciliation_required"])
+        self.assertNotIn("unapproved_run", record)
+
+    def test_interrupt_after_approval_acceptance_does_not_cancel(self):
+        owner = self.owner()
+        record = owner_issue.new_record()
+
+        original = owner_issue.commit_approval
+
+        def commit(value):
+            original(value)
+            raise KeyboardInterrupt
+
+        with unittest.mock.patch.object(owner_issue, "commit_approval", commit):
+            with self.assertRaises(KeyboardInterrupt):
+                owner_issue.issue(self.args, record, owner=owner)
+        self.assertEqual(self.cancels(), [])
+        self.assertEqual(len(self.approvals()), 1)
+        self.assertEqual(record["run_id"], 777)
+        self.assertEqual(record["approval_outcome"], "ACCEPTED")
+        self.assertIn("approved", record["stages"])
+        self.assertFalse(record["retry"])
+        self.assertFalse(record["reconciliation_required"])
+        self.assertNotIn("unapproved_run", record)
+
+    def test_collection_failure_after_approval_does_not_cancel(self):
+        for name, error in (
+                ("timeout", subprocess.TimeoutExpired(["gh"], 600)),
+                ("os", OSError(5, "Input/output error"))):
+            with self.subTest(name=name):
+                self.setUp()
+                self.host.interrupt = lambda argv, error=error: (
+                    error if argv[1:3] == ["run", "download"] else None)
+                owner = self.owner()
+                record = owner_issue.new_record()
+                with self.assertRaises((owner_issue.IssueError, OSError)):
+                    owner_issue.issue(self.args, record, owner=owner)
+                self.assertEqual(self.cancels(), [])
+                self.assertIn("approved", record["stages"])
+                self.assertEqual(record["approval_outcome"], "ACCEPTED")
+                self.assertEqual(record["run_id"], 777)
+                self.assertNotIn("unapproved_run", record)
+
     def test_run_that_cannot_be_found_is_named_with_how_to_find_and_cancel_it(self):
         self.host.run_ids = []
         record, _owner = self.issue()
