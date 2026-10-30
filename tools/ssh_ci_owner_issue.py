@@ -11,7 +11,11 @@ them through the VM's root verifier, and approves only that run. It never
 retries, never reuses a permit, and never touches the GPU or the model. It
 checks the owner config, the protected branch, other unfinished runs, and
 non-interactive VM access before dispatch, and cancels its own run if it stops
-before approval.
+before approval is attempted. A lost or failed approval response does not
+withdraw that run: the run id is kept, the outcome is UNKNOWN, and another
+attempt has to wait until that run is reconciled. An interruption after an
+observed approval does not withdraw it either. This does not provide crash
+durability or a cross-session lock.
 
 ``observe`` and ``install-permit`` are the VM-side halves of this flow.
 """
@@ -412,7 +416,34 @@ def verify_outcome(request, raw, public, permit=None):
 def new_record():
     return {"schema": "szl.ssh-cpu-build.owner-issue.v1", "evidence_class": "MEASURED",
             "result": "BLOCKED", "stages": [], "failure": None, "run_id": None,
-            "permit_id": None, "signed_bundle_sha256": None, "retry": False}
+            "permit_id": None, "signed_bundle_sha256": None, "retry": False,
+            "approval_outcome": None, "reconciliation_required": False}
+
+
+def commit_approval(record):
+    """Record an approval response this process observed. Does not call GitHub."""
+    record["approval_outcome"] = "ACCEPTED"
+    record["reconciliation_required"] = False
+    record["stages"].append("approved")
+
+
+def uncertain_approval(record, run_id, error):
+    """The approval response was lost or failed. The run may already be approved.
+
+    Does not withdraw or retry. The run id stays on the record so a person can
+    reconcile that run before another attempt. This memory dies with the process.
+    """
+    record["run_id"] = run_id
+    record["approval_outcome"] = "UNKNOWN"
+    record["result"] = "UNKNOWN"
+    record["retry"] = False
+    record["reconciliation_required"] = True
+    detail = ("approval outcome UNKNOWN for run %s; reconcile that run before retrying"
+              % run_id)
+    if not isinstance(error, Exception):
+        print("CPU BUILD STOPPED: " + detail, file=sys.stderr)
+        raise
+    raise IssueError("%s: %s; %s" % (type(error).__name__, error, detail)) from error
 
 
 def issue(args, record, owner=None, new_uuid=uuid.uuid4):
@@ -426,8 +457,11 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
     permit_id = str(new_uuid())
     record["permit_id"] = permit_id
     environment_id = None
-    # From dispatch until approval, any stop (Ctrl+C included) cancels the run,
+    approval_attempted = False
+    approval_accepted = False
+    # Until approval is attempted, any stop (Ctrl+C included) withdraws the run,
     # which would otherwise wait at the gate and hold the concurrency group.
+    # Once approval is attempted, a lost response must not withdraw it.
     try:
         run_id = owner.dispatch(permit_id)
         record["run_id"] = run_id
@@ -451,8 +485,23 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
         record["stages"].append("permit-installed")
         if owner.clock() - observed_at > MAX_APPROVAL_DELAY_SECONDS:
             raise IssueError("too little window remains; not approving (permit stays unused)")
+        approval_attempted = True
         owner.approve(run_id, environment_id, permit_id, digest)
+        approval_accepted = True
+        commit_approval(record)
     except BaseException as error:
+        if approval_accepted:
+            record["run_id"] = run_id
+            record["approval_outcome"] = "ACCEPTED"
+            record["retry"] = False
+            record["reconciliation_required"] = False
+            if not isinstance(error, Exception):
+                print("CPU BUILD STOPPED: run %s approval was accepted; not withdrawing"
+                      % run_id, file=sys.stderr)
+                raise
+            raise IssueError("%s: %s" % (type(error).__name__, error)) from error
+        if approval_attempted:
+            uncertain_approval(record, run_id, error)
         withdrawn = owner.withdraw(permit_id, record.get("run_id"), environment_id)
         record["unapproved_run"] = withdrawn
         if withdrawn["by_hand"] is None:
@@ -462,7 +511,6 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
             raise
         raise IssueError("%s: %s; %s" % (type(error).__name__, error, withdrawn["by_hand"])) \
             from error
-    record["stages"].append("approved")
     out = Path(args.evidence_dir) / ("run-%d" % run_id)
     out.mkdir(parents=True, exist_ok=False)
     raw = owner.collect(run_id, out)
