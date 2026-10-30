@@ -47,8 +47,27 @@ class PropertyTests(unittest.TestCase):
         # Hiding a directory that holds mount sources would break namespace setup.
         for source_parent in ("/run", "/run/systemd", "/run/szl-cpu-build"):
             self.assertNotIn("InaccessiblePaths=-" + source_parent, values)
-        self.assertIn("SystemCallFilter=~@privileged @resources @keyring io_uring_setup "
-                      "io_uring_enter io_uring_register", values)
+        deny = values.index("SystemCallFilter=~@privileged @resources @keyring io_uring_setup "
+                            "io_uring_enter io_uring_register")
+        # clone3 must fail with ENOSYS (glibc then falls back to clone), not EPERM.
+        self.assertEqual(values[deny + 1], "SystemCallFilter=~clone3:ENOSYS")
+        self.assertIn("SystemCallErrorNumber=EPERM", values)
+        self.assertIn("OOMScoreAdjust=1000", values)
+        self.assertEqual(sandbox.EXPECTED_PROPERTIES["OOMScoreAdjust"], "1000")
+
+    def test_unit_mount_points_are_never_hidden_and_never_covered(self):
+        covered = ["/src", "/src/", "/out/x", "/tmp", "/var/tmp/a", "/dev/shm", "/./out", "//src"]
+        values = properties(hidden_paths=[*covered, "/opt/models"])
+        self.assertIn("InaccessiblePaths=-/opt/models", values)
+        for path in covered:
+            with self.subTest(path=path):
+                self.assertNotIn("InaccessiblePaths=-" + path, values)
+        self.assertEqual(len([value for value in values if value.startswith("InaccessiblePaths=")]),
+                         len(sandbox.HIDDEN_ALWAYS) + 1)
+        # Hiding an ancestor would mask the unit's own bind or tmpfs: refuse.
+        for ancestor in ("/", "/var", "/var/", "/dev", "//dev", "/./var"):
+            with self.subTest(ancestor=ancestor), self.assertRaises(sandbox.SandboxError):
+                properties(hidden_paths=[ancestor])
 
     def test_privileged_users_bad_paths_and_longer_runtime_are_rejected(self):
         for overrides in ({"user": "root"}, {"user": "ubuntu"}, {"user": "Bad"},
@@ -88,9 +107,17 @@ class ReadbackTests(unittest.TestCase):
         self.proc = self.cgroup / "proc"
         self.write_process()
         self.shown = dict(sandbox.EXPECTED_PROPERTIES, ControlGroup="/system.slice/" + UNIT,
-                          User="szl-build", RuntimeMaxUSec="7min")
+                          User="szl-build", RuntimeMaxUSec="7min", ActiveState="active",
+                          SubState="running", MainPID="4242")
+        self.now = 0.0
 
-    def write_process(self, seccomp="2", caps=sandbox.ZERO_CAPS, shared=()):
+    def clock(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+    def write_process(self, seccomp="2", caps=sandbox.ZERO_CAPS, shared=(), oom="1000"):
         if os.name != "posix":
             patcher = unittest.mock.patch.object(sandbox, "process_readback",
                                         return_value={"failures": []})
@@ -106,15 +133,19 @@ class ReadbackTests(unittest.TestCase):
         (self.proc / "4242" / "status").write_text(
             "Name:\tpython3\nSeccomp:\t%s\nNoNewPrivs:\t1\nCapEff:\t%s\nCapPrm:\t%s\n"
             "CapBnd:\t%s\nCapAmb:\t%s\n" % (seccomp, caps, caps, caps, caps))
+        (self.proc / "4242" / "oom_score_adj").write_text(oom + "\n")
 
     def fake_run(self, argv, **_kwargs):
         self.assertEqual(argv[:3], [sandbox.SYSTEMCTL, "show", UNIT])
+        for key in sandbox.UNIT_STATE:
+            self.assertIn(key, argv[-1].split("=", 1)[1].split(","))
         text = "".join("%s=%s\n" % item for item in self.shown.items())
         return subprocess.CompletedProcess(argv, 0, text.encode("ascii"), b"")
 
-    def readback(self):
-        return sandbox.readback(UNIT, "szl-build", run=self.fake_run, cgroup_root=self.cgroup,
-                                proc_root=self.proc)
+    def readback(self, run=None):
+        return sandbox.readback(UNIT, "szl-build", run=run or self.fake_run,
+                                cgroup_root=self.cgroup, proc_root=self.proc,
+                                clock=self.clock, sleep=self.sleep)
 
     def test_exact_kernel_and_systemd_values_verify(self):
         value = self.readback()
@@ -141,12 +172,81 @@ class ReadbackTests(unittest.TestCase):
         self.assertEqual(value["process"]["separate_namespaces"], sorted(sandbox.NAMESPACES))
         for kwargs, expected in (({"seccomp": "0"}, "seccomp"),
                                  ({"caps": "000001ffffffffff"}, "capabilities"),
-                                 ({"shared": ("net",)}, "host namespace")):
+                                 ({"shared": ("net",)}, "host namespace"),
+                                 ({"oom": "0"}, "oom_score_adj")):
             with self.subTest(kwargs=kwargs):
                 self.write_process(**kwargs)
+                self.now = 0.0
                 result = self.readback()
                 self.assertIs(result["verified"], False)
                 self.assertTrue(any(expected in item for item in result["mismatched"]))
+                # Retried until the deadline, never accepted on a partial view.
+                self.assertGreaterEqual(self.now, sandbox.READBACK_SECONDS)
+
+    def test_process_is_read_only_after_execve_and_retried_until_it_holds(self):
+        states = iter([("activating", "start", "0"), ("activating", "start", "4242"),
+                       ("active", "running", "4242"), ("active", "running", "4242"),
+                       ("active", "running", "4242")])
+        shows = []
+
+        def run(argv, **kwargs):
+            self.shown["ActiveState"], self.shown["SubState"], self.shown["MainPID"] = next(states)
+            shows.append(self.shown["ActiveState"])
+            return self.fake_run(argv, **kwargs)
+        # Nothing is read while activating; a failed read or a failing view is retried.
+        reads = [OSError("gone"), {"failures": ["seccomp filter not active"]}, {"failures": []}]
+        with unittest.mock.patch.object(sandbox, "process_readback", side_effect=reads) as check:
+            value = self.readback(run)
+        self.assertIs(value["verified"], True)
+        self.assertEqual(value["mismatched"], [])
+        self.assertEqual(shows, ["activating", "activating", "active", "active", "active"])
+        self.assertEqual(check.call_args_list, [unittest.mock.call(4242, self.proc)] * 3)
+        self.assertEqual(value["unit_state"], {"ActiveState": "active", "MainPID": "4242",
+                                               "SubState": "running"})
+
+    def test_unit_never_running_is_a_mismatch_without_reading_the_process(self):
+        self.shown.update(ActiveState="activating", SubState="start")
+        with unittest.mock.patch.object(sandbox, "process_readback",
+                                        return_value={"failures": []}) as check:
+            value = self.readback()
+        self.assertIs(value["verified"], False)
+        self.assertEqual(value["failure"], "READBACK_MISMATCH")
+        self.assertIn("unit not active before deadline", value["mismatched"])
+        self.assertIsNone(value["process"])
+        self.assertEqual(value["unit_state"]["ActiveState"], "activating")
+        self.assertGreaterEqual(self.now, sandbox.READBACK_SECONDS)
+        check.assert_not_called()
+
+    def test_main_pid_outside_the_unit_cgroup_never_gets_go(self):
+        commands = []
+
+        def run(argv, **kwargs):
+            commands.append(argv)
+            if argv[1:2] == ["show"]:
+                return self.fake_run(argv, **kwargs)
+            output = b"inactive\n" if argv[1:2] == ["is-active"] else b""
+            return subprocess.CompletedProcess(argv, 3 if output else 0, output, b"")
+
+        def readback(unit, user, **kwargs):
+            return sandbox.readback(unit, user, proc_root=self.proc, clock=self.clock,
+                                    sleep=self.sleep, **kwargs)
+        for main_pid in ("999", "0", "-4242", "4242x"):
+            with self.subTest(main_pid=main_pid):
+                self.shown["MainPID"], self.now = main_pid, 0.0
+                with unittest.mock.patch.object(sandbox, "process_readback",
+                                                return_value={"failures": []}) as check:
+                    outcome = sandbox.run_unit(
+                        REQUEST_ID, ["unused"], "szl-build", run=run, cgroup_root=self.cgroup,
+                        popen=lambda _argv, **kwargs: subprocess.Popen(
+                            [sys.executable, "-c", CHILD], **kwargs),
+                        readback_fn=readback)
+                self.assertFalse(outcome["go_sent"])
+                self.assertEqual(outcome["runner_stdout"].strip(), b"EOF")
+                self.assertIn("main process not running in unit cgroup",
+                              outcome["readback"]["mismatched"])
+                check.assert_not_called()
+        self.assertIn([sandbox.SYSTEMCTL, "kill", "--kill-who=all", "--signal=SIGKILL", UNIT],
+                      commands)
 
     def test_missing_cgroup_is_unavailable(self):
         ticks = iter(range(1000))
@@ -234,6 +334,56 @@ class HostScanTests(unittest.TestCase):
                     server.close()
         self.assertEqual(problems, [])
         self.assertEqual(hidden, ["/data", "/opt/vllm", "/run/snapd.socket", "/var/lib"])
+
+    def test_unit_mount_points_left_on_the_host_root_stay_visible(self):
+        # systemd 249 creates missing bind destinations on the host root and never
+        # removes them; hiding them would mask the next unit's /src and /out binds.
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            for directory in ("usr", "etc", "var/tmp", "run", "cdrom", "persistent", "src", "out"):
+                (root / directory).mkdir(parents=True)
+            hidden, problems = sandbox.host_hidden_paths(root)
+        self.assertEqual(problems, [])
+        self.assertEqual(hidden, ["/cdrom", "/persistent"])
+        values = properties(hidden_paths=hidden)
+        self.assertIn("InaccessiblePaths=-/cdrom", values)
+        for mount in ("/src", "/out"):
+            self.assertNotIn("InaccessiblePaths=-" + mount, values)
+        self.assertIn("BindReadOnlyPaths=/run/szl-cpu-build/x/src:/src", values)
+        self.assertIn("BindPaths=/run/szl-cpu-build/x/out:/out", values)
+
+    def test_run_scan_counts_only_directories_and_sockets(self):
+        import socket
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            for directory in ("run/udev/data", "run/containerd/io", "run/dbus", "run/lock"):
+                (root / directory).mkdir(parents=True)
+            # More regular files than the limit: the old scan refused this host.
+            for index in range(sandbox.SCAN_LIMIT + 1):
+                (root / "run" / "udev" / "data" / ("c%d" % index)).touch()
+            for index in range(8):
+                (root / "run" / "containerd" / "io" / ("task%d" % index)).mkdir()
+            sockets = []
+            for path in ("run/containerd/containerd.sock", "run/dbus/system_bus_socket",
+                         "run/snapd.socket"):
+                server = socket.socket(socket.AF_UNIX)
+                server.bind(str(root / path))
+                sockets.append(server)
+            try:
+                hidden, problems = sandbox.host_hidden_paths(root)
+                # Counted: run/{containerd,dbus,lock,snapd.socket,udev,udev/data}. The
+                # hidden-as-a-whole containerd and dbus trees would add 11 if walked.
+                with unittest.mock.patch.object(sandbox, "SCAN_LIMIT", 6):
+                    limited = sandbox.host_hidden_paths(root)
+                    (root / "run" / "lock" / "extra").mkdir()
+                    overflow = sandbox.host_hidden_paths(root)
+            finally:
+                for server in sockets:
+                    server.close()
+        self.assertEqual((hidden, problems), (["/run/snapd.socket"], []))
+        self.assertEqual(limited, (["/run/snapd.socket"], []))
+        # Directories still count, so a real overflow still refuses.
+        self.assertEqual(overflow[1], ["socket scan limit reached under /run"])
 
     def test_unsafe_names_are_problems_not_silently_visible(self):
         with tempfile.TemporaryDirectory() as scratch:

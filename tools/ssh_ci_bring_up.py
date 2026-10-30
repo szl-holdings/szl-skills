@@ -5,11 +5,15 @@ Run on the workstation that holds the verified admin SSH key and host-key pin.
 Stages run in order; each one that changes something asks first:
 
   keys       create the dedicated CI key and a separate permit-signing key (local)
-  provision  fetch the merged commit on the VM, print the plan, apply on "APPLY"
+  provision  after STAGE, prove a BatchMode login, stage into a new private
+             /tmp directory that is never deleted or reused, plan, apply on
+             APPLY, then retest a fresh admin login
   qualify    sandbox negative controls plus a real build rehearsal on the VM
-  github     protected environment, secret, variables; SZL_CPU_CI_ENABLED last
+  github     fresh qualification, host-key pin and protected main before any
+             GitHub write; secret and variables; SZL_CPU_CI_ENABLED last
   run        one owner-issued build (tools/ssh_ci_owner_issue.py) and its verdict
 
+Stages that use unattended (BatchMode) ssh first prove one such login works.
 Nothing here touches the model process or the GPU. ``--dry-run`` prints every
 command instead of running it. Requires ssh, ssh-keygen, git, and gh.
 """
@@ -39,6 +43,7 @@ QUALIFICATION_MAX_AGE_SECONDS = 900
 QUALIFICATION_SCHEMA = "szl.ssh-cpu-build.qualification.v1"
 ACTIVATION_SCHEMA = "szl.ssh-cpu-build.activation-state.v1"
 CONTROLS = {"isolation", "tasks", "memory", "tmpfs", "deadline"}
+UNINSTALL = "sudo python3 -I -B /opt/szl-cpu-broker/current/tools/ssh_ci_provision.py uninstall"
 
 
 class Stop(RuntimeError):
@@ -158,9 +163,28 @@ class Lane:
         return self.run(["ssh", *self.ssh_options(), *flag, self.args.vm, command], check=check,
                         stdin=stdin, capture=capture, timeout=timeout)
 
+    def login(self):
+        """One fresh BatchMode admin login (no reused connection), as unattended calls make."""
+        return self.run(["ssh", *self.ssh_options(), "-T", "-o", "BatchMode=yes",
+                         "-o", "ControlPath=none", self.args.vm, "true"], check=False)
+
+    def require_login(self):
+        if self.login().returncode != 0:
+            raise Stop("a BatchMode admin login to %s failed; load the admin key with ssh-add "
+                       "(Windows: start the ssh-agent service), then rerun" % self.args.vm)
+
+    def gh_json(self, argv):
+        output = self.run(["gh", *argv], capture=True).stdout
+        if self.args.dry_run:
+            return None
+        try:
+            return json.loads(output.decode("utf-8"))
+        except ValueError as error:
+            raise Stop("gh %s returned non-JSON output" % " ".join(argv)) from error
+
     def confirm(self, question, word):
         if self.args.dry_run:
-            print("SIMULATED (would ask): " + question)
+            print("SIMULATED (would ask for %s): %s" % (word, question))
             return True
         return input(question + " Type %s to continue: " % word).strip() == word
 
@@ -194,7 +218,8 @@ class Lane:
             hidden += ["--hidden-path", path]
         if not self.confirm("Stage public keys and exact source in a NEW private VM directory "
                             "(retained, never deleted automatically)?", "STAGE"):
-            raise Stop("provisioning not staged")
+            raise Stop("provisioning not staged; nothing was written to the VM")
+        self.require_login()
         # No existing directory is reused, overwritten or removed, even on failure.
         staged = self.remote("umask 077; mktemp -d /tmp/szl-cpu-bringup-XXXXXXXXXX", capture=True)
         directory = ("/tmp/szl-cpu-bringup-SIMULATED" if self.args.dry_run else
@@ -202,11 +227,26 @@ class Lane:
         if re.fullmatch(r"/tmp/szl-cpu-bringup-[A-Za-z0-9]{8,32}", directory) is None:
             raise Stop("unexpected staging path; no further writes attempted")
         self.report("staging", "retained directory " + directory)
-        # Public halves only, over plain ssh stdin (no scp/SFTP subsystem needed).
+        keys = []
         for key, name in ((self.ci_key, "szl-cpu-ci.pub"), (self.owner_key, "szl-owner-permit.pub")):
-            data = b"" if self.args.dry_run else Path(str(key) + ".pub").read_bytes()
-            self.remote("umask 077; set -C; cat > %s/%s" % (directory, name), stdin=data)
+            if self.args.dry_run:
+                keys.append((name, b"", "(dry run: %s)" % name))
+                continue
+            data = Path(str(key) + ".pub").read_bytes()
+            text = data.decode("ascii").strip()
+            if "\n" in text or not text.isprintable() or not text:
+                raise Stop("%s.pub is not one public key line" % key)
+            keys.append((name, data, text))
+        print("Staging writes only under %s on %s (a new directory; an existing directory is "
+              "never deleted or reused):" % (directory, self.args.vm))
+        for name, _, text in keys:
+            print("  %s/%s: %s" % (directory, name, text))
         source = directory + "/src"
+        print("  %s: fresh fetch of https://github.com/%s %s" % (source, REPO, self.sha))
+        # Public halves only, over plain ssh stdin (no scp/SFTP subsystem needed).
+        # set -C refuses to overwrite a file that is already there.
+        for name, data, _ in keys:
+            self.remote("umask 077; set -C; cat > %s/%s" % (directory, name), stdin=data)
         self.remote(" && ".join([
             "git init -q " + source,
             "git -C %s fetch -q --depth=1 --no-tags https://github.com/%s %s" % (source, REPO, self.sha),
@@ -218,12 +258,24 @@ class Lane:
                                             " ".join(shlex.quote(part) for part in hidden)))
         plan = self.remote(base.format(action="plan"), tty=True, check=False)
         if plan.returncode != 0:
-            raise Stop("the provisioning plan is not ready; read its failures above")
+            raise Stop("the provisioning plan is not ready; read its failures above; "
+                       "retained directory %s was not deleted" % directory)
+        print("Keep a second admin SSH session (or the provider's web terminal) open until "
+              "provision ends; if a fresh admin login then fails, run there: " + UNINSTALL)
         if not self.confirm("The plan above is ready. Apply it to the VM now?", "APPLY"):
-            raise Stop("provisioning not applied")
-        self.remote(base.format(action="apply") + " --owner-window-ref "
-                    + shlex.quote(self.args.window_ref), tty=True, timeout=300)
-        self.report("provision", "applied; broker socket enabled for szl-ci")
+            raise Stop("provisioning not applied; retained directory %s was not deleted" % directory)
+        applied = self.remote(base.format(action="apply") + " --owner-window-ref "
+                              + shlex.quote(self.args.window_ref), tty=True, check=False,
+                              timeout=300)
+        if self.login().returncode != 0:
+            raise Stop("a fresh admin login to %s fails after apply; from your second admin session "
+                       "or the provider's web terminal run: %s; retained directory %s was not deleted"
+                       % (self.args.vm, UNINSTALL, directory))
+        if applied.returncode != 0:
+            raise Stop("provisioning apply failed; read its output above; "
+                       "retained directory %s was not deleted" % directory)
+        self.report("provision",
+                    "applied; broker socket enabled for szl-ci; a fresh admin login works")
 
     def qualify(self):
         self.qualification = None
@@ -260,15 +312,11 @@ class Lane:
                                self.args.window_ref, self.clock())
 
     def github(self):
+        # Every check before the first GitHub write, so a refusal changes nothing.
         self.require_qualification()
         if not self.confirm("Configure the protected GitHub environment and dedicated CI credential?",
                             "CONFIGURE"):
             raise Stop("GitHub configuration not changed")
-        user = json.loads(self.run(["gh", "api", "user"], capture=True).stdout or b'{"id": 0}')
-        environment = {"reviewers": [{"type": "User", "id": user["id"]}],
-                       "prevent_self_review": False,
-                       "deployment_branch_policy": {"protected_branches": True,
-                                                    "custom_branch_policies": False}}
         pattern = self.host if self.args.port == 22 else "[%s]:%d" % (self.host, self.args.port)
         found = self.run(["ssh-keygen", "-F", pattern, "-f", self.args.known_hosts],
                          capture=True, check=False).stdout or b""
@@ -277,11 +325,20 @@ class Lane:
         if not pins and not self.args.dry_run:
             raise Stop("no verified host-key pin for %s in %s" % (pattern, self.args.known_hosts))
         self.require_protected_main()
+        user = self.gh_json(["api", "user"])
+        if self.args.dry_run:
+            user = {"id": 0}
+        elif type(user) is not dict or type(user.get("id")) is not int or user["id"] <= 0:
+            raise Stop("gh api user did not name a numeric user id")
+        environment = {"reviewers": [{"type": "User", "id": user["id"]}],
+                       "prevent_self_review": False,
+                       "deployment_branch_policy": {"protected_branches": True,
+                                                    "custom_branch_policies": False}}
         if not self.args.dry_run:
             secret = self.ci_key.read_bytes()
         else:
             secret = b""
-        # Configuration writes start only after qualification, consent and pin checks.
+        # Configuration writes start only after qualification, consent, pin and protected main.
         self.require_qualification()
         self.run(["gh", "api", "-X", "PUT", "repos/%s/environments/%s" % (REPO, ENVIRONMENT),
                   "--input", "-"], stdin=json.dumps(environment).encode(), capture=True)
@@ -301,20 +358,17 @@ class Lane:
 
     def require_protected_main(self):
         """protected_branches=true binds deploys to main only while main itself is protected."""
+        branch = self.gh_json(["api", "repos/%s/branches/main" % REPO])
         if self.args.dry_run:
             self.report("github", "would require protected main before any GitHub write")
             return
-        branch = json.loads(self.run(
-            ["gh", "api", "repos/%s/branches/main" % REPO], capture=True).stdout or b"{}")
         if type(branch) is dict and branch.get("protected") is True:
             return
-        rules = json.loads(self.run(
-            ["gh", "api", "repos/%s/rules/branches/main" % REPO], capture=True).stdout or b"[]")
-        if type(rules) is list and rules and all(
-                type(rule) is dict and rule.get("type") for rule in rules):
-            return
-        raise Stop("main has no branch protection rule or active ruleset; protected-branch "
-                   "deployment would not restrict this environment to main")
+        rules = self.gh_json(["api", "repos/%s/rules/branches/main" % REPO])
+        if type(rules) is not list or not rules \
+                or not all(type(rule) is dict and rule.get("type") for rule in rules):
+            raise Stop("main has no branch protection rule or active ruleset; protected-branch "
+                       "deployment would not restrict this environment to main")
 
     def build(self):
         if not self.confirm("Prepare owner attestations and issue one signed CPU build?", "RUN"):
@@ -323,15 +377,19 @@ class Lane:
         if not config.exists() and self.args.dry_run:
             print("(dry run: would write an owner-config template at %s)" % config)
         elif not config.exists():
+            # Every attestation is a FILL placeholder, which the owner-config loader refuses.
             config.write_text(json.dumps({
                 "schema": "szl.ssh-cpu-build.owner-config.v1",
-                "provider_instance_uuid": "bd6e0a2e-c7d1-4423-bfc2-99b575c6a233",
+                "provider_instance_uuid": "FILL: Massed Compute instance UUID from the provider console",
                 "hf_revision": "FILL: admitted Hugging Face revision",
                 "budget": {"ledger_ref": "FILL: your budget ledger reference",
-                           "remaining_seconds": 0, "remaining_usd": 0},
+                           "remaining_seconds": "FILL: remaining budget seconds, an integer",
+                           "remaining_usd": "FILL: remaining budget USD, a number"},
                 "checkpoint_manifest_sha256": "FILL: 64 lowercase hex characters",
                 "owner_receipt_ref": "FILL: your approval reference"}, indent=2) + "\n")
-            raise Stop("wrote %s; fill in your own attestations, then rerun --stages run" % config)
+            raise Stop("wrote %s; replace every FILL value with your own attestation (numbers "
+                       "unquoted), then rerun --stages run" % config)
+        self.require_login()
         source = self.work / "src"
         if not (source / ".git").exists():
             self.run(["git", "init", "-q", source])
@@ -343,7 +401,7 @@ class Lane:
                    "--owner-config", config, "--source-sha", self.sha, "--signing-key",
                    self.owner_key,
                    "--admin-target", self.args.vm, "--admin-known-hosts", self.args.known_hosts,
-                   "--evidence-dir", self.work / "evidence"]
+                   "--port", str(self.args.port), "--evidence-dir", self.work / "evidence"]
         if self.args.admin_key:
             command += ["--admin-key", self.args.admin_key]
         # Owner issuance already bounds approval, signing, SSH and collection.
@@ -387,6 +445,8 @@ def main(argv=None):
         parser.error("--vm must be a plain user@host")
     if re.fullmatch(r"[0-9a-f]{40}", args.release_sha) is None:
         parser.error("--release-sha must be a full lowercase commit")
+    if not 1 <= args.port <= 65535:
+        parser.error("--port must be 1-65535")
     lane = Lane(args)
     handlers = {"keys": lane.keys, "provision": lane.provision, "qualify": lane.qualify,
                 "github": lane.github, "run": lane.build}

@@ -42,10 +42,14 @@ HIDDEN_ALWAYS = (
     "/etc/cloud", "/usr/local", "/var/lib", "/var/log", "/var/cache", "/var/spool",
     "/var/mail", "/var/backups", "/var/opt", "/var/www", "/var/snap", "/var/crash",
 )
-# Top-level names an OS needs; every other top-level entry is hidden per run.
+# Top-level names an OS needs, plus the unit's own /src and /out (systemd 249
+# leaves those mount points on the host root); every other entry is hidden per run.
 TOP_LEVEL_VISIBLE = frozenset({"bin", "dev", "etc", "home", "lib", "lib32", "lib64", "libx32",
-                               "opt", "proc", "root", "run", "sbin", "sys", "tmp", "usr", "var"})
+                               "opt", "out", "proc", "root", "run", "sbin", "src", "sys", "tmp",
+                               "usr", "var"})
 VAR_VISIBLE = frozenset({"tmp"})
+# The unit's own mounts cover whatever the host has at these paths.
+UNIT_MOUNTS = ("/src", "/out", "/tmp", "/var/tmp", "/dev/shm")
 SCAN_LIMIT = 4096
 SCAN_SKIP = ("/run/systemd/inaccessible", "/run/szl-cpu-build", "/run/user")
 SHM_OPTIONS = "mode=1777,size=67108864,nosuid,nodev,noexec"
@@ -70,6 +74,7 @@ EXPECTED_PROPERTIES = {
     "ProtectProc": "invisible",
     "NoNewPrivileges": "yes",
     "KillMode": "control-group",
+    "OOMScoreAdjust": "1000",
     "CapabilityBoundingSet": "",
     "AmbientCapabilities": "",
 }
@@ -134,15 +139,13 @@ def host_hidden_paths(root=Path("/"), keep_opt=("szl-cpu-broker",)):
         for entry in entries(root / parent):
             if not entry.is_symlink() and entry.name not in keep:
                 add(entry)
+    # Only directories and sockets count toward the limit; a directory hidden as a
+    # whole is not walked.
     visited = 0
     stack = [root / "run"]
     while stack:
         directory = stack.pop()
         for entry in entries(directory):
-            visited += 1
-            if visited > SCAN_LIMIT:
-                problems.append("socket scan limit reached under /run")
-                return sorted(hidden), problems
             relative = "/" + str(entry.relative_to(root)).replace("\\", "/")
             if any(relative == skip or relative.startswith(skip + "/") for skip in SCAN_SKIP):
                 continue
@@ -150,9 +153,15 @@ def host_hidden_paths(root=Path("/"), keep_opt=("szl-cpu-broker",)):
                 mode = entry.lstat().st_mode
             except OSError:
                 continue
+            if not (stat.S_ISSOCK(mode) or stat.S_ISDIR(mode)):
+                continue
+            visited += 1
+            if visited > SCAN_LIMIT:
+                problems.append("socket scan limit reached under /run")
+                return sorted(hidden), problems
             if stat.S_ISSOCK(mode):
                 add(entry)
-            elif stat.S_ISDIR(mode) and len(entry.relative_to(root).parts) < 6:
+            elif relative not in HIDDEN_ALWAYS and len(entry.relative_to(root).parts) < 6:
                 stack.append(entry)
     return sorted(hidden), problems
 
@@ -166,7 +175,14 @@ def unit_properties(*, user, source_dir, output_dir, hidden_paths=(),
         raise SandboxError("runtime must be within the fixed wall-clock profile")
     source = _absolute(source_dir, "source_dir")
     output = _absolute(output_dir, "output_dir")
-    hidden = sorted({_absolute(path, "hidden path") for path in (*HIDDEN_ALWAYS, *hidden_paths)})
+    hidden = []
+    for path in sorted({_absolute(item, "hidden path") for item in (*HIDDEN_ALWAYS, *hidden_paths)}):
+        plain = "/" + "/".join(part for part in path.split("/") if part not in ("", "."))
+        if any(mount.startswith(plain.rstrip("/") + "/") for mount in UNIT_MOUNTS):
+            raise SandboxError("hidden path would cover a unit mount point")
+        # In systemd 249 an InaccessiblePaths= entry on a bind destination wins over the bind.
+        if not any(plain == mount or plain.startswith(mount + "/") for mount in UNIT_MOUNTS):
+            hidden.append(path)
     properties = [
         "Type=exec", "User=" + user, "Group=" + user,
         "CPUAccounting=yes", "CPUQuota=100%",
@@ -175,6 +191,8 @@ def unit_properties(*, user, source_dir, output_dir, hidden_paths=(),
         "TasksAccounting=yes", "TasksMax=%d" % CPU_PROFILE["tasks_max"],
         "RuntimeMaxSec=%d" % runtime_seconds,
         "KillMode=control-group", "OOMPolicy=kill", "SendSIGKILL=yes", "TimeoutStopSec=10",
+        # A host-wide OOM kills the build before vLLM or the training job.
+        "OOMScoreAdjust=1000",
         "PrivateNetwork=yes", "IPAddressDeny=any", "RestrictAddressFamilies=AF_UNIX",
         "PrivateDevices=yes", "DevicePolicy=closed", "PrivateIPC=yes", "PrivateUsers=yes",
         "ProtectSystem=strict", "ProtectHome=yes", "ProtectProc=invisible",
@@ -185,6 +203,9 @@ def unit_properties(*, user, source_dir, output_dir, hidden_paths=(),
         "LockPersonality=yes", "SystemCallArchitectures=native",
         "SystemCallFilter=@system-service",
         "SystemCallFilter=~@privileged @resources @keyring io_uring_setup io_uring_enter io_uring_register",
+        # systemd 249's RestrictNamespaces= filters clone/unshare/setns flags but not
+        # clone3 (250 added that). ENOSYS, not EPERM, so glibc falls back to clone.
+        "SystemCallFilter=~clone3:ENOSYS",
         "SystemCallErrorNumber=EPERM", "UMask=0077",
         "TemporaryFileSystem=/tmp:" + TMPFS_OPTIONS,
         "TemporaryFileSystem=/var/tmp:" + TMPFS_OPTIONS,
@@ -220,11 +241,12 @@ def launch_argv(request_id, properties, python, runner, source_sha):
 def _read_cgroup(unit, cgroup_root):
     base = Path(cgroup_root) / "system.slice" / unit
     values = {}
+    # procs first, so no limit value read here predates a process it is paired with.
+    with open(base / "cgroup.procs", "rb") as stream:
+        values["procs"] = [int(pid) for pid in stream.read(65536).split()]
     for name in EXPECTED_CGROUP:
         with open(base / name, "rb") as stream:
             values[name] = stream.read(256).decode("ascii").strip()
-    with open(base / "cgroup.procs", "rb") as stream:
-        values["procs"] = [int(pid) for pid in stream.read(65536).split()]
     return values
 
 
@@ -233,12 +255,14 @@ ZERO_CAPS = "0000000000000000"
 
 
 def process_readback(pid, proc_root=Path("/proc")):
-    """Kernel view of one unit process: seccomp, no_new_privs, caps, namespaces."""
+    """Kernel view of one unit process: seccomp, no_new_privs, caps, namespaces, OOM score."""
     proc_root = Path(proc_root)
     with open(proc_root / str(pid) / "status", "r", encoding="ascii", errors="replace") as stream:
         status = dict(line.split(":", 1) for line in stream.read(65536).splitlines() if ":" in line)
     values = {key: status.get(key, "").strip() for key in
               ("Seccomp", "NoNewPrivs", "CapEff", "CapPrm", "CapBnd", "CapAmb")}
+    with open(proc_root / str(pid) / "oom_score_adj", "rb") as stream:
+        values["oom_score_adj"] = stream.read(64).decode("ascii").strip()
     host = {name: os.readlink(proc_root / "self" / "ns" / name) for name in NAMESPACES}
     unit = {name: os.readlink(proc_root / str(pid) / "ns" / name) for name in NAMESPACES}
     values["separate_namespaces"] = sorted(name for name in NAMESPACES if unit[name] != host[name])
@@ -251,14 +275,20 @@ def process_readback(pid, proc_root=Path("/proc")):
         failures.append("capabilities not empty")
     if values["separate_namespaces"] != sorted(NAMESPACES):
         failures.append("shares a host namespace")
+    if values["oom_score_adj"] != EXPECTED_PROPERTIES["OOMScoreAdjust"]:
+        failures.append("oom_score_adj not 1000")
     values["failures"] = failures
     return values
+
+
+UNIT_STATE = ("ActiveState", "MainPID", "SubState")
 
 
 def _show(unit, run):
     completed = run([SYSTEMCTL, "show", unit, "--no-pager",
                      "--property=" + ",".join(sorted(EXPECTED_PROPERTIES)
-                                              + ["ControlGroup", "RuntimeMaxUSec", "User"])],
+                                              + ["ControlGroup", "RuntimeMaxUSec", "User",
+                                                 *UNIT_STATE])],
                     capture_output=True, timeout=15, check=False, shell=False)
     if completed.returncode != 0:
         raise SandboxError("systemctl show failed")
@@ -272,7 +302,7 @@ def _show(unit, run):
 def readback(unit, user, *, run=subprocess.run, cgroup_root=CGROUP_ROOT,
              clock=time.monotonic, sleep=time.sleep, seconds=READBACK_SECONDS,
              runtime_seconds=CPU_PROFILE["wall_seconds"], proc_root=Path("/proc")):
-    """Wait for the unit's cgroup, then return measured values and a verdict."""
+    """Wait for the unit's main process after execve, then return measured values and a verdict."""
     deadline = clock() + seconds
     cgroup = None
     while clock() < deadline:
@@ -286,19 +316,46 @@ def readback(unit, user, *, run=subprocess.run, cgroup_root=CGROUP_ROOT,
     if not cgroup or not cgroup["procs"]:
         return {"verified": False, "failure": "CGROUP_UNAVAILABLE", "cgroup": cgroup,
                 "properties": None}
-    properties = _show(unit, run)
     expected = dict(EXPECTED_PROPERTIES, ControlGroup="/system.slice/" + unit, User=user,
                     RuntimeMaxUSec=format_timespan(runtime_seconds))
+    # The child is in the cgroup from fork but runs systemd's setup as root until
+    # execve. Type=exec is active/running only after execve, and the runner then
+    # blocks on GO, so read only that main process, retrying until it holds.
+    started, process = False, None
+    while True:
+        properties = _show(unit, run)
+        try:
+            cgroup = _read_cgroup(unit, cgroup_root)
+        except (OSError, ValueError):
+            cgroup = None
+        text = properties.get("MainPID", "")
+        pid = int(text) if re.fullmatch(r"[1-9][0-9]{0,9}", text) else 0
+        running = (properties.get("ActiveState"), properties.get("SubState")) == ("active", "running")
+        started = started or running
+        in_unit = running and pid != 0 and cgroup is not None and pid in cgroup["procs"]
+        if in_unit:
+            try:
+                process = process_readback(pid, proc_root)
+            except (OSError, ValueError) as error:
+                process = {"failures": ["process readback unavailable: " + type(error).__name__]}
+            if not process["failures"]:
+                break
+        if clock() >= deadline:
+            break
+        sleep(0.05)
     mismatched = sorted(key for key, value in expected.items() if properties.get(key) != value)
-    mismatched += sorted(key for key, value in EXPECTED_CGROUP.items() if cgroup.get(key) != value)
-    try:
-        process = process_readback(cgroup["procs"][0], proc_root)
-    except (OSError, ValueError) as error:
-        process = {"failures": ["process readback unavailable: " + type(error).__name__]}
-    mismatched += ["process: " + failure for failure in process["failures"]]
+    mismatched += sorted(key for key, value in EXPECTED_CGROUP.items()
+                         if (cgroup or {}).get(key) != value)
+    if not started:
+        mismatched.append("unit not active before deadline")
+    elif not in_unit:
+        mismatched.append("main process not running in unit cgroup")
+    if process is not None:
+        mismatched += ["process: " + failure for failure in process["failures"]]
     return {"verified": not mismatched, "failure": "READBACK_MISMATCH" if mismatched else None,
             "mismatched": mismatched, "cgroup": cgroup, "process": process,
             "pid_namespace": "shared; host processes hidden by ProtectProc=invisible",
+            "unit_state": {key: properties.get(key) for key in UNIT_STATE},
             "properties": {key: properties.get(key) for key in sorted(expected)}}
 
 
