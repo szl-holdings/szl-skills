@@ -283,7 +283,15 @@ qualification separately from the later single-use CPU build permit.
    mapped weights, command-line paths, Hugging Face/vLLM cache variables, and
    systemd unit file are probed from inside the sandbox, as is every reachable
    UNIX socket and the io_uring and keyring syscalls (x86_64 numbers); add any
-   visible model path with `--hidden-path` and re-provision.
+   visible model path with `--hidden-path` and re-provision. The probe also
+   requires `unshare` and `clone` with `CLONE_NEWUSER` to fail with `EPERM`,
+   `clone3` to fail with `ENOSYS`, and a thread to start. Before the isolation
+   control, qualification places a root-only marker in the host `/dev/shm` and
+   requires the sandbox not to see it; the marker is removed afterwards, and a
+   stale one from an interrupted run is removed at the next start. Qualification
+   holds the broker's claim lock for its whole run, so it refuses to start
+   while a build runs or the broker holds the lock, and a build request that
+   arrives meanwhile is blocked before its permit is claimed.
 
    The bring-up script validates bounded strict JSON, all five control results,
    the four-step rehearsal, source/release and configuration digest, owner window

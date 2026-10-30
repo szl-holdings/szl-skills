@@ -231,6 +231,7 @@ class ProvisionStageTests(unittest.TestCase):
             return subprocess.CompletedProcess(["fixture"], 0, stdout, b"")
 
         with mock.patch.object(lane, "confirm", side_effect=[True, False]), \
+                mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
                 mock.patch.object(lane, "remote", side_effect=remote), \
                 mock.patch.object(Path, "read_bytes", return_value=b"SYNTHETIC PUBLIC KEY"), \
                 contextlib.redirect_stdout(io.StringIO()), self.assertRaises(bring_up.Stop):
@@ -246,6 +247,7 @@ class ProvisionStageTests(unittest.TestCase):
                      STAGING + "\n/another/path"):
             lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
             with self.subTest(path=path), mock.patch.object(lane, "confirm", return_value=True), \
+                    mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
                     mock.patch.object(lane, "remote", return_value=subprocess.CompletedProcess(
                         ["fixture"], 0, (path + "\n").encode(), b"")) as remote, \
                     mock.patch.object(Path, "read_bytes", side_effect=AssertionError("key read")), \
@@ -406,6 +408,7 @@ class BuildStageTests(unittest.TestCase):
     def test_child_uses_own_stage_deadlines(self):
         lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
         with mock.patch.object(lane, "confirm", return_value=True), \
+                mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
                 mock.patch.object(Path, "exists", return_value=True), \
                 mock.patch.object(Path, "write_text", side_effect=AssertionError("file write")), \
                 mock.patch.object(lane, "run") as run, contextlib.redirect_stdout(io.StringIO()):

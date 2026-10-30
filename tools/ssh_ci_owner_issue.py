@@ -8,7 +8,10 @@ protected-environment gate, reconstructs the exact request from that waiting
 run, observes the VM read-only, builds a <=900-second permit and owner window
 from that observation and the owner's own attestations, signs them, installs
 them through the VM's root verifier, and approves only that run. It never
-retries, never reuses a permit, and never touches the GPU or the model.
+retries, never reuses a permit, and never touches the GPU or the model. It
+checks the owner config, the protected branch, other unfinished runs, and
+non-interactive VM access before dispatch, and cancels its own run if it stops
+before approval.
 
 ``observe`` and ``install-permit`` are the VM-side halves of this flow.
 """
@@ -37,7 +40,8 @@ from tools.ssh_ci_contract import (CPU_PROFILE, MAX_PINNED_PROCESSES, MAX_RESPON
 from tools.ssh_ci_owner_signature import (BUNDLE_SUFFIX, MAX_ALLOWED_SIGNERS_BYTES, NAMESPACE,
                                           SIGNATURE_SUFFIX, bundle, read_protected,
                                           verify_bundle)
-from tools.ssh_ci_owner_window import WINDOW_SCHEMA, validate_owner_window
+from tools.ssh_ci_owner_window import (OWNER_ATTESTATION_FIELDS, WINDOW_SCHEMA,
+                                       validate_owner_attestations, validate_owner_window)
 from tools.ssh_ci_plan import plan_request
 
 
@@ -48,11 +52,17 @@ OWNER_CONFIG_SCHEMA = "szl.ssh-cpu-build.owner-config.v1"
 REMOTE_TOOLS = "/opt/szl-cpu-broker/current/tools"
 PUBLIC_RECEIPTS = "/var/lib/szl-cpu-broker/public"
 WINDOW_SECONDS = 900
-MAX_APPROVAL_DELAY_SECONDS = 300  # Leaves >=600s for runner pickup and the >=450s claim floor.
+# 900 s window - 450 s claim floor - 180 s approval = 270 s left for runner pickup,
+# checkout, setup-python, and staging.
+MAX_APPROVAL_DELAY_SECONDS = 180
+WATCH_SECONDS = 1200  # Job timeout-minutes 15 (900 s) plus 300 s for pickup and upload.
+ACTIVE_STATUSES = ("waiting", "pending", "queued", "requested", "in_progress")
 REQUIRED_VARIABLES = {"SZL_CPU_CI_ENABLED", "SZL_CPU_SSH_HOST", "SZL_CPU_SSH_PORT",
                       "SZL_CPU_SSH_USER", "SZL_CPU_KNOWN_HOSTS"}
-OWNER_FIELDS = frozenset({"schema", "provider_instance_uuid", "hf_revision", "budget",
-                          "checkpoint_manifest_sha256", "owner_receipt_ref"})
+OWNER_FIELDS = OWNER_ATTESTATION_FIELDS | {"schema"}
+FIND_RUN = ("find it with: gh run list -R %s --workflow %s --json databaseId,displayTitle,status"
+            " (title 'CPU build permit %%s'), then cancel it with: gh run cancel <id> -R %s"
+            % (REPOSITORY, WORKFLOW, REPOSITORY))
 
 
 class IssueError(RuntimeError):
@@ -77,6 +87,8 @@ def load_owner_config(data):
     budget = value["budget"]
     if type(budget) is not dict or set(budget) != {"ledger_ref", "remaining_seconds", "remaining_usd"}:
         raise IssueError("owner budget needs ledger_ref, remaining_seconds, remaining_usd")
+    # The broker's own value checks, before anything is dispatched.
+    validate_owner_attestations({field: value[field] for field in OWNER_ATTESTATION_FIELDS})
     return value
 
 
@@ -124,8 +136,17 @@ class Owner:
     def __init__(self, args, *, run=subprocess.run, sleep=time.sleep, clock=time.monotonic):
         self.args, self.run, self.sleep, self.clock = args, run, sleep, clock
 
-    def command(self, argv, stage, *, stdin=None, check=True):
-        completed = self.run(argv, input=stdin, capture_output=True, timeout=600, check=False)
+    def call(self, argv, stage, timeout, **options):
+        """``run``, with subprocess failures as IssueError so the record stays clean."""
+        try:
+            return self.run(argv, timeout=timeout, check=False, **options)
+        except subprocess.TimeoutExpired as error:
+            raise IssueError("%s timed out after %d s" % (stage, timeout)) from error
+        except subprocess.SubprocessError as error:
+            raise IssueError("%s failed: %s" % (stage, type(error).__name__)) from error
+
+    def command(self, argv, stage, *, stdin=None, check=True, timeout=600):
+        completed = self.call(argv, stage, timeout, input=stdin, capture_output=True)
         if check and completed.returncode != 0:
             raise IssueError(stage + " failed: " + completed.stderr.decode("utf-8", "replace")[-300:])
         return completed
@@ -137,20 +158,59 @@ class Owner:
         except ValueError as error:
             raise IssueError(stage + " returned non-JSON output") from error
 
-    def ssh(self, remote, stage, *, tty=False):
+    def ssh_argv(self, remote, *, tty=False):
+        port = self.args.port
+        if type(port) is not int or not 1 <= port <= 65535:
+            raise IssueError("ssh port must be an integer from 1 to 65535")
         argv = [self.args.ssh, "-o", "StrictHostKeyChecking=yes", "-o", "ClearAllForwardings=yes"]
         if self.args.admin_known_hosts:
             argv += ["-o", "UserKnownHostsFile=" + self.args.admin_known_hosts]
         if self.args.admin_key:
             argv += ["-o", "IdentitiesOnly=yes", "-i", self.args.admin_key]
+        argv += ["-p", str(port)]
         argv += ["-t"] if tty else ["-T", "-o", "BatchMode=yes"]
-        argv += [self.args.admin_target, remote]
+        return argv + [self.args.admin_target, remote]
+
+    def ssh(self, remote, stage, *, tty=False):
+        argv = self.ssh_argv(remote, tty=tty)
         if tty:  # sudo may prompt on the owner's own terminal.
-            completed = self.run(argv, timeout=600, check=False)
+            completed = self.call(argv, stage, 600)
             if completed.returncode != 0:
                 raise IssueError(stage + " failed with exit %s" % completed.returncode)
             return completed
         return self.command(argv, stage)
+
+    def reachable(self):
+        """One BatchMode no-op before dispatch, so a locked admin key stops nothing midway."""
+        completed = self.command(self.ssh_argv("true"), "reach VM", check=False)
+        if completed.returncode != 0:
+            raise IssueError("the VM is not reachable without a prompt (ssh exit %d: %s); load the "
+                             "admin key with ssh-add (Windows: start the ssh-agent service first) "
+                             "and check the host pin, then rerun"
+                             % (completed.returncode,
+                                completed.stderr.decode("utf-8", "replace")[-200:].strip()))
+
+    def list_runs(self, extra, stage):
+        runs = self.gh_json(["run", "list", "-R", REPOSITORY, "--workflow", WORKFLOW, *extra], stage)
+        if type(runs) is not list or any(type(item) is not dict
+                                         or type(item.get("databaseId")) is not int
+                                         for item in runs):
+            raise IssueError(stage + " returned an unexpected shape")
+        return runs
+
+    def refuse_active_runs(self):
+        """A run not yet completed holds the workflow's concurrency group; never queue behind it."""
+        busy = {}
+        for status in ACTIVE_STATUSES:
+            for item in self.list_runs(["--status", status, "--json", "databaseId,status,url"],
+                                       "list %s runs" % status):
+                busy.setdefault(item["databaseId"], (item.get("status") or status, item.get("url")))
+        if busy:
+            raise IssueError("other %s runs are not completed and would hold the concurrency group; "
+                             "cancel each first: %s" % (WORKFLOW, "; ".join(
+                                 "run %d (%s, %s): gh run cancel %d -R %s"
+                                 % (run_id, status, url, run_id, REPOSITORY)
+                                 for run_id, (status, url) in sorted(busy.items()))))
 
     def preflight_environment(self):
         environment = self.gh_json(["api", "repos/%s/environments/%s" % (REPOSITORY, ENVIRONMENT)],
@@ -163,6 +223,17 @@ class Owner:
             raise IssueError("environment has no required reviewer; the approval gate is absent")
         if not (policy.get("protected_branches") or policy.get("custom_branch_policies")):
             raise IssueError("environment is not restricted to protected branches")
+        # With no protected branch at all, a protected-branches policy admits every branch.
+        branch = self.gh_json(["api", "repos/%s/branches/main" % REPOSITORY], "read main branch")
+        protected = type(branch) is dict and branch.get("protected") is True
+        rulesets = 0
+        if not protected:
+            rules = self.gh_json(["api", "repos/%s/rules/branches/main" % REPOSITORY],
+                                 "read main rulesets")
+            rulesets = len(rules) if type(rules) is list else 0
+        if not (protected or rulesets):
+            raise IssueError("main has no branch protection rule and no ruleset, so the "
+                             "environment's branch policy does not restrict deployments")
         variables = self.gh_json(["variable", "list", "--env", ENVIRONMENT, "-R", REPOSITORY,
                                   "--json", "name"], "list environment variables")
         secrets = self.gh_json(["secret", "list", "--env", ENVIRONMENT, "-R", REPOSITORY,
@@ -173,18 +244,21 @@ class Owner:
                              % ", ".join(missing + (["SZL_CPU_SSH_KEY"] if "SZL_CPU_SSH_KEY" not in
                                                     {item["name"] for item in secrets} else [])))
         return {"required_reviewers": len(reviewers), "branch_policy": policy,
-                "can_admins_bypass": environment.get("can_admins_bypass")}
+                "can_admins_bypass": environment.get("can_admins_bypass"),
+                "main_protected": protected, "main_rulesets": rulesets}
+
+    def runs_titled(self, permit_id):
+        runs = self.list_runs(["--event", "workflow_dispatch", "--limit", "20",
+                               "--json", "databaseId,displayTitle"], "list runs")
+        title = "CPU build permit " + permit_id
+        return [item["databaseId"] for item in runs if item.get("displayTitle") == title]
 
     def dispatch(self, permit_id):
         self.command([self.args.gh, "workflow", "run", WORKFLOW, "-R", REPOSITORY, "--ref", "main",
                       "-f", "permit_id=" + permit_id], "dispatch workflow")
         deadline = self.clock() + 120
-        title = "CPU build permit " + permit_id
         while self.clock() < deadline:
-            runs = self.gh_json(["run", "list", "-R", REPOSITORY, "--workflow", WORKFLOW,
-                                 "--event", "workflow_dispatch", "--limit", "20",
-                                 "--json", "databaseId,displayTitle"], "list runs")
-            matches = [item["databaseId"] for item in runs if item.get("displayTitle") == title]
+            matches = self.runs_titled(permit_id)
             if len(matches) == 1:
                 return matches[0]
             if len(matches) > 1:
@@ -194,6 +268,7 @@ class Owner:
 
     def waiting_run(self, run_id):
         deadline = self.clock() + 180
+        status = None
         while self.clock() < deadline:
             raw = self.command([self.args.gh, "api", "repos/%s/actions/runs/%d" % (REPOSITORY, run_id)],
                                "read run").stdout
@@ -203,7 +278,46 @@ class Owner:
             if status == "completed":
                 raise IssueError("run completed before approval (configuration BLOCKED?)")
             self.sleep(3)
-        raise IssueError("run never reached the environment approval gate")
+        raise IssueError("run never reached the environment approval gate (last status %s; a "
+                         "pending run may be queued behind another run in the concurrency group)"
+                         % status)
+
+    def withdraw(self, permit_id, run_id, environment_id):
+        """Cancel a dispatched, unapproved run so it cannot hold the concurrency group.
+
+        Never raises. Returns what was done and, for anything left behind, how to
+        cancel it by hand.
+        """
+        def attempt(argv, stage):
+            try:
+                return self.command(argv, stage, check=False).returncode == 0
+            except Exception:
+                return False
+        try:
+            ids = [run_id] if run_id is not None else self.runs_titled(permit_id)
+        except Exception:
+            ids = []
+        done = {"cancelled": [], "rejected": [], "by_hand": None}
+        left = []
+        for item in ids:
+            if attempt([self.args.gh, "run", "cancel", str(item), "-R", REPOSITORY],
+                       "cancel unapproved run"):
+                done["cancelled"].append(item)
+            elif item == run_id and environment_id is not None and attempt(
+                    [self.args.gh, "api", "-X", "POST",
+                     "repos/%s/actions/runs/%d/pending_deployments" % (REPOSITORY, item),
+                     "-F", "environment_ids[]=%d" % environment_id, "-f", "state=rejected",
+                     "-f", "comment=CPU permit %s withdrawn before approval" % permit_id],
+                    "reject unapproved deployment"):
+                done["rejected"].append(item)
+            else:
+                left.append(item)
+        if not ids:
+            done["by_hand"] = "the dispatched run was not found; " + FIND_RUN % permit_id
+        elif left:
+            done["by_hand"] = "cancel by hand: " + "; ".join(
+                "gh run cancel %s -R %s" % (item, REPOSITORY) for item in left)
+        return done
 
     def pending_environment_id(self, run_id):
         pending = self.gh_json(["api", "repos/%s/actions/runs/%d/pending_deployments"
@@ -211,7 +325,7 @@ class Owner:
         ids = [item["environment"]["id"] for item in pending
                if item.get("environment", {}).get("name") == ENVIRONMENT
                and item.get("current_user_can_approve") is True]
-        if len(ids) != 1:
+        if len(ids) != 1 or type(ids[0]) is not int:
             raise IssueError("the owner cannot approve exactly one %s gate" % ENVIRONMENT)
         return ids[0]
 
@@ -223,8 +337,8 @@ class Owner:
         with tempfile.TemporaryDirectory(prefix="szl-permit-sign-") as scratch:
             path = Path(scratch) / "bundle.json"
             path.write_bytes(data)
-            completed = self.run([self.args.ssh_keygen, "-Y", "sign", "-f", self.args.signing_key,
-                                  "-n", NAMESPACE, str(path)], timeout=300, check=False)
+            completed = self.call([self.args.ssh_keygen, "-Y", "sign", "-f", self.args.signing_key,
+                                   "-n", NAMESPACE, str(path)], "owner signing", 300)
             if completed.returncode != 0:
                 raise IssueError("owner signing failed")
             return (Path(scratch) / "bundle.json.sig").read_bytes()
@@ -245,7 +359,7 @@ class Owner:
     def collect(self, run_id, out):
         """Download evidence; return the raw broker response bytes only (bounded)."""
         self.command([self.args.gh, "run", "watch", str(run_id), "-R", REPOSITORY, "--interval", "10"],
-                     "watch run", check=False)
+                     "watch run", check=False, timeout=WATCH_SECONDS)
         self.command([self.args.gh, "run", "download", str(run_id), "-R", REPOSITORY,
                       "-n", "ssh-cpu-build-%d-1" % run_id, "-D", str(out)], "download evidence")
         path = out / "response.raw.json"
@@ -307,30 +421,47 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
     config = load_owner_config(Path(args.owner_config).read_bytes())
     record["environment"] = owner.preflight_environment()
     record["stages"].append("environment")
+    owner.refuse_active_runs()
+    owner.reachable()
     permit_id = str(new_uuid())
-    run_id = owner.dispatch(permit_id)
-    record.update(permit_id=permit_id, run_id=run_id)
-    plan = plan_request(owner.waiting_run(run_id), permit_id)
-    request, digest = plan["request"], plan["request_sha256"]
-    if request["source_sha"] != args.source_sha:
-        raise IssueError("waiting run builds %s, not the commit you named (%s); not signing"
-                         % (request["source_sha"], args.source_sha))
-    environment_id = owner.pending_environment_id(run_id)
-    record.update(request_sha256=digest, source_sha=request["source_sha"])
-    record["stages"].append("waiting-run-bound")
-    observed_at = owner.clock()
-    observation = owner.observe()
-    permit, window = build_grant(request, observation, config, new_uuid)
-    data = bundle(permit, window)
-    record.update(observation=observation, window_id=window["window_id"],
-                  not_before=permit["not_before"], expires_at=permit["expires_at"],
-                  signed_bundle_sha256=sha256(data))
-    signature = owner.sign(data)
-    owner.install(data, signature)
-    record["stages"].append("permit-installed")
-    if owner.clock() - observed_at > MAX_APPROVAL_DELAY_SECONDS:
-        raise IssueError("too little window remains; not approving (permit stays unused)")
-    owner.approve(run_id, environment_id, permit_id, digest)
+    record["permit_id"] = permit_id
+    environment_id = None
+    # From dispatch until approval, any stop (Ctrl+C included) cancels the run,
+    # which would otherwise wait at the gate and hold the concurrency group.
+    try:
+        run_id = owner.dispatch(permit_id)
+        record["run_id"] = run_id
+        plan = plan_request(owner.waiting_run(run_id), permit_id)
+        request, digest = plan["request"], plan["request_sha256"]
+        if request["source_sha"] != args.source_sha:
+            raise IssueError("waiting run builds %s, not the commit you named (%s); not signing"
+                             % (request["source_sha"], args.source_sha))
+        environment_id = owner.pending_environment_id(run_id)
+        record.update(request_sha256=digest, source_sha=request["source_sha"])
+        record["stages"].append("waiting-run-bound")
+        observed_at = owner.clock()
+        observation = owner.observe()
+        permit, window = build_grant(request, observation, config, new_uuid)
+        data = bundle(permit, window)
+        record.update(observation=observation, window_id=window["window_id"],
+                      not_before=permit["not_before"], expires_at=permit["expires_at"],
+                      signed_bundle_sha256=sha256(data))
+        signature = owner.sign(data)
+        owner.install(data, signature)
+        record["stages"].append("permit-installed")
+        if owner.clock() - observed_at > MAX_APPROVAL_DELAY_SECONDS:
+            raise IssueError("too little window remains; not approving (permit stays unused)")
+        owner.approve(run_id, environment_id, permit_id, digest)
+    except BaseException as error:
+        withdrawn = owner.withdraw(permit_id, record.get("run_id"), environment_id)
+        record["unapproved_run"] = withdrawn
+        if withdrawn["by_hand"] is None:
+            raise
+        if not isinstance(error, Exception):
+            print("CPU BUILD STOPPED: " + withdrawn["by_hand"], file=sys.stderr)
+            raise
+        raise IssueError("%s: %s; %s" % (type(error).__name__, error, withdrawn["by_hand"])) \
+            from error
     record["stages"].append("approved")
     out = Path(args.evidence_dir) / ("run-%d" % run_id)
     out.mkdir(parents=True, exist_ok=False)
@@ -389,6 +520,7 @@ def main(argv=None):
     run.add_argument("--admin-target", required=True, help="for example Ubuntu@209.137.198.191")
     run.add_argument("--admin-known-hosts", help="independently verified host-key pin file")
     run.add_argument("--admin-key")
+    run.add_argument("--port", type=int, default=22, help="VM ssh port for every ssh call")
     run.add_argument("--evidence-dir", default="szl-cpu-build-evidence")
     run.add_argument("--gh", default=shutil.which("gh") or "gh")
     run.add_argument("--ssh", default=shutil.which("ssh") or "ssh")
@@ -400,6 +532,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.action == "run" and re.fullmatch(r"[0-9a-f]{40}", args.source_sha) is None:
         parser.error("--source-sha must be a full lowercase commit")
+    if args.action == "run" and not 1 <= args.port <= 65535:
+        parser.error("--port must be from 1 to 65535")
     try:
         if args.action == "install-permit":
             result = install_permit(args.bundle_b64, args.signature_b64, args.config)
@@ -413,7 +547,7 @@ def main(argv=None):
                 Path(args.evidence_dir).mkdir(parents=True, exist_ok=True)
                 name = "owner-issue-%s.json" % datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                 (Path(args.evidence_dir) / name).write_bytes(canonical(result) + b"\n")
-    except (IssueError, ContractError, OSError, ValueError) as error:
+    except (IssueError, ContractError, OSError, ValueError, subprocess.SubprocessError) as error:
         print("CPU BUILD BLOCKED: " + type(error).__name__ + ": " + str(error), file=sys.stderr)
         return 1
     print(json.dumps(result, indent=2, sort_keys=True))
