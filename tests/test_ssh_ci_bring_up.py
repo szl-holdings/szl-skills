@@ -143,12 +143,17 @@ class GithubStageTests(unittest.TestCase):
                 output = b""
                 if argv[:2] == ["gh", "api"] and argv[2] == "user":
                     output = b'{"id": 4242, "login": "owner"}'
+                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/branches/main"]:
+                    output = b'{"protected": true}' if self.protected else b'{"protected": false}'
+                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/rules/branches/main"]:
+                    output = b'[]'
                 if argv[0] == "ssh-keygen":
                     output = (b"# Host 203.0.113.10 found: line 3\n"
                               b"203.0.113.10 ssh-ed25519 AAAAPIN\n") if self.pin else b""
                 return subprocess.CompletedProcess(argv, 0, output, b"")
             lane.run = run
             self.pin = True
+            self.protected = True
             with mock.patch("builtins.input", side_effect=["CONFIGURE", "ENABLE", "no"]), \
                     contextlib.redirect_stdout(io.StringIO()):
                 lane.github()
@@ -170,6 +175,38 @@ class GithubStageTests(unittest.TestCase):
                     contextlib.redirect_stdout(io.StringIO()):
                 lane.github()
             self.assertFalse(any(argv[:3] == ["gh", "secret", "set"] for argv, _ in calls))
+
+    def test_unprotected_main_stops_before_a_secret_write(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            work = Path(scratch) / "lane"
+            work.mkdir()
+            (work / "szl-cpu-ci").write_bytes(b"PRIVATE-KEY-BYTES")
+            lane = bring_up.Lane(lane_args(work))
+            lane.clock = lambda: NOW
+            lane.qualification = qualification_fixture()
+            lane.activation_state = mock.Mock(return_value=state_fixture())
+            calls = []
+
+            def run(argv, *, stdin=None, capture=False, check=True):
+                calls.append(list(map(str, argv)))
+                output = b""
+                if argv[:2] == ["gh", "api"] and argv[2] == "user":
+                    output = b'{"id": 4242}'
+                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/branches/main"]:
+                    output = b'{"protected": false}'
+                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/rules/branches/main"]:
+                    output = b'[]'
+                if argv[0] == "ssh-keygen":
+                    output = b"203.0.113.10 ssh-ed25519 AAAAPIN\n"
+                return subprocess.CompletedProcess(argv, 0, output, b"")
+
+            lane.run = run
+            with self.assertRaisesRegex(bring_up.Stop, "no branch protection"), \
+                    mock.patch("builtins.input", return_value="CONFIGURE"), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                lane.github()
+            self.assertFalse(any(argv[:3] == ["gh", "secret", "set"] for argv in calls))
+            self.assertFalse(any("PUT" in argv for argv in calls))
 
 
 class ProvisionStageTests(unittest.TestCase):

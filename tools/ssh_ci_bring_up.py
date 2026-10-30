@@ -276,6 +276,7 @@ class Lane:
                 if line.strip() and not line.startswith("#")]
         if not pins and not self.args.dry_run:
             raise Stop("no verified host-key pin for %s in %s" % (pattern, self.args.known_hosts))
+        self.require_protected_main()
         if not self.args.dry_run:
             secret = self.ci_key.read_bytes()
         else:
@@ -297,6 +298,23 @@ class Lane:
                         "DELETE") and not self.args.dry_run:
             self.ci_key.unlink()
         self.report("github", "environment %s configured" % ENVIRONMENT)
+
+    def require_protected_main(self):
+        """protected_branches=true binds deploys to main only while main itself is protected."""
+        if self.args.dry_run:
+            self.report("github", "would require protected main before any GitHub write")
+            return
+        branch = json.loads(self.run(
+            ["gh", "api", "repos/%s/branches/main" % REPO], capture=True).stdout or b"{}")
+        if type(branch) is dict and branch.get("protected") is True:
+            return
+        rules = json.loads(self.run(
+            ["gh", "api", "repos/%s/rules/branches/main" % REPO], capture=True).stdout or b"[]")
+        if type(rules) is list and rules and all(
+                type(rule) is dict and rule.get("type") for rule in rules):
+            return
+        raise Stop("main has no branch protection rule or active ruleset; protected-branch "
+                   "deployment would not restrict this environment to main")
 
     def build(self):
         if not self.confirm("Prepare owner attestations and issue one signed CPU build?", "RUN"):
