@@ -298,7 +298,9 @@ qualification separately from the later single-use CPU build permit.
 
 4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
    with yourself as required reviewer and protected-branch deployment only, then
-   add the secret and variables. Set `SZL_CPU_CI_ENABLED` last.
+   add the secret and variables. Set `SZL_CPU_CI_ENABLED` last. Before the first
+   GitHub write, bring-up requires `main` to report `"protected": true` or an
+   active ruleset on `main`. It writes nothing when that check fails.
 
    ```sh
    gh api -X PUT repos/szl-holdings/szl-skills/environments/massed-cpu-build \
