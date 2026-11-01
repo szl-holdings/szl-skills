@@ -137,6 +137,9 @@ class FakeHost:
         if args[:2] == ["api", "repos/%s/environments/massed-cpu-build/"
                        "deployment-branch-policies?per_page=100" % owner_issue.REPOSITORY]:
             return json.dumps(self.branch_policies).encode()
+        if args[:2] == ["api", "repos/%s/environments/massed-cpu-build/"
+                       "deployment-branch-policies/17" % owner_issue.REPOSITORY]:
+            return b'{"id": 17, "name": "main", "type": "branch"}'
         if args[:2] == ["api", "repos/%s/branches/main" % owner_issue.REPOSITORY]:
             return json.dumps(self.main_branch).encode()
         if args[:2] == ["api", "repos/%s/rules/branches/main" % owner_issue.REPOSITORY]:
@@ -295,8 +298,15 @@ class IssueFlowTests(unittest.TestCase):
                 self.setUp()
                 self.host.branch_policies["branch_policies"] = [rule]
                 record, _owner = self.issue()
-                self.assertIn("exactly the main branch", record["failure"])
+                self.assertRegex(record["failure"], "exactly the main branch|policy type is absent")
                 self.assertFalse(self.dispatched())
+
+    def test_policy_list_without_type_uses_authenticated_detail(self):
+        self.host.branch_policies["branch_policies"] = [{"id": 17, "name": "main"}]
+        record, _owner = self.issue()
+        self.assertEqual(record["result"], "PASS")
+        self.assertTrue(any(argv[1] == "api" and argv[2].endswith(
+            "deployment-branch-policies/17") for argv in self.host.calls))
 
     def test_idle_and_multi_process_gpus_are_pinned_as_a_set(self):
         # vLLM plus a training job, or no GPU work at all: both are pinned exactly.

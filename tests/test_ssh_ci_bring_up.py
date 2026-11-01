@@ -150,7 +150,9 @@ class GithubStageTests(unittest.TestCase):
                 if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/environments?per_page=100"]:
                     output = b'{"total_count": 0, "environments": []}'
                 if argv[:2] == ["gh", "api"] and "deployment-branch-policies?" in argv[2]:
-                    output = b'{"total_count": 1, "branch_policies": [{"name": "main", "type": "branch"}]}'
+                    output = b'{"total_count": 1, "branch_policies": [{"id": 17, "name": "main"}]}'
+                if argv[:2] == ["gh", "api"] and argv[2].endswith("deployment-branch-policies/17"):
+                    output = b'{"id": 17, "name": "main", "type": "branch"}'
                 if argv[0] == "ssh-keygen":
                     output = (b"# Host 203.0.113.10 found: line 3\n"
                               b"203.0.113.10 ssh-ed25519 AAAAPIN\n") if self.pin else b""

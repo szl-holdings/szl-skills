@@ -333,6 +333,12 @@ class Lane:
             raise Stop("gh api user did not name a numeric user id")
         endpoint = "repos/%s/environments/%s" % (REPO, ENVIRONMENT)
         policies = endpoint + "/deployment-branch-policies"
+
+        def read_policy(*, allow_empty=False):
+            return main_branch_policy(self.gh_json(["api", policies + "?per_page=100"]),
+                                      allow_empty=allow_empty,
+                                      lookup=lambda policy_id: self.gh_json([
+                                          "api", policies + "/" + str(policy_id)]))
         # Inspect existing rules before switching policy mode. Never activate or
         # delete an unexpected wildcard/tag/other-branch rule left by an operator.
         environments = self.gh_json(["api", "repos/%s/environments?per_page=100" % REPO])
@@ -345,8 +351,7 @@ class Lane:
                            for row in rows)):
                 raise Stop("environment listing is incomplete; no configuration changed")
             if any(row["name"] == ENVIRONMENT for row in rows):
-                has_main = main_branch_policy(self.gh_json([
-                    "api", policies + "?per_page=100"]), allow_empty=True)
+                has_main = read_policy(allow_empty=True)
         environment = {"reviewers": [{"type": "User", "id": user["id"]}],
                        "prevent_self_review": False,
                        "deployment_branch_policy": {"protected_branches": False,
@@ -363,7 +368,7 @@ class Lane:
             self.run(["gh", "api", "-X", "POST", policies, "--input", "-"],
                      stdin=json.dumps({"name": "main", "type": "branch"}).encode(), capture=True)
         if not self.args.dry_run:
-            main_branch_policy(self.gh_json(["api", policies + "?per_page=100"]))
+            read_policy()
         self.run(["gh", "secret", "set", "SZL_CPU_SSH_KEY", "--env", ENVIRONMENT, "-R", REPO],
                  stdin=secret)
         for name, value in (("SZL_CPU_SSH_HOST", self.host), ("SZL_CPU_SSH_PORT", str(self.args.port)),
@@ -372,7 +377,7 @@ class Lane:
         if self.confirm("Enable the CPU lane after a fresh qualification/identity recheck?", "ENABLE"):
             self.require_qualification()
             if not self.args.dry_run:
-                main_branch_policy(self.gh_json(["api", policies + "?per_page=100"]))
+                read_policy()
             self.run(["gh", "variable", "set", "SZL_CPU_CI_ENABLED", "--env", ENVIRONMENT, "-R",
                       REPO, "--body", "true"])
         if self.confirm("The CI private key is now only needed in GitHub. Delete the local copy?",

@@ -318,6 +318,9 @@ qualification separately from the later single-use CPU build permit.
    before any write. It creates a missing `main` branch rule and reads it back
    before uploading the dedicated credential and again before enabling the lane.
    Existing extra policies are never silently deleted.
+   If the list response omits `type`, the tool retrieves the policy by its
+   numeric ID and verifies the same ID/name and `type=branch`. Missing type in
+   both responses, an identity mismatch, or a tag policy blocks activation.
 
    ```sh
    gh api -X PUT repos/szl-holdings/szl-skills/environments/massed-cpu-build \

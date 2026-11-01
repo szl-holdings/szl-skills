@@ -239,11 +239,14 @@ class Owner:
         if (policy.get("protected_branches") is not False
                 or policy.get("custom_branch_policies") is not True):
             raise IssueError("environment needs an explicit main-only deployment branch policy")
+        policies = "repos/%s/environments/%s/deployment-branch-policies" % (
+            REPOSITORY, ENVIRONMENT)
         try:
-            main_branch_policy(self.gh_json(["api", "repos/%s/environments/%s/"
-                                             "deployment-branch-policies?per_page=100"
-                                             % (REPOSITORY, ENVIRONMENT)],
-                                            "read deployment branch policies"))
+            main_branch_policy(self.gh_json(["api", policies + "?per_page=100"],
+                                            "read deployment branch policies"),
+                               lookup=lambda policy_id: self.gh_json([
+                                   "api", policies + "/" + str(policy_id)],
+                                   "read deployment branch policy detail"))
         except ValueError as error:
             raise IssueError(str(error)) from error
         # An explicit deployment branch rule does not protect the source itself.
