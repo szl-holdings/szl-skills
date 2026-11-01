@@ -79,6 +79,8 @@ class FakeHost:
         self.observe_cost = 0.0
         self.main_branch = {"name": "main", "protected": True}
         self.main_rules = []
+        self.branch_policies = {"total_count": 1,
+                                "branch_policies": [{"name": "main", "type": "branch"}]}
         self.active = {}  # --status -> unfinished runs of the workflow.
         self.run_ids = [777]  # Runs titled with the dispatched permit.
         self.appear_at = 0.0  # Fake time from which those runs are listed.
@@ -129,9 +131,12 @@ class FakeHost:
         if args[:2] == ["api", "repos/%s/environments/massed-cpu-build" % owner_issue.REPOSITORY]:
             return json.dumps({"protection_rules": [
                 {"type": "required_reviewers", "reviewers": self.reviewers}],
-                "deployment_branch_policy": {"protected_branches": True,
-                                             "custom_branch_policies": False},
+                "deployment_branch_policy": {"protected_branches": False,
+                                             "custom_branch_policies": True},
                 "can_admins_bypass": True}).encode()
+        if args[:2] == ["api", "repos/%s/environments/massed-cpu-build/"
+                       "deployment-branch-policies?per_page=100" % owner_issue.REPOSITORY]:
+            return json.dumps(self.branch_policies).encode()
         if args[:2] == ["api", "repos/%s/branches/main" % owner_issue.REPOSITORY]:
             return json.dumps(self.main_branch).encode()
         if args[:2] == ["api", "repos/%s/rules/branches/main" % owner_issue.REPOSITORY]:
@@ -143,13 +148,20 @@ class FakeHost:
         if args[:2] == ["workflow", "run"]:
             self.permit_id = args[-1].split("=", 1)[1]
             return b""
-        if args[:2] == ["run", "list"] and "--status" in args:
-            return json.dumps(self.active.get(args[args.index("--status") + 1], [])).encode()
-        if args[:2] == ["run", "list"]:
-            titled = [{"databaseId": run_id, "displayTitle": "CPU build permit " + self.permit_id}
+        runs_endpoint = "repos/%s/actions/workflows/%s/runs?per_page=100&" % (
+            owner_issue.REPOSITORY, owner_issue.WORKFLOW)
+        if args[0] == "api" and args[1].startswith(runs_endpoint + "status="):
+            rows = self.active.get(args[1].split("status=", 1)[1], [])
+            if type(rows) is not list:
+                return json.dumps(rows).encode()
+            rows = [dict(item, id=item.get("databaseId"), html_url=item.get("url"))
+                    if type(item) is dict else item for item in rows]
+            return json.dumps({"total_count": len(rows), "workflow_runs": rows}).encode()
+        if args[:2] == ["api", runs_endpoint + "event=workflow_dispatch"]:
+            titled = [{"id": run_id, "display_title": "CPU build permit " + self.permit_id}
                       for run_id in self.run_ids if self.time >= self.appear_at]
-            return json.dumps(titled + [{"databaseId": 776,
-                                         "displayTitle": "CPU build permit other"}]).encode()
+            rows = titled + [{"id": 776, "display_title": "CPU build permit other"}]
+            return json.dumps({"total_count": len(rows), "workflow_runs": rows}).encode()
         if args[:2] == ["run", "cancel"]:
             return b""
         if args[:2] == ["api", "repos/%s/actions/runs/777" % owner_issue.REPOSITORY]:
@@ -261,9 +273,10 @@ class IssueFlowTests(unittest.TestCase):
         self.assertNotIn("unapproved_run", record)
         dispatch = next(i for i, argv in enumerate(self.host.calls) if argv[1:3] == ["workflow", "run"])
         before = self.host.calls[:dispatch]
-        self.assertEqual([argv[argv.index("--status") + 1] for argv in before
-                          if argv[1:3] == ["run", "list"] and "--status" in argv],
+        self.assertEqual([argv[2].split("status=", 1)[1] for argv in before
+                          if argv[1] == "api" and "runs?per_page=100&status=" in argv[2]],
                          list(owner_issue.ACTIVE_STATUSES))
+        self.assertFalse(any(argv[1:3] == ["run", "list"] for argv in self.host.calls))
         reach = [argv for argv in before if argv[0] == "ssh" and argv[-1] == "true"]
         self.assertEqual(len(reach), 1)
         self.assertIn("BatchMode=yes", reach[0])
@@ -274,6 +287,16 @@ class IssueFlowTests(unittest.TestCase):
         record, _owner = self.issue()
         self.assertIn("required reviewer", record["failure"])
         self.assertFalse(any(argv[1:3] == ["workflow", "run"] for argv in self.host.calls))
+
+    def test_non_main_branch_or_tag_policy_stops_before_dispatch(self):
+        for rule in ({"name": "*", "type": "branch"}, {"name": "main", "type": "tag"},
+                     {"name": "release", "type": "branch"}, {"name": "main"}):
+            with self.subTest(rule=rule):
+                self.setUp()
+                self.host.branch_policies["branch_policies"] = [rule]
+                record, _owner = self.issue()
+                self.assertIn("exactly the main branch", record["failure"])
+                self.assertFalse(self.dispatched())
 
     def test_idle_and_multi_process_gpus_are_pinned_as_a_set(self):
         # vLLM plus a training job, or no GPU work at all: both are pinned exactly.
@@ -470,10 +493,20 @@ class IssueFlowTests(unittest.TestCase):
                 self.assertFalse(self.dispatched())
 
     def test_failed_active_run_listing_stops_before_dispatch(self):
-        self.host.refuse = lambda argv: argv[1:3] == ["run", "list"] and "pending" in argv
+        self.host.refuse = lambda argv: argv[1] == "api" and argv[2].endswith("status=pending")
         record, _owner = self.issue()
         self.assertIn("list pending runs failed", record["failure"])
         self.assertFalse(self.dispatched())
+
+    def test_partial_or_invalid_rest_listing_never_means_idle(self):
+        for payload in ({"total_count": 1, "workflow_runs": []},
+                        {"total_count": True, "workflow_runs": []},
+                        {"total_count": 0}, {"workflow_runs": []}):
+            with self.subTest(payload=payload):
+                owner = self.owner()
+                owner.gh_json = unittest.mock.Mock(return_value=payload)
+                with self.assertRaisesRegex(owner_issue.IssueError, "unexpected shape"):
+                    owner.refuse_active_runs()
 
     def test_vm_unreachable_without_a_prompt_stops_before_dispatch(self):
         self.host.refuse = lambda argv: argv[0] == "ssh" and argv[-1] == "true"

@@ -268,7 +268,10 @@ qualification separately from the later single-use CPU build permit.
    `apply` refuses unmanaged files, validates `sshd -t`, checks the `szl-ci`
    effective settings, compares the admin user's effective sshd settings before
    and after (rolling back on any change), reloads `ssh`, and enables the socket.
-   `uninstall` removes the SSH entry point and socket and keeps all receipts.
+   `uninstall` disables the broker socket first, then attempts every independent
+   SSH-file and unit cleanup even when another step fails. It reloads sshd only
+   after validation, keeps claims and receipts, and reports all incomplete steps
+   with a nonzero exit instead of claiming success.
 
 3. **Qualify (VM, as root).** Rehearse the real build of the same commit.
 
@@ -305,18 +308,28 @@ qualification separately from the later single-use CPU build permit.
    not independent certification or proof of unchanged model latency.
 
 4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
-   with yourself as required reviewer and protected-branch deployment only, then
+   with yourself as required reviewer and an explicit `main` branch rule, then
    add the secret and variables. Set `SZL_CPU_CI_ENABLED` last. Before the first
    GitHub write, bring-up requires `main` to report `"protected": true` or an
-   active ruleset on `main`. It writes nothing when that check fails.
+   active ruleset on `main`. It writes nothing when that check fails. An
+   environment policy allowing all protected branches is not a main-only rule.
+   Bring-up inspects existing deployment policies before changing configuration;
+   unexpected branches, wildcards, tags, or incomplete listings stop the run
+   before any write. It creates a missing `main` branch rule and reads it back
+   before uploading the dedicated credential and again before enabling the lane.
+   Existing extra policies are never silently deleted.
 
    ```sh
    gh api -X PUT repos/szl-holdings/szl-skills/environments/massed-cpu-build \
      --input - <<'JSON'
    {"reviewers":[{"type":"User","id":<your-numeric-user-id>}],
     "prevent_self_review":false,
-    "deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}
+    "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
    JSON
+   gh api -X POST repos/szl-holdings/szl-skills/environments/massed-cpu-build/deployment-branch-policies \
+     -f name=main -f type=branch
+   gh api 'repos/szl-holdings/szl-skills/environments/massed-cpu-build/deployment-branch-policies?per_page=100'
+   # Require exactly one policy, name=main and type=branch, before continuing.
    gh secret set SZL_CPU_SSH_KEY --env massed-cpu-build -R szl-holdings/szl-skills < szl-cpu-ci
    gh variable set SZL_CPU_SSH_HOST --env massed-cpu-build -R szl-holdings/szl-skills -b <vm-ip>
    gh variable set SZL_CPU_SSH_PORT --env massed-cpu-build -R szl-holdings/szl-skills -b 22
@@ -339,9 +352,10 @@ qualification separately from the later single-use CPU build permit.
      --admin-target Ubuntu@<vm-ip> --admin-known-hosts <pinned-known-hosts>
    ```
 
-   It refuses without a required-reviewer gate, when the waiting run is not the
+   It refuses without a required-reviewer gate and the exact `main` branch policy,
+   when another workflow run is unfinished, or when the waiting run is not the
    commit you named with `--source-sha`, with more than eight GPU compute
-   processes, or when more than 300 seconds
+   processes, or when more than 180 seconds
    pass between observation and approval. It approves only the run whose title
    carries the fresh permit, pinning every GPU process it observed. Its verdict
    does not trust the job's client receipt,
@@ -350,6 +364,14 @@ qualification separately from the later single-use CPU build permit.
    the broker's public receipt on the VM to name the same request and response
    hash with a PASS execution, and the remote receipt to pin exactly the GPU
    process set you signed.
+
+   Run discovery uses the REST workflow-runs endpoint through `gh api`, so older
+   `gh run list` status enumerations cannot reject `pending` or `requested`.
+   Active-run admission rejects malformed or inconsistent responses; any active
+   result blocks dispatch. Discovery of a new permit searches only the newest
+   100 runs and fails closed if it cannot find the matching run. An uncertain
+   approval outcome still requires reconciliation of the retained run ID before
+   another attempt; this does not add crash durability or a cross-session lock.
 
 6. Only after one such run returns PASS with matching hashes and an unchanged
    model identity, describe the lane as operational for that qualified CPU

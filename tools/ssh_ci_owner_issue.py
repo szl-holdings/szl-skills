@@ -38,6 +38,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.ssh_ci_admission import PERMIT_SCHEMA, validate_permit
+from tools.ssh_ci_environment import main_branch_policy
 from tools.ssh_ci_contract import (CPU_PROFILE, MAX_PINNED_PROCESSES, MAX_RESPONSE_BYTES,
                                    RECEIPT_SCHEMA_V2, ContractError, canonical, sha256,
                                    strict_json_loads, verify_response)
@@ -194,19 +195,29 @@ class Owner:
                              % (completed.returncode,
                                 completed.stderr.decode("utf-8", "replace")[-200:].strip()))
 
-    def list_runs(self, extra, stage):
-        runs = self.gh_json(["run", "list", "-R", REPOSITORY, "--workflow", WORKFLOW, *extra], stage)
-        if type(runs) is not list or any(type(item) is not dict
-                                         or type(item.get("databaseId")) is not int
-                                         for item in runs):
+    def list_runs(self, query, stage):
+        # Older gh releases reject pending/requested in `run list --status`.
+        # The REST endpoint accepts every Actions status without CLI enum parsing.
+        endpoint = "repos/%s/actions/workflows/%s/runs?per_page=100&%s" % (
+            REPOSITORY, WORKFLOW, query)
+        payload = self.gh_json(["api", endpoint], stage)
+        runs = payload.get("workflow_runs") if type(payload) is dict else None
+        count = payload.get("total_count") if type(payload) is dict else None
+        if (type(count) is not int or count < 0 or type(runs) is not list
+                or len(runs) != min(count, 100)
+                or any(type(item) is not dict or type(item.get("id")) is not int
+                       or item["id"] <= 0 for item in runs)):
             raise IssueError(stage + " returned an unexpected shape")
-        return runs
+        # For admission, any returned active run blocks. For dispatch discovery,
+        # only this bounded newest page is searched; absence never grants execution.
+        return [dict(item, databaseId=item["id"], displayTitle=item.get("display_title"),
+                     url=item.get("html_url")) for item in runs]
 
     def refuse_active_runs(self):
         """A run not yet completed holds the workflow's concurrency group; never queue behind it."""
         busy = {}
         for status in ACTIVE_STATUSES:
-            for item in self.list_runs(["--status", status, "--json", "databaseId,status,url"],
+            for item in self.list_runs("status=" + status,
                                        "list %s runs" % status):
                 busy.setdefault(item["databaseId"], (item.get("status") or status, item.get("url")))
         if busy:
@@ -225,9 +236,17 @@ class Owner:
         policy = environment.get("deployment_branch_policy") or {}
         if not reviewers:
             raise IssueError("environment has no required reviewer; the approval gate is absent")
-        if not (policy.get("protected_branches") or policy.get("custom_branch_policies")):
-            raise IssueError("environment is not restricted to protected branches")
-        # With no protected branch at all, a protected-branches policy admits every branch.
+        if (policy.get("protected_branches") is not False
+                or policy.get("custom_branch_policies") is not True):
+            raise IssueError("environment needs an explicit main-only deployment branch policy")
+        try:
+            main_branch_policy(self.gh_json(["api", "repos/%s/environments/%s/"
+                                             "deployment-branch-policies?per_page=100"
+                                             % (REPOSITORY, ENVIRONMENT)],
+                                            "read deployment branch policies"))
+        except ValueError as error:
+            raise IssueError(str(error)) from error
+        # An explicit deployment branch rule does not protect the source itself.
         branch = self.gh_json(["api", "repos/%s/branches/main" % REPOSITORY], "read main branch")
         protected = type(branch) is dict and branch.get("protected") is True
         rulesets = 0
@@ -252,8 +271,7 @@ class Owner:
                 "main_protected": protected, "main_rulesets": rulesets}
 
     def runs_titled(self, permit_id):
-        runs = self.list_runs(["--event", "workflow_dispatch", "--limit", "20",
-                               "--json", "databaseId,displayTitle"], "list runs")
+        runs = self.list_runs("event=workflow_dispatch", "list runs")
         title = "CPU build permit " + permit_id
         return [item["databaseId"] for item in runs if item.get("displayTitle") == title]
 

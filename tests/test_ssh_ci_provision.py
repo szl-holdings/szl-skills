@@ -332,6 +332,66 @@ class ApplyOrderTests(unittest.TestCase):
                 self.assertFalse([event for event in events if event in WINDOW + REMOVE + DISABLE])
 
 
+class UninstallTests(unittest.TestCase):
+    def uninstall(self, faults=None):
+        faults, calls = faults or {}, []
+
+        def remove(path):
+            label = "remove " + path
+            calls.append(label)
+            if label in faults:
+                raise faults[label]
+
+        def run(argv, **kwargs):
+            label = " ".join([posixpath.basename(argv[0]), *argv[1:]])
+            calls.append(label)
+            fault = faults.get(label, 0)
+            if isinstance(fault, Exception):
+                raise fault
+            output = b"active\n" if "is-active" in argv else b""
+            return subprocess.CompletedProcess(argv, fault, output, b"injected failure")
+
+        with mock.patch.object(provision, "_remove", side_effect=remove):
+            try:
+                result = provision.uninstall(run=run)
+            except provision.ProvisionError as error:
+                result = error
+        return result, calls
+
+    def test_disables_admission_first_and_preserves_evidence(self):
+        result, calls = self.uninstall()
+        self.assertIsInstance(result, dict)
+        self.assertEqual(calls[0], DISABLE[0])
+        self.assertTrue(any("claims, receipts" in item for item in result["kept"]))
+        self.assertEqual([call for call in calls if call.startswith("remove ")], REMOVE + [
+            "remove /etc/systemd/system/szl-cpu-broker.socket",
+            "remove /etc/systemd/system/szl-cpu-broker@.service"])
+
+    def test_each_failure_keeps_attempting_independent_cleanup(self):
+        for stage, fault in ((REMOVE[0], PermissionError("denied")),
+                             ("sshd -t", 1),
+                             ("systemctl reload ssh.service", 1),
+                             (DISABLE[0], 1),
+                             (DISABLE[0], subprocess.TimeoutExpired("systemctl", 120))):
+            with self.subTest(stage=stage, fault=fault):
+                result, calls = self.uninstall({stage: fault})
+                self.assertIsInstance(result, provision.ProvisionError)
+                self.assertIn("uninstall incomplete", str(result))
+                self.assertIn(DISABLE[0], calls)
+                self.assertIn(REMOVE[1], calls)
+                self.assertIn("remove /etc/systemd/system/szl-cpu-broker@.service", calls)
+                self.assertEqual(calls[-1], "systemctl daemon-reload")
+                if stage == "sshd -t":
+                    self.assertNotIn("systemctl reload ssh.service", calls)
+
+    def test_multiple_failures_are_all_reported(self):
+        result, calls = self.uninstall({REMOVE[0]: PermissionError("denied"),
+                                       DISABLE[0]: 1, "systemctl daemon-reload": 1})
+        for reason in ("disable socket", REMOVE[0], "daemon-reload"):
+            self.assertIn(reason, str(result))
+        self.assertIn(REMOVE[1], calls)
+
+
 class MainTests(unittest.TestCase):
     def test_broker_subprocess_contract_and_os_errors_print_provision_blocked(self):
         with tempfile.TemporaryDirectory() as scratch:
