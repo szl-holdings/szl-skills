@@ -429,18 +429,34 @@ def apply(options, *, run=subprocess.run):
 
 
 def uninstall(*, run=subprocess.run):
-    """Remove the SSH entry point and socket; keep claims, receipts, and permits."""
+    """Attempt every cleanup; report incomplete removal without claiming success."""
+    failures = []
+
+    def attempt(stage, action):
+        try:
+            action()
+        except (ProvisionError, OSError, subprocess.SubprocessError) as error:
+            failures.append("%s: %s: %s" % (stage, type(error).__name__, error))
+            return False
+        return True
+
+    # Disable admission first, even if a later filesystem or sshd operation fails.
+    attempt("disable socket", lambda: _checked(
+        run, [SYSTEMCTL, "disable", "--now", "szl-cpu-broker.socket"], "disable socket"))
     for path in SSHD_FILES:
-        _remove(path)
-    _checked(run, [SSHD, "-t"], "sshd -t")
-    if _ssh_active(run):
-        _checked(run, [SYSTEMCTL, "reload", "ssh.service"], "reload ssh")
-    run([SYSTEMCTL, "disable", "--now", "szl-cpu-broker.socket"], capture_output=True,
-        timeout=60, check=False)
+        attempt("remove " + path, lambda path=path: _remove(path))
+    if attempt("validate sshd", lambda: _checked(run, [SSHD, "-t"], "sshd -t")):
+        def reload_ssh():
+            if _ssh_active(run):
+                _checked(run, [SYSTEMCTL, "reload", "ssh.service"], "reload ssh")
+        attempt("reload ssh", reload_ssh)
     for path in ("/etc/systemd/system/szl-cpu-broker.socket",
                  "/etc/systemd/system/szl-cpu-broker@.service"):
-        Path(path).unlink(missing_ok=True)
-    _checked(run, [SYSTEMCTL, "daemon-reload"], "daemon-reload")
+        attempt("remove " + path, lambda path=path: _remove(path))
+    attempt("daemon-reload", lambda: _checked(
+        run, [SYSTEMCTL, "daemon-reload"], "daemon-reload"))
+    if failures:
+        raise ProvisionError("uninstall incomplete: " + "; ".join(failures))
     return {"removed": ["sshd drop-in", "authorized key", "broker socket and units"],
             "kept": ["/var/lib/szl-cpu-broker (claims, receipts)", "/etc/szl-cpu-broker",
                      INSTALL_ROOT, "users " + CI_USER + " and " + BUILD_USER]}

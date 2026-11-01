@@ -147,6 +147,12 @@ class GithubStageTests(unittest.TestCase):
                     output = b'{"protected": true}' if self.protected else b'{"protected": false}'
                 if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/rules/branches/main"]:
                     output = b'[]'
+                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/environments?per_page=100"]:
+                    output = b'{"total_count": 0, "environments": []}'
+                if argv[:2] == ["gh", "api"] and "deployment-branch-policies?" in argv[2]:
+                    output = b'{"total_count": 1, "branch_policies": [{"id": 17, "name": "main"}]}'
+                if argv[:2] == ["gh", "api"] and argv[2].endswith("deployment-branch-policies/17"):
+                    output = b'{"id": 17, "name": "main", "type": "branch"}'
                 if argv[0] == "ssh-keygen":
                     output = (b"# Host 203.0.113.10 found: line 3\n"
                               b"203.0.113.10 ssh-ed25519 AAAAPIN\n") if self.pin else b""
@@ -159,7 +165,10 @@ class GithubStageTests(unittest.TestCase):
                 lane.github()
             environment = next(json.loads(stdin) for argv, stdin in calls if "PUT" in argv)
             self.assertEqual(environment["reviewers"], [{"type": "User", "id": 4242}])
-            self.assertTrue(environment["deployment_branch_policy"]["protected_branches"])
+            self.assertEqual(environment["deployment_branch_policy"],
+                             {"protected_branches": False, "custom_branch_policies": True})
+            policy = next(json.loads(stdin) for argv, stdin in calls if "POST" in argv)
+            self.assertEqual(policy, {"name": "main", "type": "branch"})
             secret = next(stdin for argv, stdin in calls if argv[:3] == ["gh", "secret", "set"])
             self.assertEqual(secret, b"PRIVATE-KEY-BYTES")
             variables = [argv[3] for argv, _ in calls if argv[:3] == ["gh", "variable", "set"]]
@@ -207,6 +216,24 @@ class GithubStageTests(unittest.TestCase):
                 lane.github()
             self.assertFalse(any(argv[:3] == ["gh", "secret", "set"] for argv in calls))
             self.assertFalse(any("PUT" in argv for argv in calls))
+
+
+    def test_existing_broad_policy_stops_before_any_configuration_write(self):
+        lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        reads = iter([{"id": 4242},
+                      {"total_count": 1, "environments": [{"name": bring_up.ENVIRONMENT}]},
+                      {"total_count": 1, "branch_policies": [{"name": "*", "type": "branch"}]}])
+        with mock.patch.object(lane, "require_qualification"), \
+                mock.patch.object(lane, "confirm", return_value=True), \
+                mock.patch.object(lane, "require_protected_main"), \
+                mock.patch.object(lane, "gh_json", side_effect=lambda _args: next(reads)), \
+                mock.patch.object(lane, "run", return_value=subprocess.CompletedProcess(
+                    ["ssh-keygen"], 0, b"203.0.113.10 ssh-ed25519 AAAAPIN\n")) as run, \
+                mock.patch.object(Path, "read_bytes", side_effect=AssertionError("key read")), \
+                self.assertRaisesRegex(ValueError, "exactly the main branch"):
+            lane.github()
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0][0], "ssh-keygen")
 
 
 class ProvisionStageTests(unittest.TestCase):
@@ -465,17 +492,24 @@ class GithubAdmissionTests(unittest.TestCase):
             def run(argv, **kwargs):
                 calls.append(argv)
                 out = b'{"id":4242}' if argv[:3] == ["gh", "api", "user"] else b""
+                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/branches/main"]:
+                    out = b'{"protected":true}'
+                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/environments?per_page=100"]:
+                    out = b'{"total_count":0,"environments":[]}'
+                if argv[:2] == ["gh", "api"] and "deployment-branch-policies?" in argv[2]:
+                    out = b'{"total_count":1,"branch_policies":[{"name":"main","type":"branch"}]}'
                 if argv[0] == "ssh-keygen":
                     out = b"203.0.113.10 ssh-ed25519 SYNTHETIC-PIN\n"
                 return subprocess.CompletedProcess(argv, 0, out, b"")
 
             with self.subTest(drift_at=drift_at), \
-                    mock.patch.object(lane, "activation_state", side_effect=states), \
+                    mock.patch.object(lane, "activation_state", side_effect=states) as readback, \
                     mock.patch.object(lane, "confirm", return_value=True), \
                     mock.patch.object(lane, "run", side_effect=run), \
                     mock.patch.object(Path, "read_bytes", return_value=b"SYNTHETIC-KEY"), \
                     contextlib.redirect_stdout(io.StringIO()), self.assertRaises(bring_up.Stop):
                 lane.github()
+            self.assertEqual(readback.call_count, drift_at + 1)
             self.assertFalse(any(argv[:4] == ["gh", "variable", "set", "SZL_CPU_CI_ENABLED"]
                                  and argv[-1] == "true" for argv in calls))
             if drift_at == 1:

@@ -33,6 +33,7 @@ if __package__ in (None, ""):
 
 from tools.ssh_ci_contract import (ContractError, STEP_NAMES, canonical,
                                    strict_json_loads, validate_pinned_processes)
+from tools.ssh_ci_environment import main_branch_policy
 
 REPO = "szl-holdings/szl-skills"
 ENVIRONMENT = "massed-cpu-build"
@@ -330,18 +331,44 @@ class Lane:
             user = {"id": 0}
         elif type(user) is not dict or type(user.get("id")) is not int or user["id"] <= 0:
             raise Stop("gh api user did not name a numeric user id")
+        endpoint = "repos/%s/environments/%s" % (REPO, ENVIRONMENT)
+        policies = endpoint + "/deployment-branch-policies"
+
+        def read_policy(*, allow_empty=False):
+            return main_branch_policy(self.gh_json(["api", policies + "?per_page=100"]),
+                                      allow_empty=allow_empty,
+                                      lookup=lambda policy_id: self.gh_json([
+                                          "api", policies + "/" + str(policy_id)]))
+        # Inspect existing rules before switching policy mode. Never activate or
+        # delete an unexpected wildcard/tag/other-branch rule left by an operator.
+        environments = self.gh_json(["api", "repos/%s/environments?per_page=100" % REPO])
+        has_main = False
+        if not self.args.dry_run:
+            rows = environments.get("environments") if type(environments) is dict else None
+            count = environments.get("total_count") if type(environments) is dict else None
+            if (type(count) is not int or type(rows) is not list or count != len(rows)
+                    or any(type(row) is not dict or type(row.get("name")) is not str
+                           for row in rows)):
+                raise Stop("environment listing is incomplete; no configuration changed")
+            if any(row["name"] == ENVIRONMENT for row in rows):
+                has_main = read_policy(allow_empty=True)
         environment = {"reviewers": [{"type": "User", "id": user["id"]}],
                        "prevent_self_review": False,
-                       "deployment_branch_policy": {"protected_branches": True,
-                                                    "custom_branch_policies": False}}
+                       "deployment_branch_policy": {"protected_branches": False,
+                                                    "custom_branch_policies": True}}
         if not self.args.dry_run:
             secret = self.ci_key.read_bytes()
         else:
             secret = b""
         # Configuration writes start only after qualification, consent, pin and protected main.
         self.require_qualification()
-        self.run(["gh", "api", "-X", "PUT", "repos/%s/environments/%s" % (REPO, ENVIRONMENT),
+        self.run(["gh", "api", "-X", "PUT", endpoint,
                   "--input", "-"], stdin=json.dumps(environment).encode(), capture=True)
+        if not has_main:
+            self.run(["gh", "api", "-X", "POST", policies, "--input", "-"],
+                     stdin=json.dumps({"name": "main", "type": "branch"}).encode(), capture=True)
+        if not self.args.dry_run:
+            read_policy()
         self.run(["gh", "secret", "set", "SZL_CPU_SSH_KEY", "--env", ENVIRONMENT, "-R", REPO],
                  stdin=secret)
         for name, value in (("SZL_CPU_SSH_HOST", self.host), ("SZL_CPU_SSH_PORT", str(self.args.port)),
@@ -349,6 +376,8 @@ class Lane:
             self.run(["gh", "variable", "set", name, "--env", ENVIRONMENT, "-R", REPO, "--body", value])
         if self.confirm("Enable the CPU lane after a fresh qualification/identity recheck?", "ENABLE"):
             self.require_qualification()
+            if not self.args.dry_run:
+                read_policy()
             self.run(["gh", "variable", "set", "SZL_CPU_CI_ENABLED", "--env", ENVIRONMENT, "-R",
                       REPO, "--body", "true"])
         if self.confirm("The CI private key is now only needed in GitHub. Delete the local copy?",
@@ -357,7 +386,7 @@ class Lane:
         self.report("github", "environment %s configured" % ENVIRONMENT)
 
     def require_protected_main(self):
-        """protected_branches=true binds deploys to main only while main itself is protected."""
+        """The explicit main deployment rule does not replace main's source protection."""
         branch = self.gh_json(["api", "repos/%s/branches/main" % REPO])
         if self.args.dry_run:
             self.report("github", "would require protected main before any GitHub write")
@@ -367,8 +396,8 @@ class Lane:
         rules = self.gh_json(["api", "repos/%s/rules/branches/main" % REPO])
         if type(rules) is not list or not rules \
                 or not all(type(rule) is dict and rule.get("type") for rule in rules):
-            raise Stop("main has no branch protection rule or active ruleset; protected-branch "
-                       "deployment would not restrict this environment to main")
+            raise Stop("main has no branch protection rule or active ruleset; "
+                       "the deployment source must remain protected")
 
     def build(self):
         if not self.confirm("Prepare owner attestations and issue one signed CPU build?", "RUN"):
