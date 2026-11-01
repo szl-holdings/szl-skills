@@ -2,7 +2,9 @@
 import hashlib
 import importlib.util
 import json
+import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -166,21 +168,32 @@ class MultiplicityTests(unittest.TestCase):
         self.assertEqual(KERNEL.szl_audit_multiplicity(b"x" * (KERNEL.MAX_BYTES + 1), encoded(results))["status"], "ERROR")
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)
+            # A fresh copy makes bytecode writes observable even when a previous
+            # run left a reusable cache in the checkout. Parent -B is not inherited.
+            skill = shutil.copytree(SKILL, root / "skill", ignore=shutil.ignore_patterns(
+                "__pycache__", "*.pyc"))
+            environment = os.environ.copy()
+            environment.pop("PYTHONDONTWRITEBYTECODE", None)
+            environment.pop("PYTHONPYCACHEPREFIX", None)
             p, r, report = root / "plan.json", root / "results.json", root / "report.json"
             p.write_bytes(encoded(plan))
             r.write_bytes(encoded(results))
-            command = [sys.executable, str(SKILL / "scripts" / "run.py"), str(p), str(r), "--output", str(report)]
-            complete = subprocess.run(command, capture_output=True, text=True, timeout=20)
+            command = [sys.executable, "-B", str(skill / "scripts" / "run.py"), str(p), str(r), "--output", str(report)]
+            complete = subprocess.run(command, capture_output=True, text=True, timeout=20,
+                                      env=environment)
             self.assertEqual(complete.returncode, 0, complete.stderr)
             self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["status"], "COMPLETE")
-            second = subprocess.run(command, capture_output=True, text=True, timeout=20)
+            second = subprocess.run(command, capture_output=True, text=True, timeout=20,
+                                    env=environment)
             self.assertEqual(second.returncode, 2)
             self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["status"], "COMPLETE")
             results["results"].pop()
             r.write_bytes(encoded(results))
-            hold = subprocess.run(command[:-2], capture_output=True, text=True, timeout=20)
+            hold = subprocess.run(command[:-2], capture_output=True, text=True, timeout=20,
+                                  env=environment)
             self.assertEqual(hold.returncode, 1)
             self.assertEqual(json.loads(hold.stdout)["status"], "HOLD")
+            self.assertEqual(list(skill.rglob("*.pyc")), [], "CLI must not write bytecode into source")
 
 
 if __name__ == "__main__":
