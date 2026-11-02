@@ -296,6 +296,12 @@ qualification separately from the later single-use CPU build permit.
    while a build runs or the broker holds the lock, and a build request that
    arrives meanwhile is blocked before its permit is claimed.
 
+   A failed rehearsal keeps bounded tails of each failed step's stderr/stdout and
+   the runner's output in the qualification receipt under
+   `/var/lib/szl-cpu-broker/qualification`. The receipt records omitted byte counts
+   and upstream truncation; these tails are diagnostic output, not complete logs.
+   The temporary build workspace is still removed. Passing rehearsals omit log tails.
+
    The bring-up script validates bounded strict JSON, all five control results,
    the four-step rehearsal, source/release and configuration digest, owner window
    reference, and host/boot/protected-process set. It accepts completion at most
