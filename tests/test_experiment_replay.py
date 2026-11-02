@@ -161,7 +161,7 @@ class ExperimentReplayTests(unittest.TestCase):
 
         stream = TrackingStream(source.open("rb"))
         engine_hash = ENGINE["_engine_hash"]
-        with mock.patch.dict(engine_hash.__globals__, {"__file__": str(source)}), \\
+        with mock.patch.dict(engine_hash.__globals__, {"__file__": str(source)}), \
              mock.patch.object(pathlib.Path, "open", return_value=stream):
             digest = engine_hash()
         self.assertEqual(requested, [ENGINE["MAX_ENGINE"] + 1])
