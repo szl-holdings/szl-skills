@@ -6,7 +6,7 @@ import errno
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import subprocess
@@ -266,7 +266,8 @@ class RehearsalDiagnosticTests(unittest.TestCase):
                   "readback": {"verified": verified}, "truncated": list(truncated)}
         build = mock.Mock()
         build.scan.return_value = ([], [])
-        build.workspace.return_value = contextlib.nullcontext((Path("/source"), Path("/out")))
+        build.workspace.return_value = contextlib.nullcontext(
+            (PurePosixPath("/source"), PurePosixPath("/out")))
         config = {"build_user": "szl-build", "build_python": "/usr/bin/python3",
                   "runner": "/opt/szl-cpu-broker/runner.py", "hidden_paths": []}
         with mock.patch.object(qualify, "stage_source"), \
