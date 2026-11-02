@@ -18,11 +18,12 @@ canonical ID in each source. There is no name matching or inferred join.
 
 `conversions` must contain exactly one entry for each observed source unit and the target
 unit. Each entry has decimal-string `scale` and `offset`; normalized value is
-`raw_value * scale + offset`, calculated with 50-digit Decimal precision. Scale must be
-positive. The target unit's conversion must be scale `1`, offset `0`. Conversion labels
+`raw_value * scale + offset`, using a private Decimal context with 50-digit precision
+and round-half-even arithmetic. Scale must be positive. The target unit's conversion
+must be scale `1`, offset `0`. Conversion labels
 and coefficients are **user declarations**, not a trusted registry. Finite decimal input
-has a bounded length and exponent; binary floating point is not used. No rounding rule,
-uncertainty, logarithmic unit, or unit composition is inferred.
+has a bounded length and exponent; binary floating point is not used. No measurement
+rounding rule, uncertainty, logarithmic unit, or unit composition is inferred.
 
 The report always records `mapping_authority: DECLARED_ONLY`,
 `scientific_validity: NOT_EVALUATED`, `network: NOT_USED`, and `execution: NOT_RUN`.
