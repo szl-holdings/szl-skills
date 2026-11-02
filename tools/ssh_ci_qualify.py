@@ -31,7 +31,7 @@ if __package__ in (None, ""):
 from tools.ssh_ci_broker import (DEFAULT_CONFIG, Build, collect_outputs, load_config,
                                  parse_runner, stage_source)
 from tools.ssh_ci_claims import ClaimError, ClaimStore
-from tools.ssh_ci_contract import ContractError, canonical, sha256
+from tools.ssh_ci_contract import ContractError, STEP_NAMES, canonical, sha256
 from tools.ssh_ci_observer import observe
 from tools import ssh_ci_sandbox as sandbox
 
@@ -43,6 +43,10 @@ CURRENT_RELEASE = Path("/opt/szl-cpu-broker/current")
 MAX_ACTIVATION_STATE_BYTES = 16384
 DEADLINE_SECONDS = 5
 TMPFS_LIMIT = 536870912
+# Bound JSON-escaped text too, so binary/control-heavy output cannot inflate a
+# failed rehearsal's receipt. Four step logs plus runner logs use at most 88 KiB.
+STDERR_DIAGNOSTIC_BYTES = 16 * 1024
+OTHER_DIAGNOSTIC_BYTES = 4 * 1024
 SHM_ROOT = Path("/dev/shm")
 # RestrictNamespaces= filters clone/unshare flags with EPERM; clone3 must fail
 # with ENOSYS, the only error on which glibc falls back to clone for threads.
@@ -394,6 +398,40 @@ def run_control(build, config, mode, arguments, *, runtime_seconds, run_unit=san
     return outcome
 
 
+def diagnostic_tail(data, limit):
+    """Keep a bounded UTF-8 tail, recording exactly how much collected data was omitted."""
+    tail = data[-limit:]
+    while True:
+        text = tail.decode("utf-8", "replace")
+        excess = len(json.dumps(text)) - limit
+        if excess <= 0:
+            return {"bytes": len(data), "omitted_bytes": len(data) - len(tail), "tail": text}
+        # A raw byte can expand to six JSON characters. Trim conservatively so
+        # binary output still keeps its final traceback rather than an empty tail.
+        tail = tail[max(1, (excess + 5) // 6):]
+
+
+def rehearsal_diagnostics(runner, outcome, files):
+    """Retain failure evidence before workspace cleanup; never add it to passing runs."""
+    failed = (set(STEP_NAMES) if runner is None else
+              {step["name"] for step in runner["steps"] if step["returncode"] != 0})
+    if not failed:  # Readback or collection failed without naming a failed step.
+        failed = set(STEP_NAMES)
+    streams = {}
+    for name in STEP_NAMES:
+        if name in failed:
+            for suffix, limit in (("stderr", STDERR_DIAGNOSTIC_BYTES),
+                                  ("stdout", OTHER_DIAGNOSTIC_BYTES)):
+                filename = name + "." + suffix
+                if filename in files:
+                    streams[filename] = diagnostic_tail(files[filename], limit)
+    for suffix in ("stderr", "stdout"):
+        streams["runner." + suffix] = diagnostic_tail(
+            outcome["runner_" + suffix], OTHER_DIAGNOSTIC_BYTES)
+    return {"streams": streams, "runner_truncated": outcome["truncated"],
+            "step_truncated": runner.get("truncated", []) if runner else []}
+
+
 def rehearse(build, config, source_sha, *, run_unit=sandbox.run_unit):
     """Run the real staged four-step build in the sandbox without any permit."""
     request_id = str(uuid.uuid4())
@@ -417,6 +455,7 @@ def rehearse(build, config, source_sha, *, run_unit=sandbox.run_unit):
         failures.append("rehearsal output problems: %s" % (problems + outcome["truncated"]))
     return {"source_sha": source_sha, "runner": runner, "collection_problems": problems,
             "file_bytes": {name: len(data) for name, data in sorted(files.items())},
+            "diagnostics": rehearsal_diagnostics(runner, outcome, files) if failures else None,
             "failures": failures}
 
 

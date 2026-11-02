@@ -6,7 +6,7 @@ import errno
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import subprocess
@@ -253,6 +253,73 @@ class FakeBuild:
     @staticmethod
     def scan():
         return ["/data", "/run/snapd.socket"], []
+
+
+class RehearsalDiagnosticTests(unittest.TestCase):
+    def run_rehearsal(self, *, codes=None, files=None, runner_stdout=None,
+                      truncated=(), step_truncated=(), problems=(), verified=True):
+        runner = {"schema": "szl.ssh-cpu-build.runner.v1", "started": True, "prepared": True,
+                  "steps": [{"name": name, "returncode": (codes or {}).get(name, 0)}
+                            for name in qualify.STEP_NAMES], "truncated": list(step_truncated)}
+        result = {"runner_stdout": qualify.canonical(runner) if runner_stdout is None else runner_stdout,
+                  "runner_stderr": b"Finished with result: success\n",
+                  "readback": {"verified": verified}, "truncated": list(truncated)}
+        build = mock.Mock()
+        build.scan.return_value = ([], [])
+        build.workspace.return_value = contextlib.nullcontext(
+            (PurePosixPath("/source"), PurePosixPath("/out")))
+        config = {"build_user": "szl-build", "build_python": "/usr/bin/python3",
+                  "runner": "/opt/szl-cpu-broker/runner.py", "hidden_paths": []}
+        with mock.patch.object(qualify, "stage_source"), \
+                mock.patch.object(qualify, "collect_outputs", return_value=(files or {}, list(problems))):
+            return qualify.rehearse(build, config, "a" * 40, run_unit=lambda *_a, **_kw: result)
+
+    def test_failed_step_keeps_traceback_after_collection_without_unrelated_logs(self):
+        traceback = b"Traceback (most recent call last):\n" + b"failure details\n" * 600
+        receipt = self.run_rehearsal(codes={"unittest": 1}, files={
+            "unittest.stderr": traceback, "unittest.stdout": b"fixture output\n",
+            "selfcheck.stderr": b"irrelevant passing output", "packages.tar": b"archive"})
+        self.assertEqual(receipt["failures"], ["rehearsal steps did not all pass"])
+        streams = receipt["diagnostics"]["streams"]
+        self.assertEqual(streams["unittest.stderr"], {"bytes": len(traceback), "omitted_bytes": 0,
+                                                     "tail": traceback.decode()})
+        self.assertEqual(streams["unittest.stdout"]["tail"], "fixture output\n")
+        self.assertEqual(set(streams), {"unittest.stderr", "unittest.stdout", "runner.stderr",
+                                       "runner.stdout"})
+
+    def test_passing_rehearsal_keeps_counts_without_log_contents(self):
+        receipt = self.run_rehearsal(files={"unittest.stderr": b"tests passed"})
+        self.assertEqual(receipt["failures"], [])
+        self.assertEqual(receipt["file_bytes"], {"unittest.stderr": 12})
+        self.assertIsNone(receipt["diagnostics"])
+
+    def test_binary_and_control_heavy_tails_are_bounded_after_json_encoding(self):
+        data = b"\x00\xff\x1b" * 40000 + b"\nLAST FAILURE\n"
+        files = {name + suffix: data for name in qualify.STEP_NAMES
+                 for suffix in (".stdout", ".stderr")}
+        receipt = self.run_rehearsal(files=files, runner_stdout=b"malformed runner\n" + data)
+        streams = receipt["diagnostics"]["streams"]
+        for name, stream in streams.items():
+            with self.subTest(stream=name):
+                limit = (qualify.STDERR_DIAGNOSTIC_BYTES if not name.startswith("runner.")
+                         and name.endswith(".stderr") else qualify.OTHER_DIAGNOSTIC_BYTES)
+                self.assertLessEqual(len(json.dumps(stream["tail"])), limit)
+                if name != "runner.stderr":
+                    self.assertGreater(stream["omitted_bytes"], 0)
+                    self.assertTrue(stream["tail"].endswith("\nLAST FAILURE\n"))
+                    self.assertLessEqual(stream["bytes"] - stream["omitted_bytes"], limit)
+        # Include pretty printing and ASCII escaping, as the CLI does.
+        self.assertLess(len(json.dumps(receipt, indent=2)), 96 * 1024)
+
+    def test_collection_failure_preserves_available_logs_and_truncation(self):
+        receipt = self.run_rehearsal(files={"unittest.stderr": b"collected prefix"},
+                                     problems=["MISSING:unittest.stdout"],
+                                     truncated=["runner_stderr"], step_truncated=["unittest.stderr"])
+        self.assertTrue(receipt["failures"])
+        self.assertEqual(receipt["diagnostics"]["runner_truncated"], ["runner_stderr"])
+        self.assertEqual(receipt["diagnostics"]["step_truncated"], ["unittest.stderr"])
+        self.assertEqual(receipt["diagnostics"]["streams"]["unittest.stderr"]["tail"],
+                         "collected prefix")
 
 
 class QualifyFlowTests(unittest.TestCase):

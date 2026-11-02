@@ -1,4 +1,4 @@
-"""Offline broker tests; the systemd unit, mount, and git staging are faked.
+"""Offline broker tests; the systemd unit, mount, git, and ownership are faked.
 
 The root-only integration case uses the real owner-signature verifier, the real
 root-owned claim store, and real file collection, with no VM or network.
@@ -12,7 +12,9 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 import uuid
 
 from tests.test_ssh_ci_executor import FakeStore, fixtures
@@ -81,6 +83,14 @@ class TestBuild(broker.Build):
 @unittest.skipUnless(POSIX, "broker file collection requires POSIX no-follow opens")
 class BrokerHandleTests(unittest.TestCase):
     def setUp(self):
+        # Even same-owner chown/fchown calls are denied inside the build sandbox.
+        # Replace only the broker's OS view; root integration keeps real syscalls.
+        self.broker_os = SimpleNamespace(**vars(os))
+        self.broker_os.chown = mock.Mock()
+        self.broker_os.fchown = mock.Mock()
+        ownership = mock.patch.object(broker, "os", self.broker_os)
+        ownership.start()
+        self.addCleanup(ownership.stop)
         scratch = tempfile.TemporaryDirectory()
         self.addCleanup(scratch.cleanup)
         self.root = Path(scratch.name)
@@ -145,6 +155,8 @@ class BrokerHandleTests(unittest.TestCase):
         self.assertEqual(record["execution"]["result"], "PASS")
         self.assertEqual(record["response_sha256"], contract.sha256(body))
         self.assertEqual(list((self.root / "run").iterdir()), [])
+        self.broker_os.chown.assert_called_once_with(
+            self.root / "run" / self.request["request_id"] / "out", os.getuid(), os.getgid())
         mounts = [argv for argv in self.commands if argv[0] == broker.MOUNT]
         self.assertEqual(mounts[0][-1], str(self.root / "run" / self.request["request_id"]))
         fetch = next(argv for argv in self.commands if "fetch" in argv)
@@ -241,6 +253,18 @@ class BrokerHandleTests(unittest.TestCase):
         self.assertFalse(stale.exists())
         self.assertIn([broker.UMOUNT, str(stale)], [argv[:2] for argv in self.commands])
 
+    def test_workspace_ownership_denial_blocks_before_source_or_unit_runs(self):
+        self.broker_os.chown.side_effect = PermissionError("ownership changes denied")
+        self.fake_unit = lambda *_args, **_kwargs: self.fail("unit must not start")
+        status, body, _record = self.handle()
+        self.assertEqual(status, b"1")
+        notice = contract.strict_json_loads(body)
+        self.assertEqual(notice["detail"], "BUILD_ERROR:PermissionError")
+        self.assertEqual(notice["claim_status"], "WRITTEN")
+        self.assertFalse(notice["retry"])
+        self.assertFalse(any(argv[0] == broker.GIT for argv in self.commands))
+        self.assertEqual(list((self.root / "run").iterdir()), [])
+
     def test_package_entry_flood_is_rejected(self):
         def flood(out):
             for index in range(broker.MAX_PACKAGE_ENTRIES + 5):
@@ -261,6 +285,9 @@ class BrokerHandleTests(unittest.TestCase):
         self.assertNotIn("files", public)
         broker.write_receipts(self.config, record)  # A replay never overwrites the first.
         self.assertEqual(len(list((self.root / "public").iterdir())), 2)
+        reader = pwd.getpwnam(READER)
+        self.assertEqual([call.args[1:] for call in self.broker_os.fchown.call_args_list],
+                         [(reader.pw_uid, reader.pw_gid)] * 2)
         output = io.BytesIO()
         original_load, original_handle = broker.load_config, broker.handle
         broker.load_config = lambda _path: dict(self.config, receipt_dir=str(self.root / "missing"))
@@ -282,6 +309,20 @@ class BrokerHandleTests(unittest.TestCase):
                 self.assertEqual(contract.strict_json_loads(body)["reason"], "INVALID_REQUEST")
                 self.assertEqual(self.commands, [])
                 self.assertIsNone(record["request_id"])
+
+
+@unittest.skipUnless(POSIX, "broker file collection requires POSIX no-follow opens")
+class BrokerUnprivilegedHarnessTests(unittest.TestCase):
+    def test_offline_cases_do_not_need_ownership_syscalls(self):
+        # Model the sandbox capability boundary even when CI runs as root.
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(BrokerHandleTests)
+        output = io.StringIO()
+        with mock.patch.object(os, "chown", side_effect=PermissionError) as chown, \
+                mock.patch.object(os, "fchown", side_effect=PermissionError) as fchown:
+            result = unittest.TextTestRunner(stream=output).run(suite)
+            chown.assert_not_called()
+            fchown.assert_not_called()
+        self.assertTrue(result.wasSuccessful(), output.getvalue())
 
 
 class ConfigAndCollectionTests(unittest.TestCase):
@@ -369,6 +410,23 @@ class RootIntegrationTests(unittest.TestCase):
         self.assertEqual(replay_status, b"1")
         self.assertEqual(contract.strict_json_loads(replay_body)["reason"], "CLAIM_UNAVAILABLE")
         self.assertEqual(len(list((self.root / "claims").glob("*.execution-claim.json"))), 1)
+
+    def test_receipts_keep_real_ownership_and_private_modes(self):
+        self.assertIs(broker.os, os)
+        (self.root / "public").mkdir(mode=0o700)
+        status, body, record = self.handle()
+        self.assertEqual(status, b"0", body[:300])
+        broker.write_receipts(self.config, record)
+        private = next((self.root / "receipts").iterdir())
+        public = self.root / "public" / (self.request["request_id"] + ".json")
+        reader = pwd.getpwnam(READER)
+        for path, uid, gid in ((private, 0, os.getgid()),
+                               (public, reader.pw_uid, reader.pw_gid)):
+            with self.subTest(path=path):
+                metadata = path.stat()
+                self.assertEqual((metadata.st_uid, metadata.st_gid), (uid, gid))
+                self.assertEqual(metadata.st_mode & 0o777, 0o600)
+        self.assertEqual(json_load(public)["response_sha256"], contract.sha256(body))
 
     def test_tampered_permit_is_not_owner_authenticated(self):
         self.bundle.write_bytes(signature.bundle(
