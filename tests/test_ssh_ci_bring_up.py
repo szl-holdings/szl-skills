@@ -1,6 +1,7 @@
 """Offline tests for the owner bring-up script; no VM, SSH, or GitHub call is made."""
 
 import argparse
+import base64
 import contextlib
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -60,6 +61,53 @@ def state_fixture():
                 "observed_at": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "host": q["host"], "gpu_compute_processes": q["model_after"],
                 "competing_cpu_jobs": 0}}
+
+
+def ed25519_blob(fill):
+    key_type = b"ssh-ed25519"
+    blob = (len(key_type).to_bytes(4, "big") + key_type
+            + (32).to_bytes(4, "big") + bytes([fill]) * 32)
+    return base64.b64encode(blob).decode("ascii")
+
+
+def plan_fixture():
+    return {"pins": ["203.0.113.10 ssh-ed25519 AAAAPIN"],
+            "public_keys": {
+                "szl-cpu-ci.pub": "ssh-ed25519 %s ci" % ed25519_blob(65),
+                "szl-owner-permit.pub": "ssh-ed25519 %s owner" % ed25519_blob(66),
+            },
+            "environment_sha256": "e" * 64,
+            "secret_names": ["SZL_CPU_SSH_KEY"], "variables_sha256": "v" * 64,
+            "variables": {"EXISTING": "keep"}}
+
+
+def environment_fixture():
+    environment = {
+        "id": 41, "name": bring_up.ENVIRONMENT, "created_at": "2029-01-01T00:00:00Z",
+        "updated_at": "2030-01-01T00:00:00Z",
+        "deployment_branch_policy": {
+            "protected_branches": False, "custom_branch_policies": True},
+        "protection_rules": [{
+            "id": 9, "type": "required_reviewers", "prevent_self_review": True,
+            "reviewers": [{"type": "User", "reviewer": {"id": 4242,
+                                                           "login": "owner"}}],
+        }],
+    }
+    policies = {"total_count": 1, "branch_policies": [
+        {"id": 17, "name": "main", "type": "branch"}]}
+    secrets = {"total_count": 1, "secrets": [
+        {"name": "SZL_CPU_SSH_KEY", "created_at": "2029-01-01T00:00:00Z",
+         "updated_at": "2030-01-01T00:00:00Z"}]}
+    return environment, policies, secrets
+
+
+def variables_fixture(enabled="false"):
+    return {"total_count": 2, "variables": [
+        {"name": "EXISTING", "value": "keep", "created_at": "2029-01-01T00:00:00Z",
+         "updated_at": "2030-01-01T00:00:00Z"},
+        {"name": "SZL_CPU_CI_ENABLED", "value": enabled,
+         "created_at": "2029-01-01T00:00:00Z", "updated_at": "2030-01-01T00:00:00Z"},
+    ]}
 
 
 def arguments(workdir, *extra):
@@ -127,113 +175,270 @@ class DryRunTests(unittest.TestCase):
 
 
 class GithubStageTests(unittest.TestCase):
-    def test_environment_secret_and_variables_with_enable_last_and_pin_required(self):
-        with tempfile.TemporaryDirectory() as scratch:
-            work = Path(scratch) / "lane"
-            work.mkdir()
-            (work / "szl-cpu-ci").write_bytes(b"PRIVATE-KEY-BYTES")
-            lane = bring_up.Lane(lane_args(work))
-            lane.clock = lambda: NOW
-            lane.qualification = qualification_fixture()
-            lane.activation_state = mock.Mock(return_value=state_fixture())
-            calls = []
-
-            def run(argv, *, stdin=None, capture=False, check=True):
-                calls.append((list(map(str, argv)), stdin))
-                output = b""
-                if argv[:2] == ["gh", "api"] and argv[2] == "user":
-                    output = b'{"id": 4242, "login": "owner"}'
-                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/branches/main"]:
-                    output = b'{"protected": true}' if self.protected else b'{"protected": false}'
-                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/rules/branches/main"]:
-                    output = b'[]'
-                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/environments?per_page=100"]:
-                    output = b'{"total_count": 0, "environments": []}'
-                if argv[:2] == ["gh", "api"] and "deployment-branch-policies?" in argv[2]:
-                    output = b'{"total_count": 1, "branch_policies": [{"id": 17, "name": "main"}]}'
-                if argv[:2] == ["gh", "api"] and argv[2].endswith("deployment-branch-policies/17"):
-                    output = b'{"id": 17, "name": "main", "type": "branch"}'
-                if argv[0] == "ssh-keygen":
-                    output = (b"# Host 203.0.113.10 found: line 3\n"
-                              b"203.0.113.10 ssh-ed25519 AAAAPIN\n") if self.pin else b""
-                return subprocess.CompletedProcess(argv, 0, output, b"")
-            lane.run = run
-            self.pin = True
-            self.protected = True
-            with mock.patch("builtins.input", side_effect=["CONFIGURE", "ENABLE", "no"]), \
-                    contextlib.redirect_stdout(io.StringIO()):
-                lane.github()
-            environment = next(json.loads(stdin) for argv, stdin in calls if "PUT" in argv)
-            self.assertEqual(environment["reviewers"], [{"type": "User", "id": 4242}])
-            self.assertEqual(environment["deployment_branch_policy"],
-                             {"protected_branches": False, "custom_branch_policies": True})
-            policy = next(json.loads(stdin) for argv, stdin in calls if "POST" in argv)
-            self.assertEqual(policy, {"name": "main", "type": "branch"})
-            secret = next(stdin for argv, stdin in calls if argv[:3] == ["gh", "secret", "set"])
-            self.assertEqual(secret, b"PRIVATE-KEY-BYTES")
-            variables = [argv[3] for argv, _ in calls if argv[:3] == ["gh", "variable", "set"]]
-            self.assertEqual(variables[-1], "SZL_CPU_CI_ENABLED")
-            pin = next(argv for argv, _ in calls if "SZL_CPU_KNOWN_HOSTS" in argv)
-            self.assertEqual(pin[-1], "203.0.113.10 ssh-ed25519 AAAAPIN")
-            self.assertTrue((work / "szl-cpu-ci").exists())
-            self.assertEqual(lane.activation_state.call_count, 3)
-            calls.clear()
-            self.pin = False
-            with self.assertRaisesRegex(bring_up.Stop, "no verified host-key pin"), \
-                    mock.patch("builtins.input", return_value="CONFIGURE"), \
-                    contextlib.redirect_stdout(io.StringIO()):
-                lane.github()
-            self.assertFalse(any(argv[:3] == ["gh", "secret", "set"] for argv, _ in calls))
-
-    def test_unprotected_main_stops_before_a_secret_write(self):
-        with tempfile.TemporaryDirectory() as scratch:
-            work = Path(scratch) / "lane"
-            work.mkdir()
-            (work / "szl-cpu-ci").write_bytes(b"PRIVATE-KEY-BYTES")
-            lane = bring_up.Lane(lane_args(work))
-            lane.clock = lambda: NOW
-            lane.qualification = qualification_fixture()
-            lane.activation_state = mock.Mock(return_value=state_fixture())
-            calls = []
-
-            def run(argv, *, stdin=None, capture=False, check=True):
-                calls.append(list(map(str, argv)))
-                output = b""
-                if argv[:2] == ["gh", "api"] and argv[2] == "user":
-                    output = b'{"id": 4242}'
-                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/branches/main"]:
-                    output = b'{"protected": false}'
-                if argv[:3] == ["gh", "api", "repos/szl-holdings/szl-skills/rules/branches/main"]:
-                    output = b'[]'
-                if argv[0] == "ssh-keygen":
-                    output = b"203.0.113.10 ssh-ed25519 AAAAPIN\n"
-                return subprocess.CompletedProcess(argv, 0, output, b"")
-
-            lane.run = run
-            with self.assertRaisesRegex(bring_up.Stop, "no branch protection"), \
-                    mock.patch("builtins.input", return_value="CONFIGURE"), \
-                    contextlib.redirect_stdout(io.StringIO()):
-                lane.github()
-            self.assertFalse(any(argv[:3] == ["gh", "secret", "set"] for argv in calls))
-            self.assertFalse(any("PUT" in argv for argv in calls))
-
-
-    def test_existing_broad_policy_stops_before_any_configuration_write(self):
+    def test_release_must_equal_the_current_main_commit(self):
         lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
-        reads = iter([{"id": 4242},
-                      {"total_count": 1, "environments": [{"name": bring_up.ENVIRONMENT}]},
-                      {"total_count": 1, "branch_policies": [{"name": "*", "type": "branch"}]}])
-        with mock.patch.object(lane, "require_qualification"), \
-                mock.patch.object(lane, "confirm", return_value=True), \
-                mock.patch.object(lane, "require_protected_main"), \
-                mock.patch.object(lane, "gh_json", side_effect=lambda _args: next(reads)), \
-                mock.patch.object(lane, "run", return_value=subprocess.CompletedProcess(
-                    ["ssh-keygen"], 0, b"203.0.113.10 ssh-ed25519 AAAAPIN\n")) as run, \
-                mock.patch.object(Path, "read_bytes", side_effect=AssertionError("key read")), \
-                self.assertRaisesRegex(ValueError, "exactly the main branch"):
+        lane.gh_json = mock.Mock(return_value={"sha": SHA})
+        lane.require_release_is_current_main()
+        lane.gh_json.assert_called_once_with(
+            ["api", "repos/%s/commits/main" % bring_up.REPO])
+        for response in ({"sha": "d" * 40}, {}, [], None):
+            lane.gh_json = mock.Mock(return_value=response)
+            with self.subTest(response=response), self.assertRaisesRegex(
+                    bring_up.Stop, "not the current main"):
+                lane.require_release_is_current_main()
+
+    def test_environment_snapshot_digest_binds_full_authority_preimage(self):
+        lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+
+        def snapshot(environment, policies, secrets, variables, *, listed_count=1,
+                     allow_enabled=False):
+            endpoint = "repos/%s/environments/%s" % (bring_up.REPO, bring_up.ENVIRONMENT)
+            responses = {
+                "repos/%s/environments?per_page=100" % bring_up.REPO: {
+                    "total_count": listed_count,
+                    "environments": [{"name": bring_up.ENVIRONMENT}]},
+                endpoint: environment,
+                endpoint + "/deployment-branch-policies?per_page=100": policies,
+                endpoint + "/secrets?per_page=100": secrets,
+                endpoint + "/variables?per_page=100": variables,
+            }
+
+            def read(argv):
+                self.assertEqual(argv[0], "api")
+                return deepcopy(responses[argv[1]])
+
+            lane.gh_json = mock.Mock(side_effect=read)
+            return lane.environment_snapshot(allow_enabled=allow_enabled)
+
+        environment, policies, secrets = environment_fixture()
+        variables = variables_fixture()
+        base = snapshot(environment, policies, secrets, variables)
+        self.assertEqual(base["secret_names"], ["SZL_CPU_SSH_KEY"])
+        self.assertEqual(base["variables"], {"EXISTING": "keep",
+                                              "SZL_CPU_CI_ENABLED": "false"})
+        digests = set()
+        for mutate in (
+                lambda e, p, s: e["protection_rules"][0].update(prevent_self_review=False),
+                lambda e, p, s: e["protection_rules"][0]["reviewers"][0]["reviewer"].update(
+                    id=4343),
+                lambda e, p, s: p["branch_policies"][0].update(id=18),
+                lambda e, p, s: s["secrets"][0].update(
+                    updated_at="2030-01-02T00:00:00Z"),
+                lambda e, p, s: (s["secrets"].append({"name": "OTHER", "updated_at":
+                                                        "2030-01-01T00:00:00Z",
+                                                        "created_at":
+                                                        "2029-01-01T00:00:00Z"}),
+                                   s.update(total_count=2)),
+        ):
+            changed_environment, changed_policies, changed_secrets = environment_fixture()
+            mutate(changed_environment, changed_policies, changed_secrets)
+            changed = snapshot(changed_environment, changed_policies, changed_secrets, variables)
+            self.assertNotEqual(changed["environment_sha256"], base["environment_sha256"])
+            digests.add(changed["environment_sha256"])
+        self.assertEqual(len(digests), 5)
+        changed_variables = variables_fixture()
+        changed_variables["variables"][0]["value"] = "changed"
+        changed = snapshot(environment, policies, secrets, changed_variables)
+        self.assertNotEqual(changed["variables_sha256"], base["variables_sha256"])
+        with self.assertRaisesRegex(bring_up.Stop, "listing is incomplete"):
+            snapshot(environment, policies, secrets, variables, listed_count=2)
+        with self.assertRaisesRegex(bring_up.Stop, "absent or exactly false"):
+            snapshot(environment, policies, secrets, variables_fixture("true"))
+        enabled = snapshot(environment, policies, secrets, variables_fixture("true"),
+                           allow_enabled=True)
+        self.assertEqual(enabled["variables"]["SZL_CPU_CI_ENABLED"], "true")
+
+    def test_variables_enable_last_without_environment_secret_or_key_mutation(self):
+        lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        lane.clock = lambda: NOW
+        lane.qualification = qualification_fixture()
+        lane.plan_state = plan_fixture()
+        lane.activation_state = mock.Mock(return_value=state_fixture())
+        lane.verify_plan = mock.Mock(return_value=plan_fixture())
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(list(map(str, argv)))
+            return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+        lane.run = run
+        with mock.patch.object(lane, "confirm", side_effect=[True, True]), \
+                mock.patch.object(Path, "read_bytes", side_effect=AssertionError("private key read")), \
+                contextlib.redirect_stdout(io.StringIO()):
             lane.github()
-        self.assertEqual(run.call_count, 1)
-        self.assertEqual(run.call_args.args[0][0], "ssh-keygen")
+        variables = [argv[3] for argv in calls if argv[:3] == ["gh", "variable", "set"]]
+        self.assertEqual(variables, ["SZL_CPU_SSH_HOST", "SZL_CPU_SSH_PORT",
+                                     "SZL_CPU_SSH_USER", "SZL_CPU_KNOWN_HOSTS",
+                                     "SZL_CPU_CI_ENABLED"])
+        self.assertFalse(any("-X" in argv for argv in calls))
+        self.assertFalse(any(argv[:2] == ["gh", "secret"] for argv in calls))
+        self.assertEqual(lane.activation_state.call_count, 3)
+        self.assertEqual(lane.verify_plan.call_count, 3)
+        expected = {"EXISTING": "keep", **lane.connection_variables(plan_fixture()["pins"])}
+        self.assertEqual(lane.verify_plan.call_args_list[1],
+                         mock.call(expected_variables=expected))
+        expected["SZL_CPU_CI_ENABLED"] = "true"
+        self.assertEqual(lane.verify_plan.call_args_list[2],
+                         mock.call(expected_variables=expected, allow_enabled=True))
+
+    def test_failed_activation_is_disabled_and_uncertain_recovery_is_reported(self):
+        cases = ((False, False, False), (False, True, False),
+                 (False, False, True), (True, False, False))
+        for uncertain, deactivation_error, enable_error in cases:
+            lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+            lane.clock = lambda: NOW
+            lane.qualification = qualification_fixture()
+            lane.plan_state = plan_fixture()
+            lane.activation_state = mock.Mock(return_value=state_fixture())
+            lane.verify_plan = mock.Mock(side_effect=[
+                plan_fixture(), plan_fixture(), bring_up.Stop("post-activation drift")])
+            calls = []
+
+            def run(argv, **kwargs):
+                calls.append(list(map(str, argv)))
+                if (enable_error and argv[:4] == ["gh", "variable", "set",
+                                                 "SZL_CPU_CI_ENABLED"]
+                        and argv[-1] == "true"):
+                    raise bring_up.Stop("activation command uncertain")
+                if (deactivation_error and argv[:4] == ["gh", "variable", "set",
+                                                       "SZL_CPU_CI_ENABLED"]
+                        and argv[-1] == "false"):
+                    raise bring_up.Stop("deactivation command uncertain")
+                return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+            readback = (bring_up.Stop("readback unavailable") if uncertain else {
+                "variables_sha256": "r" * 64,
+                "variables": {"SZL_CPU_CI_ENABLED": "false"},
+            })
+            message = "not proven" if uncertain else "false readback verified"
+            with self.subTest(uncertain=uncertain, deactivation_error=deactivation_error,
+                              enable_error=enable_error), \
+                    mock.patch.object(lane, "confirm", side_effect=[True, True]), \
+                    mock.patch.object(lane, "run", side_effect=run), \
+                    mock.patch.object(lane, "environment_variable_snapshot",
+                                      side_effect=readback if uncertain else None,
+                                      return_value=None if uncertain else readback), \
+                    contextlib.redirect_stdout(io.StringIO()), \
+                    self.assertRaisesRegex(bring_up.Stop, message):
+                lane.github()
+            enabled_writes = [argv[-1] for argv in calls
+                              if argv[:4] == ["gh", "variable", "set",
+                                              "SZL_CPU_CI_ENABLED"]]
+            self.assertEqual(enabled_writes, ["true", "false"])
+
+    def test_changed_plan_stops_before_any_variable_write(self):
+        cases = (
+            ("public key", {**plan_fixture()["public_keys"],
+                            "szl-cpu-ci.pub": "ssh-ed25519 CHANGED"},
+             plan_fixture()["pins"], "e" * 64, "v" * 64, {"sha": SHA}),
+            ("host pin", plan_fixture()["public_keys"],
+             ["203.0.113.10 ssh-ed25519 CHANGED"], "e" * 64, "v" * 64, {"sha": SHA}),
+            ("environment", plan_fixture()["public_keys"], plan_fixture()["pins"],
+             "f" * 64, "v" * 64, {"sha": SHA}),
+            ("variables", plan_fixture()["public_keys"], plan_fixture()["pins"],
+             "e" * 64, "w" * 64, {"sha": SHA}),
+            ("main advance", plan_fixture()["public_keys"], plan_fixture()["pins"],
+             "e" * 64, "v" * 64, {"sha": "d" * 40}),
+        )
+        for label, public_keys, pins, digest, variable_digest, commit in cases:
+            lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+            lane.plan_state = plan_fixture()
+            calls = []
+
+            def run(argv, **kwargs):
+                calls.append(argv)
+                return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+            with self.subTest(label=label), \
+                    mock.patch.object(lane, "require_qualification"), \
+                    mock.patch.object(lane, "confirm", return_value=True), \
+                    mock.patch.object(lane, "public_key_snapshot", return_value=public_keys), \
+                    mock.patch.object(lane, "host_pins", return_value=pins), \
+                    mock.patch.object(lane, "require_protected_main"), \
+                    mock.patch.object(lane, "gh_json", return_value=commit), \
+                    mock.patch.object(lane, "environment_snapshot", return_value={
+                        "environment_sha256": digest,
+                        "secret_names": ["SZL_CPU_SSH_KEY"],
+                        "variables_sha256": variable_digest,
+                        "variables": {"EXISTING": "keep"}}), \
+                    mock.patch.object(lane, "run", side_effect=run), \
+                    self.assertRaises(bring_up.Stop):
+                lane.github()
+            self.assertEqual(calls, [])
+
+    def test_live_plan_records_only_the_read_preimage(self):
+        lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        snapshot = {"environment_sha256": "e" * 64,
+                    "secret_names": ["SZL_CPU_SSH_KEY"],
+                    "variables_sha256": "v" * 64,
+                    "variables": {"EXISTING": "keep"}}
+        output = io.StringIO()
+        with mock.patch.object(lane, "preprovisioned_keys", return_value=("ci", "owner")), \
+                mock.patch.object(lane, "host_pins", return_value=plan_fixture()["pins"]), \
+                mock.patch.object(lane, "require_login"), \
+                mock.patch.object(lane, "require_protected_main"), \
+                mock.patch.object(lane, "require_release_is_current_main"), \
+                mock.patch.object(lane, "environment_snapshot", return_value=snapshot), \
+                mock.patch.object(lane, "run", side_effect=AssertionError("write command")), \
+                contextlib.redirect_stdout(output):
+            lane.plan()
+        planned_keys = {"szl-cpu-ci.pub": "ci", "szl-owner-permit.pub": "owner"}
+        self.assertEqual(lane.plan_state, {"pins": plan_fixture()["pins"],
+                                           "public_keys": planned_keys, **snapshot})
+        payload = next(json.loads(line) for line in output.getvalue().splitlines()
+                       if line.startswith("{"))
+        self.assertEqual(payload["schema"], "szl.ssh-cpu-build.live-plan.v1")
+        self.assertRegex(payload["public_keys_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual({row["name"]: row["value"] for row in payload["writes"]}, {
+            **lane.connection_variables(plan_fixture()["pins"]),
+            "SZL_CPU_CI_ENABLED": "true",
+        })
+
+
+class KeyStageTests(unittest.TestCase):
+    def test_existing_distinct_keys_are_validated_without_generation_or_private_read(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            lane = bring_up.Lane(lane_args(scratch))
+            lane.ci_key.write_bytes(b"opaque-private-ci")
+            Path(str(lane.ci_key) + ".pub").write_text(
+                "ssh-ed25519 %s ci\n" % ed25519_blob(65), encoding="ascii")
+            lane.owner_key.write_bytes(b"opaque-private-owner")
+            Path(str(lane.owner_key) + ".pub").write_text(
+                "ssh-ed25519 %s owner\n" % ed25519_blob(66), encoding="ascii")
+            original_open = Path.open
+
+            def refuse_private_read(path, *args, **kwargs):
+                if path in {lane.ci_key, lane.owner_key}:
+                    raise AssertionError("private key read")
+                return original_open(path, *args, **kwargs)
+
+            with mock.patch.object(lane, "run", side_effect=AssertionError("command")), \
+                    mock.patch.object(lane, "confirm", side_effect=AssertionError("prompt")), \
+                    mock.patch.object(Path, "open", refuse_private_read), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                lane.keys()
+            self.assertEqual(lane.ci_key.read_bytes(), b"opaque-private-ci")
+            self.assertEqual(lane.owner_key.read_bytes(), b"opaque-private-owner")
+
+    def test_missing_or_reused_key_material_is_rejected(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            lane = bring_up.Lane(lane_args(scratch))
+            with self.assertRaisesRegex(bring_up.Stop, "pre-provision"):
+                lane.keys()
+            lane.ci_key.write_bytes(b"opaque-private")
+            Path(str(lane.ci_key) + ".pub").write_text(
+                "ssh-ed25519 QUFBQQ== malformed\n", encoding="ascii")
+            lane.owner_key.write_bytes(b"opaque-private")
+            Path(str(lane.owner_key) + ".pub").write_text(
+                "ssh-ed25519 %s owner\n" % ed25519_blob(66), encoding="ascii")
+            with self.assertRaises(bring_up.Stop):
+                lane.keys()
+            for key in (lane.ci_key, lane.owner_key):
+                key.write_bytes(b"opaque-private")
+                Path(str(key) + ".pub").write_text(
+                    "ssh-ed25519 %s same\n" % ed25519_blob(65), encoding="ascii")
+            with self.assertRaisesRegex(bring_up.Stop, "must differ"):
+                lane.keys()
 
 
 class ProvisionStageTests(unittest.TestCase):
@@ -250,6 +455,7 @@ class ProvisionStageTests(unittest.TestCase):
 
     def test_declined_apply_retains_unique_staging_without_deleting_anything(self):
         lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        lane.plan_state = plan_fixture()
         calls = []
 
         def remote(command, **kwargs):
@@ -258,22 +464,50 @@ class ProvisionStageTests(unittest.TestCase):
             return subprocess.CompletedProcess(["fixture"], 0, stdout, b"")
 
         with mock.patch.object(lane, "confirm", side_effect=[True, False]), \
+                mock.patch.object(lane, "verify_plan") as verify_plan, \
                 mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
                 mock.patch.object(lane, "remote", side_effect=remote), \
-                mock.patch.object(Path, "read_bytes", return_value=b"SYNTHETIC PUBLIC KEY"), \
+                mock.patch.object(Path, "read_bytes", side_effect=AssertionError("key reread")), \
                 contextlib.redirect_stdout(io.StringIO()), self.assertRaises(bring_up.Stop):
             lane.provision()
+        verify_plan.assert_called_once_with()
         self.assertIn("mktemp -d", calls[0])
         self.assertTrue(any(STAGING + "/src" in cmd for cmd in calls))
         self.assertTrue(any("ssh_ci_provision.py plan" in cmd for cmd in calls))
         self.assertFalse(any("ssh_ci_provision.py apply" in cmd for cmd in calls))
         self.assertFalse(any("rm " in cmd or "rmdir" in cmd for cmd in calls))
 
+    def test_provision_stages_the_public_keys_captured_by_the_plan(self):
+        lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        lane.plan_state = plan_fixture()
+        writes = []
+
+        def remote(command, **kwargs):
+            if "mktemp -d" in command:
+                return subprocess.CompletedProcess(["fixture"], 0, (STAGING + "\n").encode(), b"")
+            if kwargs.get("stdin") is not None:
+                writes.append(kwargs["stdin"])
+            return subprocess.CompletedProcess(["fixture"], 0, b"", b"")
+
+        with mock.patch.object(lane, "confirm", side_effect=[True, False]), \
+                mock.patch.object(lane, "verify_plan"), \
+                mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
+                mock.patch.object(lane, "remote", side_effect=remote), \
+                mock.patch.object(Path, "read_bytes", side_effect=AssertionError("key reread")), \
+                contextlib.redirect_stdout(io.StringIO()), self.assertRaises(bring_up.Stop):
+            lane.provision()
+        self.assertEqual(writes, [
+            plan_fixture()["public_keys"]["szl-cpu-ci.pub"].encode("ascii"),
+            plan_fixture()["public_keys"]["szl-owner-permit.pub"].encode("ascii"),
+        ])
+
     def test_invalid_staging_path_refused_before_public_key_transfer(self):
         for path in ("../existing-work", "/tmp/unrelated", "/tmp/szl-cpu-bringup-ok/../x",
                      STAGING + "\n/another/path"):
             lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+            lane.plan_state = plan_fixture()
             with self.subTest(path=path), mock.patch.object(lane, "confirm", return_value=True), \
+                    mock.patch.object(lane, "verify_plan"), \
                     mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
                     mock.patch.object(lane, "remote", return_value=subprocess.CompletedProcess(
                         ["fixture"], 0, (path + "\n").encode(), b"")) as remote, \
@@ -281,6 +515,15 @@ class ProvisionStageTests(unittest.TestCase):
                     self.assertRaises(bring_up.Stop):
                 lane.provision()
             self.assertEqual(remote.call_count, 1)
+
+    def test_mutating_bring_up_stages_require_a_same_invocation_plan(self):
+        for method in ("provision", "qualify"):
+            lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+            with self.subTest(method=method), \
+                    mock.patch.object(lane, "confirm", return_value=True), \
+                    mock.patch.object(lane, "remote", side_effect=AssertionError("remote write")), \
+                    self.assertRaisesRegex(bring_up.Stop, "run plan"):
+                getattr(lane, method)()
 
 
 class QualificationValidationTests(unittest.TestCase):
@@ -388,13 +631,16 @@ class QualificationStageTests(unittest.TestCase):
     def test_real_stage_captures_json_without_pty_and_keeps_validated_evidence(self):
         receipt = qualification_fixture()
         lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        lane.plan_state = plan_fixture()
         lane.clock = lambda: NOW
         with mock.patch.object(lane, "remote", return_value=subprocess.CompletedProcess(
                 ["fixture"], 0, json.dumps(receipt).encode(), b"")) as remote, \
                 mock.patch.object(lane, "activation_state", return_value=state_fixture()), \
                 mock.patch.object(lane, "confirm", return_value=True), \
+                mock.patch.object(lane, "verify_plan") as verify_plan, \
                 contextlib.redirect_stdout(io.StringIO()):
             lane.qualify()
+        verify_plan.assert_called_once_with()
         self.assertEqual(lane.qualification, receipt)
         self.assertFalse(remote.call_args.kwargs.get("tty", False))
         self.assertTrue(remote.call_args.kwargs.get("capture"))
@@ -403,17 +649,21 @@ class QualificationStageTests(unittest.TestCase):
 
     def test_failed_second_attempt_clears_prior_evidence(self):
         lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        lane.plan_state = plan_fixture()
         lane.qualification = qualification_fixture()
         with mock.patch.object(lane, "remote", return_value=subprocess.CompletedProcess(
                 ["fixture"], 1, b"", b"")), mock.patch.object(lane, "confirm", return_value=True), \
+                mock.patch.object(lane, "verify_plan"), \
                 self.assertRaises(bring_up.Stop):
             lane.qualify()
         self.assertIsNone(lane.qualification)
 
     def test_preview_never_caches_live_qualification(self):
         lane = bring_up.Lane(lane_args("unused-synthetic-lane", dry_run=True))
+        lane.plan_state = plan_fixture()
         lane.qualification = qualification_fixture()
         with contextlib.redirect_stdout(io.StringIO()), \
+                mock.patch.object(lane, "verify_plan"), \
                 mock.patch.object(subprocess, "run", side_effect=AssertionError("external call")):
             lane.qualify()
         self.assertIsNone(lane.qualification)
@@ -422,11 +672,13 @@ class QualificationStageTests(unittest.TestCase):
         for stdout in (b"", b"success", b'{"result":"QUALIFIED","result":"QUALIFIED"}',
                        b" " * 262145):
             lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+            lane.plan_state = plan_fixture()
             lane.qualification = qualification_fixture()
             with self.subTest(size=len(stdout)), \
                     mock.patch.object(lane, "remote", return_value=subprocess.CompletedProcess(
                         ["fixture"], 0, stdout, b"")), \
-                    mock.patch.object(lane, "confirm", return_value=True), self.assertRaises(bring_up.Stop):
+                    mock.patch.object(lane, "confirm", return_value=True), \
+                    mock.patch.object(lane, "verify_plan"), self.assertRaises(bring_up.Stop):
                 lane.qualify()
             self.assertIsNone(lane.qualification)
 
@@ -472,6 +724,7 @@ class GithubAdmissionTests(unittest.TestCase):
     def test_declined_configuration_has_no_github_command_or_key_read(self):
         lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
         lane.qualification = qualification_fixture()
+        lane.plan_state = plan_fixture()
         lane.clock = lambda: NOW
         with mock.patch.object(lane, "activation_state", return_value=state_fixture()), \
                 mock.patch.object(lane, "confirm", return_value=False), \
@@ -484,6 +737,7 @@ class GithubAdmissionTests(unittest.TestCase):
         for drift_at in (1, 2):
             lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
             lane.qualification = qualification_fixture()
+            lane.plan_state = plan_fixture()
             lane.clock = lambda: NOW
             states = [state_fixture() for _ in range(drift_at + 1)]
             states[-1]["observation"]["gpu_compute_processes"][0]["start_ticks"] += 1
@@ -504,12 +758,14 @@ class GithubAdmissionTests(unittest.TestCase):
 
             with self.subTest(drift_at=drift_at), \
                     mock.patch.object(lane, "activation_state", side_effect=states) as readback, \
+                    mock.patch.object(lane, "verify_plan", return_value=plan_fixture()) as plan_check, \
                     mock.patch.object(lane, "confirm", return_value=True), \
                     mock.patch.object(lane, "run", side_effect=run), \
                     mock.patch.object(Path, "read_bytes", return_value=b"SYNTHETIC-KEY"), \
                     contextlib.redirect_stdout(io.StringIO()), self.assertRaises(bring_up.Stop):
                 lane.github()
             self.assertEqual(readback.call_count, drift_at + 1)
+            self.assertEqual(plan_check.call_count, 1)
             self.assertFalse(any(argv[:4] == ["gh", "variable", "set", "SZL_CPU_CI_ENABLED"]
                                  and argv[-1] == "true" for argv in calls))
             if drift_at == 1:

@@ -4,13 +4,15 @@
 Run on the workstation that holds the verified admin SSH key and host-key pin.
 Stages run in order; each one that changes something asks first:
 
-  keys       create the dedicated CI key and a separate permit-signing key (local)
+  plan       live read-only preflight; pins source, host and GitHub preimage
+  keys       verify separately provisioned CI and permit-signing keys (read-only)
   provision  after STAGE, prove a BatchMode login, stage into a new private
              /tmp directory that is never deleted or reused, plan, apply on
              APPLY, then retest a fresh admin login
   qualify    sandbox negative controls plus a real build rehearsal on the VM
-  github     fresh qualification, host-key pin and protected main before any
-             GitHub write; secret and variables; SZL_CPU_CI_ENABLED last
+  github     fresh qualification plus unchanged live plan before variable
+             writes; the environment and secret must already exist;
+             SZL_CPU_CI_ENABLED is written last
   run        one owner-issued build (tools/ssh_ci_owner_issue.py) and its verdict
 
 Stages that use unattended (BatchMode) ssh first prove one such login works.
@@ -20,6 +22,7 @@ command instead of running it. Requires ssh, ssh-keygen, git, and gh.
 
 import argparse
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -33,11 +36,13 @@ if __package__ in (None, ""):
 
 from tools.ssh_ci_contract import (ContractError, STEP_NAMES, canonical,
                                    strict_json_loads, validate_pinned_processes)
-from tools.ssh_ci_environment import main_branch_policy
+from tools.ssh_ci_environment import (environment_variables_preimage,
+                                      required_environment_preimage)
+from tools.ssh_ci_provision import ProvisionError, public_key as normalize_public_key
 
 REPO = "szl-holdings/szl-skills"
 ENVIRONMENT = "massed-cpu-build"
-STAGES = ("keys", "provision", "qualify", "github", "run")
+STAGES = ("plan", "keys", "provision", "qualify", "github", "run")
 PLAIN_PATH = r"/[A-Za-z0-9._/@+-]{1,254}"
 MAX_EVIDENCE_BYTES = 256 * 1024
 QUALIFICATION_MAX_AGE_SECONDS = 900
@@ -133,6 +138,7 @@ class Lane:
         self.owner_key = self.work / "szl-owner-permit"
         self.host = args.vm.split("@", 1)[-1]
         self.qualification = None
+        self.plan_state = None
         self.clock = lambda: datetime.now(timezone.utc)
 
     # -- plumbing -------------------------------------------------------------
@@ -189,25 +195,180 @@ class Lane:
             return True
         return input(question + " Type %s to continue: " % word).strip() == word
 
+    def public_key(self, private_path, label):
+        """Validate public material and private-file presence without reading private bytes."""
+        private_path = Path(private_path)
+        public_path = Path(str(private_path) + ".pub")
+        if (private_path.is_symlink() or public_path.is_symlink()
+                or not private_path.is_file() or not public_path.is_file()):
+            raise Stop("pre-provision %s private/public key files before bring-up" % label)
+        try:
+            text = public_path.read_text(encoding="ascii").strip()
+        except (OSError, UnicodeError) as error:
+            raise Stop("%s public key is unavailable or not ASCII" % label) from error
+        try:
+            normalized = normalize_public_key(text, label + " public key")
+        except ProvisionError as error:
+            raise Stop(str(error)) from error
+        fields = normalized.split()
+        if fields[0] != "ssh-ed25519":
+            raise Stop("%s public key is not Ed25519" % label)
+        return fields[1], text
+
+    def preprovisioned_keys(self):
+        ci, ci_text = self.public_key(self.ci_key, "CI")
+        owner, owner_text = self.public_key(self.owner_key, "owner permit-signing")
+        if ci == owner:
+            raise Stop("the CI key and the permit-signing key must differ")
+        return ci_text, owner_text
+
+    def public_key_snapshot(self):
+        """Return the exact public-key bytes the live plan will later stage."""
+        if self.args.dry_run:
+            return {
+                "szl-cpu-ci.pub": "ssh-ed25519 SIMULATED-CI-PUBLIC-KEY",
+                "szl-owner-permit.pub": "ssh-ed25519 SIMULATED-OWNER-PUBLIC-KEY",
+            }
+        ci, owner = self.preprovisioned_keys()
+        return {"szl-cpu-ci.pub": ci, "szl-owner-permit.pub": owner}
+
+    def host_pins(self):
+        pattern = self.host if self.args.port == 22 else "[%s]:%d" % (self.host, self.args.port)
+        found = self.run(["ssh-keygen", "-F", pattern, "-f", self.args.known_hosts],
+                         capture=True, check=False).stdout or b""
+        if self.args.dry_run:
+            return [pattern + " ssh-ed25519 SIMULATED-PIN"]
+        pins = [line for line in found.decode("ascii", "replace").splitlines()
+                if line.strip() and not line.startswith("#")]
+        if not pins:
+            raise Stop("no verified host-key pin for %s in %s" % (pattern, self.args.known_hosts))
+        return pins
+
+    def require_release_is_current_main(self):
+        commit = self.gh_json(["api", "repos/%s/commits/main" % REPO])
+        if self.args.dry_run:
+            self.report("plan", "would require release SHA to equal current main")
+            return
+        if type(commit) is not dict or commit.get("sha") != self.sha:
+            raise Stop("release SHA is not the current main commit; re-read and re-plan")
+
+    def environment_variable_snapshot(self, *, allow_enabled=False):
+        endpoint = "repos/%s/environments/%s/variables?per_page=100" % (REPO, ENVIRONMENT)
+        if self.args.dry_run:
+            return {"variables_sha256": "0" * 64, "variables": {}}
+        variables = self.gh_json(["api", endpoint])
+        try:
+            preimage, values = environment_variables_preimage(variables)
+            digest = hashlib.sha256(canonical(preimage)).hexdigest()
+        except (ContractError, TypeError, ValueError) as error:
+            raise Stop("GitHub environment variable preimage rejected: " + str(error)) from error
+        enabled = values.get("SZL_CPU_CI_ENABLED")
+        if not allow_enabled and enabled not in (None, "false"):
+            raise Stop("SZL_CPU_CI_ENABLED must be absent or exactly false before configuration")
+        return {"variables_sha256": digest, "variables": values}
+
+    def environment_snapshot(self, *, allow_enabled=False):
+        endpoint = "repos/%s/environments/%s" % (REPO, ENVIRONMENT)
+        policies = endpoint + "/deployment-branch-policies"
+        environments = self.gh_json(["api", "repos/%s/environments?per_page=100" % REPO])
+        if self.args.dry_run:
+            return {"environment_sha256": "0" * 64,
+                    "secret_names": ["SZL_CPU_SSH_KEY"],
+                    "variables_sha256": "0" * 64, "variables": {}}
+        rows = environments.get("environments") if type(environments) is dict else None
+        count = environments.get("total_count") if type(environments) is dict else None
+        if (type(count) is not int or type(rows) is not list or count != len(rows)
+                or any(type(row) is not dict or type(row.get("name")) is not str
+                       for row in rows)):
+            raise Stop("environment listing is incomplete; no configuration changed")
+        if sum(row["name"] == ENVIRONMENT for row in rows) != 1:
+            raise Stop("pre-provision the protected %s environment before bring-up" % ENVIRONMENT)
+        environment = self.gh_json(["api", endpoint])
+        branch_policies = self.gh_json(["api", policies + "?per_page=100"])
+        details = {}
+
+        def lookup(policy_id):
+            details[policy_id] = self.gh_json(["api", policies + "/" + str(policy_id)])
+            return details[policy_id]
+
+        secrets = self.gh_json(["api", endpoint + "/secrets?per_page=100"])
+        try:
+            preimage = required_environment_preimage(
+                environment, branch_policies, secrets, expected_name=ENVIRONMENT,
+                required_secret="SZL_CPU_SSH_KEY", lookup=lookup)
+            digest = hashlib.sha256(canonical(preimage)).hexdigest()
+        except (ContractError, TypeError, ValueError) as error:
+            raise Stop("GitHub environment preimage rejected: " + str(error)) from error
+        variable_snapshot = self.environment_variable_snapshot(allow_enabled=allow_enabled)
+        return {"environment_sha256": digest,
+                "secret_names": [row["name"] for row in preimage["secrets"]],
+                **variable_snapshot}
+
+    def verify_plan(self, *, expected_variables=None, allow_enabled=False):
+        if self.plan_state is None:
+            raise Stop("run plan in this invocation before any mutating stage")
+        public_keys = self.public_key_snapshot()
+        if public_keys != self.plan_state["public_keys"]:
+            raise Stop("planned public key material changed; activation refused")
+        pins = self.host_pins()
+        self.require_protected_main()
+        self.require_release_is_current_main()
+        current = self.environment_snapshot(allow_enabled=allow_enabled)
+        if (pins != self.plan_state["pins"]
+                or current["environment_sha256"] != self.plan_state["environment_sha256"]):
+            raise Stop("live plan authority preimage changed; activation refused")
+        if expected_variables is None:
+            if current["variables_sha256"] != self.plan_state["variables_sha256"]:
+                raise Stop("live plan variable preimage changed; activation refused")
+        elif self.args.dry_run:
+            return current
+        elif current["variables"] != expected_variables:
+            raise Stop("environment variables do not match the exact planned values")
+        return current
+
+    def connection_variables(self, pins):
+        """The exact ordered non-secret connection values proposed by the live plan."""
+        return {
+            "SZL_CPU_SSH_HOST": self.host,
+            "SZL_CPU_SSH_PORT": str(self.args.port),
+            "SZL_CPU_SSH_USER": "szl-ci",
+            "SZL_CPU_KNOWN_HOSTS": "\n".join(pins),
+        }
+
     # -- stages ---------------------------------------------------------------
+    def plan(self):
+        """Perform live reads only and bind every later write to their preimage."""
+        self.plan_state = None
+        self.require_window()
+        if self.args.dry_run:
+            print("SIMULATED: live plan would validate pre-provisioned keys and read host/GitHub state")
+        public_keys = self.public_key_snapshot()
+        pins = self.host_pins()
+        self.require_login()
+        self.require_protected_main()
+        self.require_release_is_current_main()
+        snapshot = self.environment_snapshot()
+        self.plan_state = {"pins": pins, "public_keys": public_keys, **snapshot}
+        connection = self.connection_variables(pins)
+        plan = {"schema": "szl.ssh-cpu-build.live-plan.v1", "repo": REPO,
+                "release_sha": self.sha, "vm": self.args.vm, "port": self.args.port,
+                "environment": ENVIRONMENT,
+                "environment_sha256": snapshot["environment_sha256"],
+                "variables_sha256": snapshot["variables_sha256"],
+                 "public_keys_sha256": hashlib.sha256(canonical(public_keys)).hexdigest(),
+                "preprovisioned_secret": "SZL_CPU_SSH_KEY",
+                "writes": [{"name": name, "value": value}
+                           for name, value in connection.items()]
+                          + [{"name": "SZL_CPU_CI_ENABLED", "value": "true"}]}
+        print(json.dumps(plan, sort_keys=True, separators=(",", ":")))
+        self.report("plan", "live read-only preimage recorded")
+
     def keys(self):
-        if not self.confirm("Create any missing dedicated CI and permit-signing keys?", "KEYS"):
-            raise Stop("keys not created")
-        if not self.args.dry_run:
-            self.work.mkdir(parents=True, exist_ok=True)
-        if not self.ci_key.exists():
-            self.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "szl-cpu-ci",
-                      "-f", self.ci_key])
-        if not self.owner_key.exists():
-            print("Choose a passphrase for your permit-signing key; it signs every build permit.")
-            self.run(["ssh-keygen", "-t", "ed25519", "-C", "stephen-szl-permit",
-                      "-f", self.owner_key])
-        if not self.args.dry_run:
-            ci, owner = (Path(str(key) + ".pub").read_text().split()[1]
-                         for key in (self.ci_key, self.owner_key))
-            if ci == owner:
-                raise Stop("the CI key and the permit-signing key must differ")
-        self.report("keys", "CI key %s, permit-signing key %s" % (self.ci_key, self.owner_key))
+        if self.args.dry_run:
+            print("SIMULATED: would verify distinct public keys and private-file presence")
+        else:
+            self.preprovisioned_keys()
+        self.report("keys", "distinct public keys and private-file presence verified")
 
     def provision(self):
         self.qualification = None
@@ -220,6 +381,7 @@ class Lane:
         if not self.confirm("Stage public keys and exact source in a NEW private VM directory "
                             "(retained, never deleted automatically)?", "STAGE"):
             raise Stop("provisioning not staged; nothing was written to the VM")
+        self.verify_plan()
         self.require_login()
         # No existing directory is reused, overwritten or removed, even on failure.
         staged = self.remote("umask 077; mktemp -d /tmp/szl-cpu-bringup-XXXXXXXXXX", capture=True)
@@ -229,15 +391,9 @@ class Lane:
             raise Stop("unexpected staging path; no further writes attempted")
         self.report("staging", "retained directory " + directory)
         keys = []
-        for key, name in ((self.ci_key, "szl-cpu-ci.pub"), (self.owner_key, "szl-owner-permit.pub")):
-            if self.args.dry_run:
-                keys.append((name, b"", "(dry run: %s)" % name))
-                continue
-            data = Path(str(key) + ".pub").read_bytes()
-            text = data.decode("ascii").strip()
-            if "\n" in text or not text.isprintable() or not text:
-                raise Stop("%s.pub is not one public key line" % key)
-            keys.append((name, data, text))
+        for name in ("szl-cpu-ci.pub", "szl-owner-permit.pub"):
+            text = self.plan_state["public_keys"][name]
+            keys.append((name, b"" if self.args.dry_run else text.encode("ascii"), text))
         print("Staging writes only under %s on %s (a new directory; an existing directory is "
               "never deleted or reused):" % (directory, self.args.vm))
         for name, _, text in keys:
@@ -284,6 +440,7 @@ class Lane:
         if not self.confirm("Run bounded CPU isolation controls and the exact-source rehearsal?",
                             "QUALIFY"):
             raise Stop("qualification not run")
+        self.verify_plan()
         result = self.remote(self.qualifier_command() + " --rehearse-build %s --owner-window-ref %s"
                              % (self.sha, shlex.quote(self.args.window_ref)), capture=True,
                              check=False, timeout=900)
@@ -315,75 +472,50 @@ class Lane:
     def github(self):
         # Every check before the first GitHub write, so a refusal changes nothing.
         self.require_qualification()
-        if not self.confirm("Configure the protected GitHub environment and dedicated CI credential?",
+        if self.plan_state is None:
+            raise Stop("run plan,qualify,github together: no live plan in this invocation")
+        if not self.confirm("Write the planned GitHub variables to the pre-provisioned environment?",
                             "CONFIGURE"):
             raise Stop("GitHub configuration not changed")
-        pattern = self.host if self.args.port == 22 else "[%s]:%d" % (self.host, self.args.port)
-        found = self.run(["ssh-keygen", "-F", pattern, "-f", self.args.known_hosts],
-                         capture=True, check=False).stdout or b""
-        pins = [line for line in found.decode("ascii", "replace").splitlines()
-                if line.strip() and not line.startswith("#")]
-        if not pins and not self.args.dry_run:
-            raise Stop("no verified host-key pin for %s in %s" % (pattern, self.args.known_hosts))
-        self.require_protected_main()
-        user = self.gh_json(["api", "user"])
-        if self.args.dry_run:
-            user = {"id": 0}
-        elif type(user) is not dict or type(user.get("id")) is not int or user["id"] <= 0:
-            raise Stop("gh api user did not name a numeric user id")
-        endpoint = "repos/%s/environments/%s" % (REPO, ENVIRONMENT)
-        policies = endpoint + "/deployment-branch-policies"
-
-        def read_policy(*, allow_empty=False):
-            return main_branch_policy(self.gh_json(["api", policies + "?per_page=100"]),
-                                      allow_empty=allow_empty,
-                                      lookup=lambda policy_id: self.gh_json([
-                                          "api", policies + "/" + str(policy_id)]))
-        # Inspect existing rules before switching policy mode. Never activate or
-        # delete an unexpected wildcard/tag/other-branch rule left by an operator.
-        environments = self.gh_json(["api", "repos/%s/environments?per_page=100" % REPO])
-        has_main = False
-        if not self.args.dry_run:
-            rows = environments.get("environments") if type(environments) is dict else None
-            count = environments.get("total_count") if type(environments) is dict else None
-            if (type(count) is not int or type(rows) is not list or count != len(rows)
-                    or any(type(row) is not dict or type(row.get("name")) is not str
-                           for row in rows)):
-                raise Stop("environment listing is incomplete; no configuration changed")
-            if any(row["name"] == ENVIRONMENT for row in rows):
-                has_main = read_policy(allow_empty=True)
-        environment = {"reviewers": [{"type": "User", "id": user["id"]}],
-                       "prevent_self_review": False,
-                       "deployment_branch_policy": {"protected_branches": False,
-                                                    "custom_branch_policies": True}}
-        if not self.args.dry_run:
-            secret = self.ci_key.read_bytes()
-        else:
-            secret = b""
-        # Configuration writes start only after qualification, consent, pin and protected main.
+        # The environment, its reviewers/policy and the private secret are owner-
+        # provisioned. This controller never creates/replaces them or reads the key.
+        self.verify_plan()
+        pins = self.plan_state["pins"]
+        connection = self.connection_variables(pins)
+        # Variable writes start only after qualification, consent and exact preimage checks.
         self.require_qualification()
-        self.run(["gh", "api", "-X", "PUT", endpoint,
-                  "--input", "-"], stdin=json.dumps(environment).encode(), capture=True)
-        if not has_main:
-            self.run(["gh", "api", "-X", "POST", policies, "--input", "-"],
-                     stdin=json.dumps({"name": "main", "type": "branch"}).encode(), capture=True)
-        if not self.args.dry_run:
-            read_policy()
-        self.run(["gh", "secret", "set", "SZL_CPU_SSH_KEY", "--env", ENVIRONMENT, "-R", REPO],
-                 stdin=secret)
-        for name, value in (("SZL_CPU_SSH_HOST", self.host), ("SZL_CPU_SSH_PORT", str(self.args.port)),
-                            ("SZL_CPU_SSH_USER", "szl-ci"), ("SZL_CPU_KNOWN_HOSTS", "\n".join(pins))):
+        for name, value in connection.items():
             self.run(["gh", "variable", "set", name, "--env", ENVIRONMENT, "-R", REPO, "--body", value])
         if self.confirm("Enable the CPU lane after a fresh qualification/identity recheck?", "ENABLE"):
             self.require_qualification()
-            if not self.args.dry_run:
-                read_policy()
-            self.run(["gh", "variable", "set", "SZL_CPU_CI_ENABLED", "--env", ENVIRONMENT, "-R",
-                      REPO, "--body", "true"])
-        if self.confirm("The CI private key is now only needed in GitHub. Delete the local copy?",
-                        "DELETE") and not self.args.dry_run:
-            self.ci_key.unlink()
-        self.report("github", "environment %s configured" % ENVIRONMENT)
+            expected = {**self.plan_state["variables"], **connection}
+            self.verify_plan(expected_variables=expected)
+            enabled = {**expected, "SZL_CPU_CI_ENABLED": "true"}
+            try:
+                self.run(["gh", "variable", "set", "SZL_CPU_CI_ENABLED", "--env", ENVIRONMENT,
+                          "-R", REPO, "--body", "true"])
+                self.verify_plan(expected_variables=enabled, allow_enabled=True)
+            except BaseException as activation_error:
+                recovery_notes = []
+                try:
+                    self.run(["gh", "variable", "set", "SZL_CPU_CI_ENABLED", "--env",
+                              ENVIRONMENT, "-R", REPO, "--body", "false"])
+                except BaseException as error:
+                    recovery_notes.append("deactivation command: " + str(error))
+                try:
+                    disabled = self.environment_variable_snapshot()
+                    if disabled["variables"].get("SZL_CPU_CI_ENABLED") not in (None, "false"):
+                        raise Stop("enabled value remains true")
+                except BaseException as error:
+                    details = recovery_notes + ["disabled readback: " + str(error)]
+                    raise Stop("activation failed and disabled state was not proven; inspect the "
+                               "environment immediately (" + "; ".join(details) + ")") \
+                        from activation_error
+                note = ("; " + "; ".join(recovery_notes)) if recovery_notes else ""
+                raise Stop("activation was not admitted; SZL_CPU_CI_ENABLED=false readback verified"
+                           + note) \
+                    from activation_error
+        self.report("github", "variables configured in unchanged environment %s" % ENVIRONMENT)
 
     def require_protected_main(self):
         """The explicit main deployment rule does not replace main's source protection."""
@@ -463,7 +595,7 @@ def main(argv=None):
     parser.add_argument("--hidden-path", action="append", default=[],
                         help="extra model or data directory to hide from builds (repeatable)")
     parser.add_argument("--owner-config", help="owner attestations for the run stage")
-    parser.add_argument("--stages", default="keys,provision,qualify,github")
+    parser.add_argument("--stages", default="plan,keys,provision,qualify,github")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     stages = [stage.strip() for stage in args.stages.split(",") if stage.strip()]
@@ -477,7 +609,8 @@ def main(argv=None):
     if not 1 <= args.port <= 65535:
         parser.error("--port must be 1-65535")
     lane = Lane(args)
-    handlers = {"keys": lane.keys, "provision": lane.provision, "qualify": lane.qualify,
+    handlers = {"plan": lane.plan, "keys": lane.keys, "provision": lane.provision,
+                "qualify": lane.qualify,
                 "github": lane.github, "run": lane.build}
     for stage in STAGES:
         if stage in stages:
