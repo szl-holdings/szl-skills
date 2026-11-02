@@ -39,7 +39,7 @@ general, scientific truth, model quality, or uninterrupted model latency.
 - The `massed-cpu-build` environment must be explicitly provisioned and restricted
   to protected `main` before activation. Creating it automatically by dispatching
   this workflow is not a substitute for configuring protection.
-- `SZL_CPU_CI_ENABLED` must remain unset until all qualification gates below pass.
+- `SZL_CPU_CI_ENABLED` must remain unset or exactly `false` until all qualification gates below pass.
   Missing configuration is BLOCKED, not a skipped remote success.
 - A fresh CPU permit ID is required for each execution. GitHub concurrency does
   not replace a VM-wide lock or the owner's workload reservation. Automatic
@@ -218,36 +218,47 @@ Run every VM step yourself, inside one owner-approved window, from the
 workstation that holds the verified admin key and host pin (or a ThinLinc
 terminal). Nothing here touches the model process or the GPU.
 `tools/ssh_ci_bring_up.py` performs steps 1-5 for one merged commit. Start
-with `--dry-run`; without it, it asks before every change:
+with `--dry-run`, then run the live read-only `plan` stage. The live plan checks
+the current main commit, host pin/login, protected branch, complete existing
+environment protections, main-only deployment rule and pre-provisioned secret.
+It records hashes of the authority and variable preimages and performs no write.
+Provisioning, qualification, and GitHub configuration refuse unless the same
+invocation recorded the plan and its preimages are unchanged:
 
 ```sh
 python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
   --known-hosts <pinned-known-hosts> --window-ref <approval reference> \
-  --hidden-path <model-or-data-dir> --stages keys,provision,qualify,github
+  --hidden-path <model-or-data-dir> --stages plan,keys,provision,qualify,github
 ```
 
 Dry-run output is explicitly **SIMULATED**. It executes no command, creates no
-key or file, and establishes no applied/qualified/PASS outcome. A dry run never
-populates the live qualification gate.
+key or file, and establishes no live plan, applied, qualified or PASS outcome.
+The real `plan` stage executes only bounded reads and a BatchMode `true` login.
 
-The workstation asks for `KEYS` before key creation, `STAGE` before **any** remote
-staging write, `APPLY` after the provisioning plan, `QUALIFY` before the bounded
-controls, and `CONFIGURE` before GitHub configuration. Staging uses a new private
+The controller never creates, uploads or deletes a private key. Provision the
+two distinct key pairs and the GitHub environment secret in a separate owner
+procedure. The workstation asks for `STAGE` before **any** remote staging write,
+`APPLY` after the provisioning plan, `QUALIFY` before the bounded controls, and
+`CONFIGURE` before GitHub variable writes. Staging uses a new private
 absolute `/tmp/szl-cpu-bringup-*` directory per attempt. It never deletes/reuses an
 old checkout or overwrites an existing public-key file. The printed staging
 directory is retained on success and failure for owner-controlled inspection and
 cleanup; do not broadly remove matching directories or another operator's work.
 
-Run `qualify,github` together when resuming after provisioning. Standalone
+Run `plan,qualify,github` together when resuming after provisioning. Standalone
 `--stages github` is refused before credential reads or configuration changes:
-the script must consume the live qualification receipt from this invocation,
-not an arbitrary local JSON file or a remembered exit code. Qualification uses
+the script must consume the live plan and qualification receipt from this
+invocation, not an arbitrary local JSON file or a remembered exit code. Qualification uses
 non-PTY strict-pinned SSH and non-interactive sudo; unavailable sudo is a stop,
 not a prompt bypass. The provisioning window covers staging, installation and
 qualification separately from the later single-use CPU build permit.
 
-1. **Keys (workstation).** Create a dedicated CI key and a separate owner
-   permit-signing key; never reuse the admin key for either.
+1. **Keys (workstation, owner-provisioned).** Create a dedicated CI key and a
+   separate owner permit-signing key outside the controller; never reuse the
+   admin key for either. The `keys` stage verifies that both expected private
+   files and public-key files exist, validates the public-key lines, and requires
+   their public material to differ. It does not read either private key and does
+   not claim that a public key was derived from its adjacent private file.
 
    ```sh
    ssh-keygen -t ed25519 -N "" -C szl-cpu-ci -f szl-cpu-ci
@@ -313,42 +324,43 @@ qualification separately from the later single-use CPU build permit.
    activation. Root-owned host evidence remains host-local, unsigned evidence,
    not independent certification or proof of unchanged model latency.
 
-4. **GitHub environment (workstation, owner login).** Create `massed-cpu-build`
-   with yourself as required reviewer and an explicit `main` branch rule, then
-   add the secret and variables. Set `SZL_CPU_CI_ENABLED` last. Before the first
-   GitHub write, bring-up requires `main` to report `"protected": true` or an
+4. **GitHub environment (workstation, owner login).** In a separate owner
+   procedure, pre-create `massed-cpu-build` with at least one required reviewer,
+   an explicit `main` branch rule and the `SZL_CPU_SSH_KEY` environment secret.
+   The controller refuses to create or replace the environment, reviewers,
+   deployment policies or secret. It writes only the four non-secret connection
+   variables and then, after a second preimage/readiness check,
+   `SZL_CPU_CI_ENABLED` last. Before the first GitHub write, bring-up requires
+   `main` to report `"protected": true` or an
    active ruleset on `main`. It writes nothing when that check fails. An
    environment policy allowing all protected branches is not a main-only rule.
-   Bring-up inspects existing deployment policies before changing configuration;
-   unexpected branches, wildcards, tags, or incomplete listings stop the run
-   before any write. It creates a missing `main` branch rule and reads it back
-   before uploading the dedicated credential and again before enabling the lane.
-   Existing extra policies are never silently deleted.
+   Bring-up inspects the complete environment, reviewer gate, deployment policy,
+   secret metadata and environment-variable listing before changing variables.
+   `SZL_CPU_CI_ENABLED` must be absent or exactly `false`; this prevents mixed
+   old/new connection values from being used by an already-enabled lane. The
+   tool prints the exact proposed values, rechecks the unchanged preimage before
+   the first write, compares the complete variable values before activation, and
+   reads them back after activation. If the enable command or final readback
+   fails, it attempts to set the lane back to `false` and performs a separate
+   disabled-state readback. It reports an explicit uncertain state when that
+   recovery cannot be proven. Unexpected branches, wildcards, tags,
+   missing reviewers/secrets, incomplete listings or any preimage change stop
+   activation. Existing protections are never rewritten by this controller.
    If the list response omits `type`, the tool retrieves the policy by its
    numeric ID and verifies the same ID/name and `type=branch`. Missing type in
    both responses, an identity mismatch, or a tag policy blocks activation.
 
    ```sh
-   gh api -X PUT repos/szl-holdings/szl-skills/environments/massed-cpu-build \
-     --input - <<'JSON'
-   {"reviewers":[{"type":"User","id":<your-numeric-user-id>}],
-    "prevent_self_review":false,
-    "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
-   JSON
-   gh api -X POST repos/szl-holdings/szl-skills/environments/massed-cpu-build/deployment-branch-policies \
-     -f name=main -f type=branch
-   gh api 'repos/szl-holdings/szl-skills/environments/massed-cpu-build/deployment-branch-policies?per_page=100'
-   # Require exactly one policy, name=main and type=branch, before continuing.
-   gh secret set SZL_CPU_SSH_KEY --env massed-cpu-build -R szl-holdings/szl-skills < szl-cpu-ci
-   gh variable set SZL_CPU_SSH_HOST --env massed-cpu-build -R szl-holdings/szl-skills -b <vm-ip>
-   gh variable set SZL_CPU_SSH_PORT --env massed-cpu-build -R szl-holdings/szl-skills -b 22
-   gh variable set SZL_CPU_SSH_USER --env massed-cpu-build -R szl-holdings/szl-skills -b szl-ci
-   gh variable set SZL_CPU_KNOWN_HOSTS --env massed-cpu-build -R szl-holdings/szl-skills \
-     -b "<the independently verified host-key line>"
-   gh variable set SZL_CPU_CI_ENABLED --env massed-cpu-build -R szl-holdings/szl-skills -b true
+   # Owner precondition: environment, reviewers, main-only policy and secret exist.
+   python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
+     --known-hosts <pinned-known-hosts> --window-ref <approval-reference> \
+     --stages plan,qualify,github
    ```
 
-   Then delete the local copy of the CI private key.
+   Do not repeat these writes with direct `gh variable set` commands; that would
+   bypass the controller's qualification and preimage checks.
+
+   Private-key retention or deletion is an owner operation outside this script.
 
 5. **One build (workstation).** Write your own attestations to an owner config
    (`szl.ssh-cpu-build.owner-config.v1`: provider instance UUID, admitted HF
