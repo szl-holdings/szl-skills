@@ -222,6 +222,16 @@ class Lane:
             raise Stop("the CI key and the permit-signing key must differ")
         return ci_text, owner_text
 
+    def public_key_snapshot(self):
+        """Return the exact public-key bytes the live plan will later stage."""
+        if self.args.dry_run:
+            return {
+                "szl-cpu-ci.pub": "ssh-ed25519 SIMULATED-CI-PUBLIC-KEY",
+                "szl-owner-permit.pub": "ssh-ed25519 SIMULATED-OWNER-PUBLIC-KEY",
+            }
+        ci, owner = self.preprovisioned_keys()
+        return {"szl-cpu-ci.pub": ci, "szl-owner-permit.pub": owner}
+
     def host_pins(self):
         pattern = self.host if self.args.port == 22 else "[%s]:%d" % (self.host, self.args.port)
         found = self.run(["ssh-keygen", "-F", pattern, "-f", self.args.known_hosts],
@@ -297,6 +307,9 @@ class Lane:
     def verify_plan(self, *, expected_variables=None, allow_enabled=False):
         if self.plan_state is None:
             raise Stop("run plan in this invocation before any mutating stage")
+        public_keys = self.public_key_snapshot()
+        if public_keys != self.plan_state["public_keys"]:
+            raise Stop("planned public key material changed; activation refused")
         pins = self.host_pins()
         self.require_protected_main()
         self.require_release_is_current_main()
@@ -329,20 +342,20 @@ class Lane:
         self.require_window()
         if self.args.dry_run:
             print("SIMULATED: live plan would validate pre-provisioned keys and read host/GitHub state")
-        else:
-            self.preprovisioned_keys()
+        public_keys = self.public_key_snapshot()
         pins = self.host_pins()
         self.require_login()
         self.require_protected_main()
         self.require_release_is_current_main()
         snapshot = self.environment_snapshot()
-        self.plan_state = {"pins": pins, **snapshot}
+        self.plan_state = {"pins": pins, "public_keys": public_keys, **snapshot}
         connection = self.connection_variables(pins)
         plan = {"schema": "szl.ssh-cpu-build.live-plan.v1", "repo": REPO,
                 "release_sha": self.sha, "vm": self.args.vm, "port": self.args.port,
                 "environment": ENVIRONMENT,
                 "environment_sha256": snapshot["environment_sha256"],
                 "variables_sha256": snapshot["variables_sha256"],
+                 "public_keys_sha256": hashlib.sha256(canonical(public_keys)).hexdigest(),
                 "preprovisioned_secret": "SZL_CPU_SSH_KEY",
                 "writes": [{"name": name, "value": value}
                            for name, value in connection.items()]
@@ -378,15 +391,9 @@ class Lane:
             raise Stop("unexpected staging path; no further writes attempted")
         self.report("staging", "retained directory " + directory)
         keys = []
-        for key, name in ((self.ci_key, "szl-cpu-ci.pub"), (self.owner_key, "szl-owner-permit.pub")):
-            if self.args.dry_run:
-                keys.append((name, b"", "(dry run: %s)" % name))
-                continue
-            data = Path(str(key) + ".pub").read_bytes()
-            text = data.decode("ascii").strip()
-            if "\n" in text or not text.isprintable() or not text:
-                raise Stop("%s.pub is not one public key line" % key)
-            keys.append((name, data, text))
+        for name in ("szl-cpu-ci.pub", "szl-owner-permit.pub"):
+            text = self.plan_state["public_keys"][name]
+            keys.append((name, b"" if self.args.dry_run else text.encode("ascii"), text))
         print("Staging writes only under %s on %s (a new directory; an existing directory is "
               "never deleted or reused):" % (directory, self.args.vm))
         for name, _, text in keys:

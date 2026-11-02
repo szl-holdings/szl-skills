@@ -63,18 +63,22 @@ def state_fixture():
                 "competing_cpu_jobs": 0}}
 
 
-def plan_fixture():
-    return {"pins": ["203.0.113.10 ssh-ed25519 AAAAPIN"],
-            "environment_sha256": "e" * 64,
-            "secret_names": ["SZL_CPU_SSH_KEY"], "variables_sha256": "v" * 64,
-            "variables": {"EXISTING": "keep"}}
-
-
 def ed25519_blob(fill):
     key_type = b"ssh-ed25519"
     blob = (len(key_type).to_bytes(4, "big") + key_type
             + (32).to_bytes(4, "big") + bytes([fill]) * 32)
     return base64.b64encode(blob).decode("ascii")
+
+
+def plan_fixture():
+    return {"pins": ["203.0.113.10 ssh-ed25519 AAAAPIN"],
+            "public_keys": {
+                "szl-cpu-ci.pub": "ssh-ed25519 %s ci" % ed25519_blob(65),
+                "szl-owner-permit.pub": "ssh-ed25519 %s owner" % ed25519_blob(66),
+            },
+            "environment_sha256": "e" * 64,
+            "secret_names": ["SZL_CPU_SSH_KEY"], "variables_sha256": "v" * 64,
+            "variables": {"EXISTING": "keep"}}
 
 
 def environment_fixture():
@@ -324,14 +328,19 @@ class GithubStageTests(unittest.TestCase):
 
     def test_changed_plan_stops_before_any_variable_write(self):
         cases = (
-            ("host pin", ["203.0.113.10 ssh-ed25519 CHANGED"], "e" * 64, "v" * 64,
-             {"sha": SHA}),
-            ("environment", plan_fixture()["pins"], "f" * 64, "v" * 64, {"sha": SHA}),
-            ("variables", plan_fixture()["pins"], "e" * 64, "w" * 64, {"sha": SHA}),
-            ("main advance", plan_fixture()["pins"], "e" * 64, "v" * 64,
-             {"sha": "d" * 40}),
+            ("public key", {**plan_fixture()["public_keys"],
+                            "szl-cpu-ci.pub": "ssh-ed25519 CHANGED"},
+             plan_fixture()["pins"], "e" * 64, "v" * 64, {"sha": SHA}),
+            ("host pin", plan_fixture()["public_keys"],
+             ["203.0.113.10 ssh-ed25519 CHANGED"], "e" * 64, "v" * 64, {"sha": SHA}),
+            ("environment", plan_fixture()["public_keys"], plan_fixture()["pins"],
+             "f" * 64, "v" * 64, {"sha": SHA}),
+            ("variables", plan_fixture()["public_keys"], plan_fixture()["pins"],
+             "e" * 64, "w" * 64, {"sha": SHA}),
+            ("main advance", plan_fixture()["public_keys"], plan_fixture()["pins"],
+             "e" * 64, "v" * 64, {"sha": "d" * 40}),
         )
-        for label, pins, digest, variable_digest, commit in cases:
+        for label, public_keys, pins, digest, variable_digest, commit in cases:
             lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
             lane.plan_state = plan_fixture()
             calls = []
@@ -343,6 +352,7 @@ class GithubStageTests(unittest.TestCase):
             with self.subTest(label=label), \
                     mock.patch.object(lane, "require_qualification"), \
                     mock.patch.object(lane, "confirm", return_value=True), \
+                    mock.patch.object(lane, "public_key_snapshot", return_value=public_keys), \
                     mock.patch.object(lane, "host_pins", return_value=pins), \
                     mock.patch.object(lane, "require_protected_main"), \
                     mock.patch.object(lane, "gh_json", return_value=commit), \
@@ -372,10 +382,13 @@ class GithubStageTests(unittest.TestCase):
                 mock.patch.object(lane, "run", side_effect=AssertionError("write command")), \
                 contextlib.redirect_stdout(output):
             lane.plan()
-        self.assertEqual(lane.plan_state, {"pins": plan_fixture()["pins"], **snapshot})
+        planned_keys = {"szl-cpu-ci.pub": "ci", "szl-owner-permit.pub": "owner"}
+        self.assertEqual(lane.plan_state, {"pins": plan_fixture()["pins"],
+                                           "public_keys": planned_keys, **snapshot})
         payload = next(json.loads(line) for line in output.getvalue().splitlines()
                        if line.startswith("{"))
         self.assertEqual(payload["schema"], "szl.ssh-cpu-build.live-plan.v1")
+        self.assertRegex(payload["public_keys_sha256"], r"^[0-9a-f]{64}$")
         self.assertEqual({row["name"]: row["value"] for row in payload["writes"]}, {
             **lane.connection_variables(plan_fixture()["pins"]),
             "SZL_CPU_CI_ENABLED": "true",
@@ -454,7 +467,7 @@ class ProvisionStageTests(unittest.TestCase):
                 mock.patch.object(lane, "verify_plan") as verify_plan, \
                 mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
                 mock.patch.object(lane, "remote", side_effect=remote), \
-                mock.patch.object(Path, "read_bytes", return_value=b"SYNTHETIC PUBLIC KEY"), \
+                mock.patch.object(Path, "read_bytes", side_effect=AssertionError("key reread")), \
                 contextlib.redirect_stdout(io.StringIO()), self.assertRaises(bring_up.Stop):
             lane.provision()
         verify_plan.assert_called_once_with()
@@ -463,6 +476,30 @@ class ProvisionStageTests(unittest.TestCase):
         self.assertTrue(any("ssh_ci_provision.py plan" in cmd for cmd in calls))
         self.assertFalse(any("ssh_ci_provision.py apply" in cmd for cmd in calls))
         self.assertFalse(any("rm " in cmd or "rmdir" in cmd for cmd in calls))
+
+    def test_provision_stages_the_public_keys_captured_by_the_plan(self):
+        lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        lane.plan_state = plan_fixture()
+        writes = []
+
+        def remote(command, **kwargs):
+            if "mktemp -d" in command:
+                return subprocess.CompletedProcess(["fixture"], 0, (STAGING + "\n").encode(), b"")
+            if kwargs.get("stdin") is not None:
+                writes.append(kwargs["stdin"])
+            return subprocess.CompletedProcess(["fixture"], 0, b"", b"")
+
+        with mock.patch.object(lane, "confirm", side_effect=[True, False]), \
+                mock.patch.object(lane, "verify_plan"), \
+                mock.patch.object(lane, "login", return_value=subprocess.CompletedProcess(["ssh"], 0)), \
+                mock.patch.object(lane, "remote", side_effect=remote), \
+                mock.patch.object(Path, "read_bytes", side_effect=AssertionError("key reread")), \
+                contextlib.redirect_stdout(io.StringIO()), self.assertRaises(bring_up.Stop):
+            lane.provision()
+        self.assertEqual(writes, [
+            plan_fixture()["public_keys"]["szl-cpu-ci.pub"].encode("ascii"),
+            plan_fixture()["public_keys"]["szl-owner-permit.pub"].encode("ascii"),
+        ])
 
     def test_invalid_staging_path_refused_before_public_key_transfer(self):
         for path in ("../existing-work", "/tmp/unrelated", "/tmp/szl-cpu-bringup-ok/../x",

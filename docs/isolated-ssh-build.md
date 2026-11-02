@@ -221,9 +221,11 @@ terminal). Nothing here touches the model process or the GPU.
 with `--dry-run`, then run the live read-only `plan` stage. The live plan checks
 the current main commit, host pin/login, protected branch, complete existing
 environment protections, main-only deployment rule and pre-provisioned secret.
-It records hashes of the authority and variable preimages and performs no write.
-Provisioning, qualification, and GitHub configuration refuse unless the same
-invocation recorded the plan and its preimages are unchanged:
+It captures the exact validated public-key lines, records hashes of the key,
+authority, and variable preimages, and performs no write. Provisioning stages
+those captured public-key bytes rather than rereading the files. Provisioning,
+qualification, and GitHub configuration refuse unless the same invocation
+recorded the plan and every preimage is unchanged:
 
 ```sh
 python tools/ssh_ci_bring_up.py --release-sha <main-sha> --vm Ubuntu@<vm-ip> \
@@ -257,8 +259,10 @@ qualification separately from the later single-use CPU build permit.
    separate owner permit-signing key outside the controller; never reuse the
    admin key for either. The `keys` stage verifies that both expected private
    files and public-key files exist, validates the public-key lines, and requires
-   their public material to differ. It does not read either private key and does
-   not claim that a public key was derived from its adjacent private file.
+   their public material to differ. The live plan binds the exact validated
+   public-key lines used by provisioning, so swapping a key file between stages
+   fails closed. It does not read either private key and does not claim that a
+   public key was derived from its adjacent private file.
 
    ```sh
    ssh-keygen -t ed25519 -N "" -C szl-cpu-ci -f szl-cpu-ci
