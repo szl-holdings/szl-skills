@@ -73,7 +73,9 @@ general, scientific truth, model quality, or uninterrupted model latency.
 
 **Sandbox properties (read back before `GO`).** One aggregate cgroup:
 `CPUQuota=100%`, `MemoryMax=1 GiB`, `MemorySwapMax=0`, `TasksMax=64`,
-`RuntimeMaxSec=420`, `OOMPolicy=kill`, `KillMode=control-group`. Namespaces:
+`RuntimeMaxSec=420`, `OOMPolicy=kill`, `KillMode=control-group`, and
+`OOMScoreAdjust=1000`, so a host-wide OOM kills the build before the model
+server or the training job (the broker service runs at 500). Namespaces:
 `PrivateNetwork` (plus `IPAddressDeny=any` and `RestrictAddressFamilies=AF_UNIX`),
 `PrivateUsers`, `PrivateIPC`, mount namespace with `ProtectSystem=strict`,
 `ProtectHome`, read-only `/src`, writable `/out`, and tmpfs `/tmp`, `/var/tmp`,
@@ -86,16 +88,29 @@ which can carry tokens), broker and SSH configuration, and owner-listed model
 paths. A host name that cannot be expressed safely blocks the build. Directories
 that hold mount sources (`/run/systemd/inaccessible`, `/run/szl-cpu-build`) are
 never hidden wholesale, because systemd resolves those inside the namespace it
-builds. `NoNewPrivileges`, an empty capability bounding set, `RestrictNamespaces`,
-and the `@system-service` syscall set minus `@privileged @resources @keyring` and
-`io_uring_*` apply. Host processes are hidden with
+builds. The unit's own mount points (`/src`, `/out`, `/tmp`, `/var/tmp`,
+`/dev/shm`) are never hidden: systemd 249 leaves empty `/src` and `/out`
+directories on the host root after the first unit, and hiding them would block
+every later bind. A hidden path that covers one of them is refused. The `/run`
+walk counts only directories and sockets toward its 4096-entry limit and does not
+descend into directories it already hides. `NoNewPrivileges`, an empty capability
+bounding set, `RestrictNamespaces`, and the `@system-service` syscall set minus
+`@privileged @resources @keyring` and `io_uring_*` apply. systemd 249.11's
+`RestrictNamespaces` filters `clone`, `unshare` and `setns` but not `clone3`
+(upstream added that rule in 251 and backported it to stable 249.12; where Ubuntu
+carries the backport the entry below is redundant and harmless), so the unit sets
+`SystemCallFilter=~clone3:ENOSYS`; glibc then falls back to `clone`, whose
+namespace flags are filtered, and threads keep working. Host processes are hidden with
 `ProtectProc=invisible` and the user namespace, **not** a separate PID namespace
 (systemd 249 on Ubuntu 22.04 has no `PrivatePIDs=`); qualification measures that
-the model PID is invisible. Before `GO`, the broker reads back the kernel files `cpu.max`,
-`memory.max`, `memory.swap.max`, and `pids.max`, the systemd properties, and the
-waiting runner process itself from `/proc`: seccomp mode 2, `NoNewPrivs`, empty
-effective/permitted/bounding/ambient capabilities, and network, mount, user, IPC,
-and UTS namespaces distinct from the host's. Any mismatch withholds `GO`.
+the model PID is invisible. Before `GO`, the broker waits until the unit is
+`active`/`running` (with `Type=exec`, only after `execve`) and its `MainPID` is in
+the unit cgroup, then reads back the kernel files `cpu.max`, `memory.max`,
+`memory.swap.max`, and `pids.max`, the systemd properties, and that waiting runner
+process itself from `/proc`: seccomp mode 2, `NoNewPrivs`, empty
+effective/permitted/bounding/ambient capabilities, `oom_score_adj` 1000, and
+network, mount, user, IPC, and UTS namespaces distinct from the host's. It retries
+until the readback deadline; any remaining mismatch withholds `GO`.
 
 **Broker behaviour.** The broker shares the host mount namespace, so its per-run
 256 MiB, 16384-inode `noexec` tmpfs is visible to the unit it starts. While it
@@ -283,6 +298,12 @@ qualification separately from the later single-use CPU build permit.
    `apply` refuses unmanaged files, validates `sshd -t`, checks the `szl-ci`
    effective settings, compares the admin user's effective sshd settings before
    and after (rolling back on any change), reloads `ssh`, and enables the socket.
+   Any failure after the first sshd write removes the SSH entry point and
+   disables the socket, even one an earlier apply enabled (a failure before that
+   window, such as a failed `daemon-reload`, leaves the earlier entry point and
+   socket as they were). Hidden paths that are `/`, contain `..`, or cover one of
+   the unit's mount points are refused by the plan, and by bring-up before it
+   stages anything.
    `uninstall` disables the broker socket first, then attempts every independent
    SSH-file and unit cleanup even when another step fails. It reloads sshd only
    after validation, keeps claims and receipts, and reports all incomplete steps
@@ -309,7 +330,15 @@ qualification separately from the later single-use CPU build permit.
    stale one from an interrupted run is removed at the next start. Qualification
    holds the broker's claim lock for its whole run, so it refuses to start
    while a build runs or the broker holds the lock, and a build request that
-   arrives meanwhile is blocked before its permit is claimed.
+   arrives meanwhile is blocked before its permit is claimed. The refusal names
+   its cause: "held by another process (a build may be running)" means wait; for
+   "unavailable", fix what the message names (re-provisioning repairs directory
+   modes, but not the lock file or the directories above the broker's). Stale
+   markers are removed
+   only under that lock and only if they are root-owned, single-link regular
+   files named `szl-qualify-<32 hex>`. Qualification ignores SIGHUP until its
+   receipt is written, so a dropped session cannot stop it before it removes its
+   marker, releases the lock, and records the result.
 
    A failed rehearsal keeps bounded tails of each failed step's stderr/stdout and
    the runner's output in the qualification receipt under

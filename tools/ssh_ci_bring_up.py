@@ -38,6 +38,7 @@ from tools.ssh_ci_contract import (ContractError, STEP_NAMES, canonical,
                                    strict_json_loads, validate_pinned_processes)
 from tools.ssh_ci_environment import (environment_variables_preimage,
                                       required_environment_preimage)
+from tools.ssh_ci_broker import overlaps_unit_mount
 from tools.ssh_ci_provision import ProvisionError, public_key as normalize_public_key
 
 REPO = "szl-holdings/szl-skills"
@@ -137,6 +138,7 @@ class Lane:
         self.ci_key = self.work / "szl-cpu-ci"
         self.owner_key = self.work / "szl-owner-permit"
         self.host = args.vm.split("@", 1)[-1]
+        self.admin = args.vm.split("@", 1)[0]
         self.qualification = None
         self.plan_state = None
         self.clock = lambda: datetime.now(timezone.utc)
@@ -179,6 +181,16 @@ class Lane:
         if self.login().returncode != 0:
             raise Stop("a BatchMode admin login to %s failed; load the admin key with ssh-add "
                        "(Windows: start the ssh-agent service), then rerun" % self.args.vm)
+
+    def recovery(self):
+        """What to run from a second admin session when a fresh admin login fails after apply."""
+        return ("%s; if fresh admin logins still fail, apply's sshd reload may have activated a "
+                "pending sshd_config or sshd_config.d edit: check sudo sshd -T -C "
+                "user=%s,host=localhost,addr=127.0.0.1 and again with host= and addr= both set "
+                "to your workstation's address (the first field of $SSH_CLIENT), since Match "
+                "Host/Address blocks only apply to their own host or address; compare file times "
+                "under /etc/ssh, revert any edit szl did not make, then run sudo systemctl reload "
+                "ssh" % (UNINSTALL, self.admin))
 
     def gh_json(self, argv):
         output = self.run(["gh", *argv], capture=True).stdout
@@ -377,6 +389,10 @@ class Lane:
         for path in self.args.hidden_path:
             if re.fullmatch(PLAIN_PATH, path) is None:
                 raise Stop("hidden path must be a plain absolute path: " + path)
+            if ".." in path.split("/"):  # The VM plan refuses it too, after staging.
+                raise Stop("hidden path must not contain '..': " + path)
+            if overlaps_unit_mount(path):
+                raise Stop("hidden path must not cover a build unit mount point: " + path)
             hidden += ["--hidden-path", path]
         if not self.confirm("Stage public keys and exact source in a NEW private VM directory "
                             "(retained, never deleted automatically)?", "STAGE"):
@@ -418,7 +434,7 @@ class Lane:
             raise Stop("the provisioning plan is not ready; read its failures above; "
                        "retained directory %s was not deleted" % directory)
         print("Keep a second admin SSH session (or the provider's web terminal) open until "
-              "provision ends; if a fresh admin login then fails, run there: " + UNINSTALL)
+              "provision ends; if a fresh admin login then fails, run there: " + self.recovery())
         if not self.confirm("The plan above is ready. Apply it to the VM now?", "APPLY"):
             raise Stop("provisioning not applied; retained directory %s was not deleted" % directory)
         applied = self.remote(base.format(action="apply") + " --owner-window-ref "
@@ -427,7 +443,7 @@ class Lane:
         if self.login().returncode != 0:
             raise Stop("a fresh admin login to %s fails after apply; from your second admin session "
                        "or the provider's web terminal run: %s; retained directory %s was not deleted"
-                       % (self.args.vm, UNINSTALL, directory))
+                       % (self.args.vm, self.recovery(), directory))
         if applied.returncode != 0:
             raise Stop("provisioning apply failed; read its output above; "
                        "retained directory %s was not deleted" % directory)

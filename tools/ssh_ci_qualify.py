@@ -20,6 +20,8 @@ import os
 from pathlib import Path
 import posixpath
 import re
+import signal
+import stat
 import subprocess
 import sys
 import time
@@ -48,6 +50,7 @@ TMPFS_LIMIT = 536870912
 STDERR_DIAGNOSTIC_BYTES = 16 * 1024
 OTHER_DIAGNOSTIC_BYTES = 4 * 1024
 SHM_ROOT = Path("/dev/shm")
+SHM_MARKER = re.compile(r"szl-qualify-[0-9a-f]{32}")
 # RestrictNamespaces= filters clone/unshare flags with EPERM; clone3 must fail
 # with ENOSYS, the only error on which glibc falls back to clone for threads.
 NAMESPACE_DENIALS = {"namespace:unshare": "DENIED:EPERM", "namespace:clone": "DENIED:EPERM",
@@ -470,10 +473,64 @@ def shm_marker(root=SHM_ROOT):
     return path
 
 
+def remove_stale_markers(root=SHM_ROOT, owner=0):
+    """Remove markers a killed run left: only single-link regular files of ``owner``.
+
+    Call only while holding the claim lock, so no other run's marker can exist.
+    Links are never followed; any other entry is left alone.
+    """
+    try:
+        names = sorted(os.listdir(root))
+    except OSError as error:
+        raise QualifyError("cannot list host /dev/shm: " + type(error).__name__) from error
+    removed = []
+    for name in names:
+        if SHM_MARKER.fullmatch(name) is None:
+            continue
+        path = Path(root) / name
+        try:
+            metadata = os.lstat(path)
+            if (stat.S_ISREG(metadata.st_mode) and metadata.st_uid == owner
+                    and metadata.st_nlink == 1):
+                os.unlink(path)
+                removed.append(name)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise QualifyError("cannot remove a stale host /dev/shm marker: "
+                               + type(error).__name__) from error
+    return removed
+
+
+def _caused_by(error, kind):
+    seen = set()
+    while error is not None and id(error) not in seen:
+        if isinstance(error, kind):
+            return True
+        seen.add(id(error))
+        error = error.__cause__
+    return False
+
+
+@contextlib.contextmanager
+def _hangup_ignored():
+    """A dropped ``ssh -t`` session must not end qualification before its cleanup runs."""
+    hangup = getattr(signal, "SIGHUP", None)
+    if hangup is None:  # Windows has no SIGHUP.
+        yield
+        return
+    previous = signal.signal(hangup, signal.SIG_IGN)
+    try:
+        yield
+    finally:
+        signal.signal(hangup, signal.SIG_DFL if previous is None else previous)
+
+
+@_hangup_ignored()
 def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.run,
             popen=subprocess.Popen, clock=lambda: datetime.now(timezone.utc),
             run_unit=sandbox.run_unit, proc=Path("/proc"), build_uid=None, observer=None,
-            build=None, claim_store_factory=None, shm_root=SHM_ROOT):
+            build=None, claim_store_factory=None, shm_root=SHM_ROOT, shm_owner=0):
     build = build or Build(config, run=run, popen=popen)
     if observer is None:
         def observer():
@@ -485,8 +542,13 @@ def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.
             # removes these units' run directories, until qualification ends.
             stack.enter_context(store)
         except ClaimError as error:
-            raise QualifyError("the broker claim lock is held or unavailable (a build may be "
-                               "running); qualification not started") from error
+            # Only flock contention (EWOULDBLOCK) proves another holder; always keep the cause.
+            state = ("held by another process (a build may be running)"
+                     if _caused_by(error, BlockingIOError) else "unavailable")
+            cause = ("" if error.__cause__ is None
+                     else " (" + type(error.__cause__).__name__ + ")")
+            raise QualifyError("the broker claim lock is " + state + ": " + str(error) + cause
+                               + "; qualification not started") from error
         before = observer()
         competing = before.get("competing_cpu_jobs")
         if type(competing) is not int or competing != 0:
@@ -503,6 +565,7 @@ def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.
                      "secret_files": model_files,
                      "unix_sockets": sorted({"/run/szl-cpu-broker.sock",
                                              "/run/dbus/system_bus_socket", *sockets})}
+        remove_stale_markers(shm_root, shm_owner)  # Under the lock, so none is another run's.
         marker = shm_marker(shm_root)
         try:
             arguments["shm_marker"] = marker.name
@@ -541,6 +604,7 @@ def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.
     }
 
 
+@_hangup_ignored()  # Through the receipt write: a dropped session must not lose the evidence.
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=DEFAULT_CONFIG)

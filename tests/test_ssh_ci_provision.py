@@ -80,6 +80,18 @@ class RenderTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(Exception):
                 provision.render(options(**change))
 
+    def test_hidden_paths_over_a_unit_mount_are_refused_by_plan_and_apply(self):
+        def run(argv, **_kwargs):
+            raise AssertionError("no command may run: " + " ".join(argv))
+        for path in ("/", "/var", "/dev/", "/tmp", "/var/tmp/x", "/src", "//out", "/dev/shm"):
+            for action in (provision.plan, provision.apply):
+                with self.subTest(path=path, action=action.__name__), \
+                        mock.patch.object(provision, "file_actions", side_effect=AssertionError), \
+                        mock.patch.object(provision, "preflight", side_effect=AssertionError), \
+                        self.assertRaisesRegex(contract.ContractError,
+                                               "hidden path .* must not overlap a unit mount"):
+                    action(options(hidden_paths=["/data/models", path]), run=run)
+
     def test_file_actions_never_overwrite_unmanaged_or_symlinked_files(self):
         files = provision.render(options())
         with tempfile.TemporaryDirectory() as root:
@@ -292,11 +304,12 @@ class ApplyOrderTests(unittest.TestCase):
              KeyboardInterrupt),
             ("write receipt", OSError("disk full"), 9, True, OSError),
         )
-        for label, fault, reached, disabled, kind in cases:
+        for label, fault, reached, _enable_reached, kind in cases:
             with self.subTest(label=label, fault=type(fault).__name__):
                 outcome, events, quiet = self.apply({label: fault})
                 self.assertIsInstance(outcome, kind)
-                after = WINDOW[:reached] + REMOVE + (DISABLE if disabled else [])
+                # Disabled even when this run never reached the enable: an earlier apply may have.
+                after = WINDOW[:reached] + REMOVE + DISABLE
                 self.assertEqual(events, self.prefix() + after)
                 self.assertEqual(quiet, [False] * len(self.prefix()) + [True] * len(after))
 
@@ -393,6 +406,28 @@ class UninstallTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
+    def test_hidden_paths_over_a_unit_mount_print_provision_blocked(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            ci, owner = Path(scratch) / "ci.pub", Path(scratch) / "owner.pub"
+            ci.write_text(CI_KEY + "\n", encoding="ascii")
+            owner.write_text(OWNER_KEY + "\n", encoding="ascii")
+            for action in ("plan", "apply"):
+                argv = [action, "--release-sha", "a" * 40, "--ci-public-key", str(ci),
+                        "--owner-public-key", str(owner), "--admin-user", "Ubuntu",
+                        "--owner-window-ref", "owner://window/1", "--hidden-path", "/data/models",
+                        "--hidden-path", "/var"]
+                with self.subTest(action=action):
+                    with mock.patch.object(provision, "file_actions", side_effect=AssertionError), \
+                            mock.patch.object(provision, "preflight", side_effect=AssertionError), \
+                            contextlib.redirect_stderr(io.StringIO()) as stderr, \
+                            contextlib.redirect_stdout(io.StringIO()) as stdout:
+                        code = provision.main(argv)
+                    self.assertEqual((code, stdout.getvalue()), (1, ""))
+                    self.assertTrue(stderr.getvalue().startswith(
+                        "PROVISION BLOCKED: " + action + ": ContractError: hidden path /var must "
+                        "not overlap a unit mount (/src, /out, /tmp, /var/tmp, /dev/shm)"),
+                        stderr.getvalue())
+
     def test_broker_subprocess_contract_and_os_errors_print_provision_blocked(self):
         with tempfile.TemporaryDirectory() as scratch:
             ci, owner = Path(scratch) / "ci.pub", Path(scratch) / "owner.pub"
