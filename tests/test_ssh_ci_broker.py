@@ -336,6 +336,46 @@ class ConfigAndCollectionTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(contract.ContractError):
                 broker.parse_config(contract.canonical(dict(good, **change)))
 
+    def test_hidden_paths_that_overlap_a_unit_mount_are_refused_at_config_time(self):
+        good = config(Path("/etc/szl-cpu-broker"))
+        refused = ["/", "//", "/.", "/var", "/var/", "/dev", "//dev", "/./var", "/src", "/src/",
+                   "//src", "/./out", "/out/x", "/tmp", "/tmp/a", "/var/tmp", "/var//tmp/a",
+                   "/var/./tmp", "/dev/shm", "/dev/shm/x"]
+        accepted = ["/opt/models", "/srcx", "/outbox", "/tmpdata", "/var/tmpx", "/var/lib/x",
+                    "/dev/shmx", "/devices", "/data/models"]
+        units = {"user": "szl-build", "source_dir": "/run/szl-cpu-build/x/src",
+                 "output_dir": "/run/szl-cpu-build/x/out"}
+        for path in refused:
+            with self.subTest(path=path):
+                with self.assertRaisesRegex(contract.ContractError,
+                                            "hidden path .* must not overlap a unit mount"):
+                    broker.parse_config(contract.canonical(dict(good, hidden_paths=["/ok", path])))
+                # The build unit refuses it or drops it: it is never hidden as configured.
+                try:
+                    values = broker.sandbox.unit_properties(hidden_paths=[path], **units)
+                except broker.sandbox.SandboxError:
+                    continue
+                self.assertNotIn("InaccessiblePaths=-" + path, values)
+        parsed = broker.parse_config(contract.canonical(dict(good, hidden_paths=accepted)))
+        self.assertEqual(parsed["hidden_paths"], accepted)
+        values = broker.sandbox.unit_properties(hidden_paths=accepted, **units)
+        for path in accepted:
+            self.assertIn("InaccessiblePaths=-" + path, values)
+
+    def test_a_hidden_path_over_a_unit_mount_blocks_before_any_request_handling(self):
+        data = contract.canonical(dict(config(Path("/etc/szl-cpu-broker")), hidden_paths=["/var"]))
+        real = broker.load_config
+        output = io.BytesIO()
+        with mock.patch.object(broker, "load_config",
+                               lambda path: real(path, reader=lambda _path, _limit: data)), \
+                mock.patch.object(broker, "handle", side_effect=AssertionError("handled")):
+            code = broker.main([], stdin=io.BytesIO(b"{}"), stdout=output)
+        self.assertEqual(code, 1)
+        self.assertEqual(output.getvalue()[:1], b"1")
+        notice = contract.strict_json_loads(output.getvalue()[1:])
+        self.assertEqual((notice["reason"], notice["claim_status"]),
+                         ("BROKER_CONFIG_UNAVAILABLE", "NOT_ATTEMPTED"))
+
     def test_deterministic_tar_has_fixed_metadata(self):
         first = broker.deterministic_tar({"b.zip": b"2", "a.zip": b"1"})
         self.assertEqual(first, broker.deterministic_tar({"a.zip": b"1", "b.zip": b"2"}))
