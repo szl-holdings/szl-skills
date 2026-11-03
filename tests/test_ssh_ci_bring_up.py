@@ -187,6 +187,31 @@ class GithubStageTests(unittest.TestCase):
                     bring_up.Stop, "not the current main"):
                 lane.require_release_is_current_main()
 
+    def test_main_protection_needs_json_true_or_typed_active_rules(self):
+        branch_path = "repos/%s/branches/main" % bring_up.REPO
+        rules_path = "repos/%s/rules/branches/main" % bring_up.REPO
+
+        def protect(branch, rules):
+            lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+            lane.gh_json = mock.Mock(side_effect=lambda argv: deepcopy(
+                {branch_path: branch, rules_path: rules}[argv[1]]))
+            lane.require_protected_main()
+            return [call.args[0][1] for call in lane.gh_json.call_args_list]
+
+        # Only the JSON boolean true counts; anything else falls through to the rules.
+        for branch in ({"protected": "yes"}, {"protected": 1}, {"protected": "true"},
+                       {"name": "main"}, [], None):
+            with self.subTest(branch=branch), self.assertRaisesRegex(
+                    bring_up.Stop, "no branch protection rule or active ruleset"):
+                protect(branch, [])
+        for rules in ([], [{}], [{"type": ""}], ["pull_request"], {"message": "Not Found"}, None):
+            with self.subTest(rules=rules), self.assertRaisesRegex(
+                    bring_up.Stop, "no branch protection rule or active ruleset"):
+                protect({"protected": False}, rules)
+        self.assertEqual(protect({"protected": True}, None), [branch_path])
+        self.assertEqual(protect({"protected": False}, [{"type": "deletion", "ruleset_id": 9}]),
+                         [branch_path, rules_path])
+
     def test_environment_snapshot_digest_binds_full_authority_preimage(self):
         lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
 
@@ -500,6 +525,72 @@ class ProvisionStageTests(unittest.TestCase):
             plan_fixture()["public_keys"]["szl-cpu-ci.pub"].encode("ascii"),
             plan_fixture()["public_keys"]["szl-owner-permit.pub"].encode("ascii"),
         ])
+
+    def provision_through_apply(self, probe_after, apply_code):
+        """Provision with both answers given; every ssh, including both logins, is recorded."""
+        lane = bring_up.Lane(lane_args("unused-synthetic-lane"))
+        lane.plan_state = plan_fixture()
+        calls, probes, shown, output = [], [0, probe_after], [], io.StringIO()
+
+        def run(argv, **kwargs):
+            argv = list(map(str, argv))
+            calls.append(argv)
+            if argv[-1] == "true":
+                return subprocess.CompletedProcess(argv, probes.pop(0), None, b"")
+            if "mktemp -d" in argv[-1]:
+                return subprocess.CompletedProcess(argv, 0, (STAGING + "\n").encode(), b"")
+            code = apply_code if "ssh_ci_provision.py apply" in argv[-1] else 0
+            return subprocess.CompletedProcess(argv, code, b"", b"")
+
+        def confirm(_question, word):
+            shown.append((word, output.getvalue()))  # What the owner has read at this prompt.
+            return True
+
+        error = None
+        with mock.patch.object(lane, "confirm", side_effect=confirm), \
+                mock.patch.object(lane, "verify_plan"), \
+                mock.patch.object(lane, "run", side_effect=run), \
+                contextlib.redirect_stdout(output):
+            try:
+                lane.provision()
+            except bring_up.Stop as stop:
+                error = str(stop)
+        return calls, shown, output.getvalue(), error
+
+    def test_apply_is_followed_by_a_fresh_admin_login_and_recovery_on_failure(self):
+        recovery = (bring_up.UNINSTALL + "; if fresh admin logins still fail",
+                    "pending sshd_config or sshd_config.d edit",
+                    "check sudo sshd -T -C user=Ubuntu,host=localhost,addr=127.0.0.1",
+                    "revert any edit szl did not make", "then run sudo systemctl reload ssh")
+        for label, probe_after, apply_code, message in (
+                ("works", 0, 0, None),
+                ("locked out", 255, 0, "fresh admin login to Ubuntu@203.0.113.10 fails after apply"),
+                ("apply failed", 0, 1, "provisioning apply failed")):
+            with self.subTest(label):
+                calls, shown, output, error = self.provision_through_apply(probe_after, apply_code)
+                self.assertEqual([word for word, _ in shown], ["STAGE", "APPLY"])
+                before_apply = shown[1][1]
+                self.assertIn("second admin SSH session (or the provider's web terminal)", before_apply)
+                for part in recovery:
+                    self.assertIn(part, before_apply)
+                applied = next(i for i, argv in enumerate(calls)
+                               if "ssh_ci_provision.py apply" in argv[-1])
+                self.assertEqual(len(calls), applied + 2)  # Only the fresh login follows apply.
+                probe = calls[-1]
+                for option in ("-T", "BatchMode=yes", "ControlPath=none",
+                               "StrictHostKeyChecking=yes"):
+                    self.assertIn(option, probe)
+                self.assertEqual(probe[-2:], ["Ubuntu@203.0.113.10", "true"])
+                self.assertFalse(any("rm " in argv[-1] or "rmdir" in argv[-1] for argv in calls))
+                if message is None:
+                    self.assertIsNone(error)
+                    self.assertIn("a fresh admin login works", output)
+                    continue
+                self.assertIn(message, error)
+                self.assertIn("retained directory %s was not deleted" % STAGING, error)
+                if probe_after:  # Locked out: the error itself carries the whole recovery.
+                    for part in recovery:
+                        self.assertIn(part, error)
 
     def test_invalid_staging_path_refused_before_public_key_transfer(self):
         for path in ("../existing-work", "/tmp/unrelated", "/tmp/szl-cpu-bringup-ok/../x",

@@ -74,6 +74,19 @@ class IssueError(RuntimeError):
     """The issue flow stopped; nothing after the failing stage happened."""
 
 
+def by_hand(permit_id, left, dispatched):
+    """How to cancel what a withdraw left behind; ``left`` None means no run was found."""
+    if left is None and not dispatched:
+        return ("the dispatch did not complete, so GitHub likely created no run; if one "
+                "appears, " + FIND_RUN % permit_id)
+    if left is None:
+        return "the dispatched run was not found; " + FIND_RUN % permit_id
+    if left:
+        return "cancel by hand: " + "; ".join(
+            "gh run cancel %s -R %s" % (item, REPOSITORY) for item in left)
+    return None
+
+
 def utc_now():
     return datetime.now(timezone.utc)
 
@@ -281,6 +294,8 @@ class Owner:
     def dispatch(self, permit_id):
         self.command([self.args.gh, "workflow", "run", WORKFLOW, "-R", REPOSITORY, "--ref", "main",
                       "-f", "permit_id=" + permit_id], "dispatch workflow")
+
+    def dispatched_run(self, permit_id):
         deadline = self.clock() + 120
         while self.clock() < deadline:
             matches = self.runs_titled(permit_id)
@@ -307,41 +322,52 @@ class Owner:
                          "pending run may be queued behind another run in the concurrency group)"
                          % status)
 
-    def withdraw(self, permit_id, run_id, environment_id):
+    def withdraw(self, permit_id, run_id, environment_id, done, dispatched=True):
         """Cancel a dispatched, unapproved run so it cannot hold the concurrency group.
 
-        Never raises. Returns what was done and, for anything left behind, how to
-        cancel it by hand.
+        Fills ``done`` with what was cancelled, rejected, or had already completed,
+        and how to cancel by hand anything left. Never raises, except to re-raise
+        an interrupt once ``done`` is filled; nothing is tried after an interrupt.
         """
-        def attempt(argv, stage):
+        interrupts = []
+
+        def attempt(step, *values):
+            if interrupts:
+                return None
             try:
-                return self.command(argv, stage, check=False).returncode == 0
-            except Exception:
-                return False
-        try:
-            ids = [run_id] if run_id is not None else self.runs_titled(permit_id)
-        except Exception:
-            ids = []
-        done = {"cancelled": [], "rejected": [], "by_hand": None}
+                return step(*values)
+            except BaseException as error:  # Ctrl+C included; re-raised once recorded.
+                if not isinstance(error, Exception):
+                    interrupts.append(error)
+                return None
+
+        def ran(argv, stage):
+            return self.command(argv, stage, check=False).returncode == 0
+
+        def completed(item):
+            value = self.gh_json(["api", "repos/%s/actions/runs/%d" % (REPOSITORY, item)],
+                                 "read unapproved run")
+            return type(value) is dict and value.get("status") == "completed"
+        ids = [run_id] if run_id is not None else (attempt(self.runs_titled, permit_id) or [])
         left = []
         for item in ids:
-            if attempt([self.args.gh, "run", "cancel", str(item), "-R", REPOSITORY],
+            if attempt(ran, [self.args.gh, "run", "cancel", str(item), "-R", REPOSITORY],
                        "cancel unapproved run"):
                 done["cancelled"].append(item)
-            elif item == run_id and environment_id is not None and attempt(
-                    [self.args.gh, "api", "-X", "POST",
-                     "repos/%s/actions/runs/%d/pending_deployments" % (REPOSITORY, item),
-                     "-F", "environment_ids[]=%d" % environment_id, "-f", "state=rejected",
-                     "-f", "comment=CPU permit %s withdrawn before approval" % permit_id],
+            elif attempt(completed, item):  # A completed run cannot be cancelled; nothing is left.
+                done["already_completed"].append(item)
+            elif item == run_id and environment_id is not None and attempt(ran, [
+                    self.args.gh, "api", "-X", "POST",
+                    "repos/%s/actions/runs/%d/pending_deployments" % (REPOSITORY, item),
+                    "-F", "environment_ids[]=%d" % environment_id, "-f", "state=rejected",
+                    "-f", "comment=CPU permit %s withdrawn before approval" % permit_id],
                     "reject unapproved deployment"):
                 done["rejected"].append(item)
             else:
                 left.append(item)
-        if not ids:
-            done["by_hand"] = "the dispatched run was not found; " + FIND_RUN % permit_id
-        elif left:
-            done["by_hand"] = "cancel by hand: " + "; ".join(
-                "gh run cancel %s -R %s" % (item, REPOSITORY) for item in left)
+        done["by_hand"] = by_hand(permit_id, left if ids else None, dispatched)
+        if interrupts:
+            raise interrupts[0]
         return done
 
     def pending_environment_id(self, run_id):
@@ -477,14 +503,16 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
     owner.reachable()
     permit_id = str(new_uuid())
     record["permit_id"] = permit_id
-    environment_id = None
+    environment_id, dispatched = None, False
     approval_attempted = False
     approval_accepted = False
     # Until approval is attempted, any stop (Ctrl+C included) withdraws the run,
     # which would otherwise wait at the gate and hold the concurrency group.
     # Once approval is attempted, a lost response must not withdraw it.
     try:
-        run_id = owner.dispatch(permit_id)
+        owner.dispatch(permit_id)
+        dispatched = True
+        run_id = owner.dispatched_run(permit_id)
         record["run_id"] = run_id
         plan = plan_request(owner.waiting_run(run_id), permit_id)
         request, digest = plan["request"], plan["request_sha256"]
@@ -523,8 +551,17 @@ def issue(args, record, owner=None, new_uuid=uuid.uuid4):
             raise IssueError("%s: %s" % (type(error).__name__, error)) from error
         if approval_attempted:
             uncertain_approval(record, run_id, error)
-        withdrawn = owner.withdraw(permit_id, record.get("run_id"), environment_id)
-        record["unapproved_run"] = withdrawn
+        # Recorded first, so an interrupted withdraw still leaves the by-hand step.
+        known = record.get("run_id")
+        withdrawn = record["unapproved_run"] = {
+            "cancelled": [], "rejected": [], "already_completed": [],
+            "by_hand": by_hand(permit_id, None if known is None else [known], dispatched)}
+        try:
+            owner.withdraw(permit_id, known, environment_id, withdrawn, dispatched)
+        except BaseException:  # A second interrupt, during the withdraw, after recording.
+            if withdrawn["by_hand"] is not None:
+                print("CPU BUILD STOPPED: " + withdrawn["by_hand"], file=sys.stderr)
+            raise
         if withdrawn["by_hand"] is None:
             raise
         if not isinstance(error, Exception):
