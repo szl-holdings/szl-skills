@@ -431,12 +431,11 @@ class QualifyFlowTests(unittest.TestCase):
         cases = ((held_error(), ("is held by another process (a build may be running): cannot "
                                  "acquire trusted claim store; execution denied (BlockingIOError); ")),
                  (claim_error("claim directory must have mode 0700 or 0750"),
-                  ("is held or unavailable (a build may be running): claim directory must have "
-                   "mode 0700 or 0750; ")),
+                  ("is unavailable: claim directory must have mode 0700 or 0750; ")),
                  (claim_error("cannot acquire trusted claim store; execution denied",
                               FileNotFoundError(errno.ENOENT, "missing")),
-                  ("is held or unavailable (a build may be running): cannot acquire trusted claim "
-                   "store; execution denied (FileNotFoundError); ")),
+                  ("is unavailable: cannot acquire trusted claim store; execution denied "
+                   "(FileNotFoundError); ")),
                  (claim_error("lock file must be empty", claim_error("wrapped", held_error())),
                   "is held by another process"))
         for error, expected in cases:
@@ -445,6 +444,9 @@ class QualifyFlowTests(unittest.TestCase):
                     self.run_qualify([observation()], lock=FakeLock(self.events, error))
                 self.assertIn("the broker claim lock " + expected, str(raised.exception))
                 self.assertIs(raised.exception.__cause__, error)
+                # Only real contention suggests a running build; anything else is to fix.
+                self.assertEqual("a build may be running" in str(raised.exception),
+                                 "held by another process" in expected)
         self.assertEqual(self.events, [])
 
     @unittest.skipUnless(os.name == "posix" and claims.fcntl is not None, "a real flock needs POSIX")
@@ -643,6 +645,26 @@ class MainTests(unittest.TestCase):
                 contextlib.redirect_stderr(stderr):
             self.assertEqual(qualify.main(["--owner-window-ref", "window-1"]), 1)
         self.assertIn("QUALIFICATION REFUSED: lock held", stderr.getvalue())
+
+    @unittest.skipUnless(hasattr(signal, "SIGHUP"), "SIGHUP is POSIX")
+    def test_hangup_stays_ignored_until_the_receipt_is_written(self):
+        def handler(*_args):
+            self.fail("SIGHUP handler ran")
+        self.addCleanup(signal.signal, signal.SIGHUP, signal.signal(signal.SIGHUP, handler))
+        seen = []
+
+        class Receipt(io.BytesIO):
+            def write(self, data):
+                seen.append(signal.getsignal(signal.SIGHUP))
+                return super().write(data)
+        receipt = {"result": "QUALIFIED", "failures": []}
+        with unittest.mock.patch.object(qualify, "load_config", return_value={}), \
+                unittest.mock.patch.object(qualify, "qualify", return_value=receipt), \
+                unittest.mock.patch("builtins.open", side_effect=lambda *_a, **_k: Receipt()), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(qualify.main(["--owner-window-ref", "window-1"]), 0)
+        self.assertEqual(seen, [signal.SIG_IGN])
+        self.assertIs(signal.getsignal(signal.SIGHUP), handler)
 
 
 class ReleaseBindingTests(unittest.TestCase):

@@ -543,12 +543,12 @@ def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.
             stack.enter_context(store)
         except ClaimError as error:
             # Only flock contention (EWOULDBLOCK) proves another holder; always keep the cause.
-            state = ("held by another process" if _caused_by(error, BlockingIOError)
-                     else "held or unavailable")
+            state = ("held by another process (a build may be running)"
+                     if _caused_by(error, BlockingIOError) else "unavailable")
             cause = ("" if error.__cause__ is None
                      else " (" + type(error.__cause__).__name__ + ")")
-            raise QualifyError("the broker claim lock is " + state + " (a build may be running): "
-                               + str(error) + cause + "; qualification not started") from error
+            raise QualifyError("the broker claim lock is " + state + ": " + str(error) + cause
+                               + "; qualification not started") from error
         before = observer()
         competing = before.get("competing_cpu_jobs")
         if type(competing) is not int or competing != 0:
@@ -604,6 +604,7 @@ def qualify(config, *, rehearse_sha=None, owner_window_ref=None, run=subprocess.
     }
 
 
+@_hangup_ignored()  # Through the receipt write: a dropped session must not lose the evidence.
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=DEFAULT_CONFIG)

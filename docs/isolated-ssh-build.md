@@ -299,9 +299,11 @@ qualification separately from the later single-use CPU build permit.
    effective settings, compares the admin user's effective sshd settings before
    and after (rolling back on any change), reloads `ssh`, and enables the socket.
    Any failure after the first sshd write removes the SSH entry point and
-   disables the socket, even one an earlier apply enabled. Hidden paths that are
-   `/` or cover one of the unit's mount points are refused by the plan (and by
-   bring-up before it stages anything).
+   disables the socket, even one an earlier apply enabled (a failure before that
+   window, such as a failed `daemon-reload`, leaves the earlier entry point and
+   socket as they were). Hidden paths that are `/`, contain `..`, or cover one of
+   the unit's mount points are refused by the plan, and by bring-up before it
+   stages anything.
    `uninstall` disables the broker socket first, then attempts every independent
    SSH-file and unit cleanup even when another step fails. It reloads sshd only
    after validation, keeps claims and receipts, and reports all incomplete steps
@@ -329,12 +331,14 @@ qualification separately from the later single-use CPU build permit.
    holds the broker's claim lock for its whole run, so it refuses to start
    while a build runs or the broker holds the lock, and a build request that
    arrives meanwhile is blocked before its permit is claimed. The refusal names
-   its cause: "held by another process" means wait; any other reason (for example
-   a wrong claim-directory mode) means re-provision. Stale markers are removed
+   its cause: "held by another process (a build may be running)" means wait; for
+   "unavailable", fix what the message names (re-provisioning repairs directory
+   modes, but not the lock file or the directories above the broker's). Stale
+   markers are removed
    only under that lock and only if they are root-owned, single-link regular
-   files named `szl-qualify-<32 hex>`. Qualification ignores SIGHUP for its whole
-   run, so a dropped session cannot stop it before it removes its marker and
-   releases the lock.
+   files named `szl-qualify-<32 hex>`. Qualification ignores SIGHUP until its
+   receipt is written, so a dropped session cannot stop it before it removes its
+   marker, releases the lock, and records the result.
 
    A failed rehearsal keeps bounded tails of each failed step's stderr/stdout and
    the runner's output in the qualification receipt under
