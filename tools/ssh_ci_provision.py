@@ -351,19 +351,23 @@ def install_release(sha, run):
     return str(release)
 
 
-def _rollback(run, socket_enabled):
-    """Remove the SSH entry point, then the socket once enabled; return what was not undone."""
+def _rollback(run):
+    """Remove the SSH entry point, then disable the socket; return what was not undone.
+
+    The socket is disabled whether or not this run enabled it: an earlier apply may have,
+    and a socket left listening behind a removed entry point would serve a release that
+    was installed but never validated here.
+    """
     incomplete = []
     for path in SSHD_FILES:
         try:
             _remove(path)
         except OSError as error:
             incomplete.append("remove %s: %s" % (path, type(error).__name__))
-    if socket_enabled:
-        try:
-            _checked(run, [SYSTEMCTL, "disable", "--now", "szl-cpu-broker.socket"], "disable socket")
-        except ProvisionError as error:
-            incomplete.append(str(error))
+    try:
+        _checked(run, [SYSTEMCTL, "disable", "--now", "szl-cpu-broker.socket"], "disable socket")
+    except ProvisionError as error:
+        incomplete.append(str(error))
     return incomplete
 
 
@@ -391,9 +395,8 @@ def apply(options, *, run=subprocess.run):
     _checked(run, [SYSTEMCTL, "daemon-reload"], "daemon-reload")
     # From the first sshd write to the receipt, neither Ctrl-C nor a dropped ``ssh -t``
     # session can stop apply halfway, and any failure (even an interrupt raised as an
-    # exception) removes the SSH entry point and, once enabled, the socket. The socket is
+    # exception) removes the SSH entry point and disables the socket. The socket is
     # enabled only after sshd accepted, enforced, and reloaded the drop-in.
-    enabled = False
     previous = {number: signal.signal(number, signal.SIG_IGN) for number in INTERRUPTS}
     try:
         for path in SSHD_FILES:
@@ -407,7 +410,6 @@ def apply(options, *, run=subprocess.run):
             raise ProvisionError("drop-in changed the administrator's sshd settings")
         if _ssh_active(run):
             _checked(run, [SYSTEMCTL, "reload", "ssh.service"], "reload ssh")
-        enabled = True  # Set first: a failed or timed-out enable may still have enabled it.
         _checked(run, [SYSTEMCTL, "enable", "--now", "szl-cpu-broker.socket"], "enable socket")
         receipt = dict(report, schema="szl.ssh-cpu-build.provision-receipt.v1",
                        applied_at=datetime.now(timezone.utc).isoformat(), release=release,
@@ -416,7 +418,7 @@ def apply(options, *, run=subprocess.run):
         name = "provision-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".json"
         _write("/var/lib/szl-cpu-broker/" + name, canonical(receipt) + b"\n", 0o600)
     except BaseException as error:
-        incomplete = _rollback(run, enabled)
+        incomplete = _rollback(run)
         if incomplete:
             raise ProvisionError("%s (%s); rollback incomplete: %s" % (
                 type(error).__name__, error, "; ".join(incomplete))) from error

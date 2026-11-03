@@ -77,8 +77,9 @@ class IssueError(RuntimeError):
 def by_hand(permit_id, left, dispatched):
     """How to cancel what a withdraw left behind; ``left`` None means no run was found."""
     if left is None and not dispatched:
-        return ("the dispatch did not complete, so GitHub likely created no run; if one "
-                "appears, " + FIND_RUN % permit_id)
+        # A timeout or interrupt may follow a POST GitHub already accepted.
+        return ("the dispatch did not complete, and GitHub may still have created a run; "
+                + FIND_RUN % permit_id)
     if left is None:
         return "the dispatched run was not found; " + FIND_RUN % permit_id
     if left:
@@ -336,9 +337,10 @@ class Owner:
                 return None
             try:
                 return step(*values)
-            except BaseException as error:  # Ctrl+C included; re-raised once recorded.
-                if not isinstance(error, Exception):
-                    interrupts.append(error)
+            except Exception:
+                return None
+            except (KeyboardInterrupt, SystemExit) as error:  # Re-raised once recorded.
+                interrupts.append(error)
                 return None
 
         def ran(argv, stage):

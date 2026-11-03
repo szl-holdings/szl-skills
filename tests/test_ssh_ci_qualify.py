@@ -485,9 +485,14 @@ class QualifyFlowTests(unittest.TestCase):
     def test_hangup_is_ignored_while_qualifying_and_then_restored(self):
         def handler(*_args):
             self.fail("SIGHUP handler ran")
+        def interrupt(*_args):
+            self.fail("SIGINT handler ran")
         previous = signal.signal(signal.SIGHUP, handler)
         self.addCleanup(signal.signal, signal.SIGHUP, previous)
-        interrupt, seen = signal.getsignal(signal.SIGINT), []
+        # A known SIGINT handler, so an earlier test that left SIGINT ignored cannot mask
+        # a regression that ignores it here too.
+        self.addCleanup(signal.signal, signal.SIGINT, signal.signal(signal.SIGINT, interrupt))
+        seen = []
 
         def control(*args, **kwargs):
             seen.append((signal.getsignal(signal.SIGHUP), signal.getsignal(signal.SIGINT)))
@@ -495,9 +500,11 @@ class QualifyFlowTests(unittest.TestCase):
         self.run_qualify([observation(), observation()], control=control)
         self.assertEqual(set(seen), {(signal.SIG_IGN, interrupt)})
         self.assertIs(signal.getsignal(signal.SIGHUP), handler)
+        self.assertIs(signal.getsignal(signal.SIGINT), interrupt)
         with self.assertRaises(qualify.QualifyError):
             self.run_qualify([observation()], lock=FakeLock(self.events, held_error()))
         self.assertIs(signal.getsignal(signal.SIGHUP), handler)
+        self.assertIs(signal.getsignal(signal.SIGINT), interrupt)
 
     def test_stale_markers_are_removed_under_the_lock_and_nothing_else(self):
         owner = os.geteuid() if hasattr(os, "geteuid") else 0
@@ -539,6 +546,20 @@ class QualifyFlowTests(unittest.TestCase):
             qualify.remove_stale_markers(self.shm, owner)
         with self.assertRaisesRegex(qualify.QualifyError, "cannot list host /dev/shm"):
             qualify.remove_stale_markers(self.shm / "missing", owner)
+
+    def test_stale_marker_that_vanishes_mid_scan_is_skipped(self):
+        names = ["szl-qualify-" + digit * 32 for digit in "01"]
+        for name in names:
+            (self.shm / name).write_bytes(b"")
+        owner = os.geteuid() if hasattr(os, "geteuid") else 0
+        real = os.lstat
+
+        def lstat(path, *args, **kwargs):
+            if Path(path).name == names[0]:  # Removed by someone else after listdir.
+                raise FileNotFoundError(path)
+            return real(path, *args, **kwargs)
+        with unittest.mock.patch.object(qualify.os, "lstat", side_effect=lstat):
+            self.assertEqual(qualify.remove_stale_markers(self.shm, owner), names[1:])
 
     @unittest.skipUnless(hasattr(signal, "SIGHUP"), "SIGHUP is POSIX")
     def test_failed_rehearsal_keeps_diagnostics_and_cleans_up_through_a_hangup(self):

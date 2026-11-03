@@ -161,6 +161,15 @@ class DryRunTests(unittest.TestCase):
                                                "--stages", "provision", "--dry-run"))
             self.assertEqual(code, 1)
             self.assertIn("plain absolute path", output.getvalue())
+            for path in ("/var", "/tmp/models", "/dev"):  # Refused before STAGE, not by the VM plan.
+                output = io.StringIO()
+                with self.subTest(path=path), contextlib.redirect_stdout(output), \
+                        contextlib.redirect_stderr(output):
+                    code = bring_up.main(arguments(scratch, "--hidden-path", path,
+                                                   "--stages", "provision", "--dry-run"))
+                    self.assertEqual(code, 1)
+                    self.assertIn("cover a build unit mount point", output.getvalue())
+                    self.assertNotIn("STAGE", output.getvalue())
 
     def test_provision_and_qualify_need_a_window_reference(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -561,6 +570,7 @@ class ProvisionStageTests(unittest.TestCase):
         recovery = (bring_up.UNINSTALL + "; if fresh admin logins still fail",
                     "pending sshd_config or sshd_config.d edit",
                     "check sudo sshd -T -C user=Ubuntu,host=localhost,addr=127.0.0.1",
+                    "addr= your workstation's address", "Match Address/Host",
                     "revert any edit szl did not make", "then run sudo systemctl reload ssh")
         for label, probe_after, apply_code, message in (
                 ("works", 0, 0, None),

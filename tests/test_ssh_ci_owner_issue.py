@@ -709,7 +709,7 @@ class IssueFlowTests(unittest.TestCase):
         self.host.run_ids = []
         self.host.refuse = lambda argv: argv[1:3] == ["workflow", "run"]
         record, _owner = self.issue()
-        steps = ("the dispatch did not complete, so GitHub likely created no run; if one appears, "
+        steps = ("the dispatch did not complete, and GitHub may still have created a run; "
                  + owner_issue.FIND_RUN % record["permit_id"])
         self.assertEqual(record["failure"],
                          "IssueError: dispatch workflow failed: refused by the test; " + steps)

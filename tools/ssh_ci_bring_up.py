@@ -38,6 +38,7 @@ from tools.ssh_ci_contract import (ContractError, STEP_NAMES, canonical,
                                    strict_json_loads, validate_pinned_processes)
 from tools.ssh_ci_environment import (environment_variables_preimage,
                                       required_environment_preimage)
+from tools.ssh_ci_broker import overlaps_unit_mount
 from tools.ssh_ci_provision import ProvisionError, public_key as normalize_public_key
 
 REPO = "szl-holdings/szl-skills"
@@ -185,8 +186,10 @@ class Lane:
         """What to run from a second admin session when a fresh admin login fails after apply."""
         return ("%s; if fresh admin logins still fail, apply's sshd reload may have activated a "
                 "pending sshd_config or sshd_config.d edit: check sudo sshd -T -C "
-                "user=%s,host=localhost,addr=127.0.0.1, revert any edit szl did not make, then "
-                "run sudo systemctl reload ssh" % (UNINSTALL, self.admin))
+                "user=%s,host=localhost,addr=127.0.0.1 and again with addr= your workstation's "
+                "address (the first field of $SSH_CLIENT), since Match Address/Host blocks only "
+                "apply to their own address; compare file times under /etc/ssh, revert any edit "
+                "szl did not make, then run sudo systemctl reload ssh" % (UNINSTALL, self.admin))
 
     def gh_json(self, argv):
         output = self.run(["gh", *argv], capture=True).stdout
@@ -385,6 +388,8 @@ class Lane:
         for path in self.args.hidden_path:
             if re.fullmatch(PLAIN_PATH, path) is None:
                 raise Stop("hidden path must be a plain absolute path: " + path)
+            if overlaps_unit_mount(path):  # The VM plan refuses it too, after staging.
+                raise Stop("hidden path must not cover a build unit mount point: " + path)
             hidden += ["--hidden-path", path]
         if not self.confirm("Stage public keys and exact source in a NEW private VM directory "
                             "(retained, never deleted automatically)?", "STAGE"):

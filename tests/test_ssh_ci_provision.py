@@ -304,11 +304,12 @@ class ApplyOrderTests(unittest.TestCase):
              KeyboardInterrupt),
             ("write receipt", OSError("disk full"), 9, True, OSError),
         )
-        for label, fault, reached, disabled, kind in cases:
+        for label, fault, reached, _enable_reached, kind in cases:
             with self.subTest(label=label, fault=type(fault).__name__):
                 outcome, events, quiet = self.apply({label: fault})
                 self.assertIsInstance(outcome, kind)
-                after = WINDOW[:reached] + REMOVE + (DISABLE if disabled else [])
+                # Disabled even when this run never reached the enable: an earlier apply may have.
+                after = WINDOW[:reached] + REMOVE + DISABLE
                 self.assertEqual(events, self.prefix() + after)
                 self.assertEqual(quiet, [False] * len(self.prefix()) + [True] * len(after))
 
