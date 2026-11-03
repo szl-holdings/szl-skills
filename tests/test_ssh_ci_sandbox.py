@@ -204,6 +204,32 @@ class ReadbackTests(unittest.TestCase):
         self.assertEqual(value["unit_state"], {"ActiveState": "active", "MainPID": "4242",
                                                "SubState": "running"})
 
+    def test_main_pid_is_checked_against_procs_read_on_the_same_pass(self):
+        # The first loop sees 4242; by the active/running pass the cgroup holds only 999.
+        procs = self.cgroup / "system.slice" / UNIT / "cgroup.procs"
+
+        def run(argv, **kwargs):
+            procs.write_text("999\n")
+            return self.fake_run(argv, **kwargs)
+        with unittest.mock.patch.object(sandbox, "process_readback",
+                                        return_value={"failures": []}) as check:
+            value = self.readback(run)
+        self.assertIs(value["verified"], False)
+        self.assertIn("main process not running in unit cgroup", value["mismatched"])
+        self.assertEqual(value["cgroup"]["procs"], [999])
+        check.assert_not_called()
+
+    def test_cgroup_procs_is_read_before_any_limit_file(self):
+        opened = []
+
+        def spy(path, *args, **kwargs):
+            opened.append(Path(path).name)
+            return open(path, *args, **kwargs)
+        with unittest.mock.patch.object(sandbox, "open", spy, create=True):
+            values = sandbox._read_cgroup(UNIT, self.cgroup)
+        self.assertEqual(opened, ["cgroup.procs", *sandbox.EXPECTED_CGROUP])
+        self.assertEqual(values["procs"], [4242])
+
     def test_unit_never_running_is_a_mismatch_without_reading_the_process(self):
         self.shown.update(ActiveState="activating", SubState="start")
         with unittest.mock.patch.object(sandbox, "process_readback",

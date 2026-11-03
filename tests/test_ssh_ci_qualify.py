@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -18,6 +19,7 @@ import unittest.mock
 from unittest import mock
 import uuid
 
+from tools import ssh_ci_claims as claims
 from tools import ssh_ci_qualify as qualify
 from tools.ssh_ci_claims import ClaimError
 
@@ -181,6 +183,32 @@ class ProbeNamespaceTests(unittest.TestCase):
         self.assertEqual(result["thread_start"], "ALLOWED")
 
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "the probe reads Linux /dev/shm")
+class ProbeShmMarkerTests(unittest.TestCase):
+    def run_lines(self, root, name):
+        # The probe's attempt() and /dev/shm lines, with a temp dir standing in for /dev/shm.
+        define = qualify.PROBE[qualify.PROBE.index("def attempt"):qualify.PROBE.index("def emit")]
+        start = qualify.PROBE.index('    r["dev_shm_entries"]')
+        block = textwrap.dedent(qualify.PROBE[start:qualify.PROBE.index('    r["gpu_devices"]')])
+        self.assertEqual(block.count('"/dev/shm"'), 1)
+        self.assertEqual(block.count('"/dev/shm/" + args["shm_marker"]'), 1)
+        script = ('import json, os, sys\nr, args = {}, {"shm_marker": sys.argv[1]}\n' + define
+                  + block.replace('"/dev/shm', '"' + root.as_posix()) + "print(json.dumps(r))\n")
+        done = subprocess.run([sys.executable, "-I", "-B", "-c", script, name],
+                              capture_output=True, timeout=60, check=False)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout)
+
+    def test_visible_marker_is_allowed_and_an_unused_name_is_absent(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        marker = qualify.shm_marker(root)
+        visible = self.run_lines(root, marker.name)
+        self.assertEqual((visible["dev_shm_marker"], visible["dev_shm_entries"]), ("ALLOWED", 1))
+        unused = self.run_lines(root, "szl-qualify-" + uuid.uuid4().hex)
+        self.assertEqual(unused["dev_shm_marker"], "ABSENT")
+
+
 class HostReadTests(unittest.TestCase):
     def test_listening_ports_and_model_paths_are_read_only_parses(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -231,15 +259,27 @@ def observation(processes=(), competing=0):
     return {"host": HOST, "gpu_compute_processes": list(processes), "competing_cpu_jobs": competing}
 
 
-class FakeLock:
-    """Stands in for the broker's ClaimStore context; ``held`` is a busy broker."""
+def claim_error(text, cause=None):
+    error = ClaimError(text)
+    error.__cause__ = cause
+    return error
 
-    def __init__(self, events, held=False):
-        self.events, self.held = events, held
+
+def held_error():
+    """What ClaimStore raises while another process holds the flock."""
+    return claim_error("cannot acquire trusted claim store; execution denied",
+                       BlockingIOError(errno.EWOULDBLOCK, "Resource temporarily unavailable"))
+
+
+class FakeLock:
+    """Stands in for the broker's ClaimStore context; ``error`` is what entering raises."""
+
+    def __init__(self, events, error=None):
+        self.events, self.error = events, error
 
     def __enter__(self):
-        if self.held:
-            raise ClaimError("cannot acquire trusted claim store; execution denied")
+        if self.error is not None:
+            raise self.error
         self.events.append("lock")
         return self
 
@@ -344,19 +384,24 @@ class QualifyFlowTests(unittest.TestCase):
                   "deadline": b"Finished with result: timeout\n"}.get(mode, b"")
         return dict(outcome(stderr), runner_stdout=json.dumps(PROBES[mode]).encode())
 
-    def run_qualify(self, observations, *, lock=None, control=None, **options):
+    def run_qualify(self, observations, *, lock=None, control=None, claim_dir=None, build=None,
+                    **options):
         observations = iter(observations)
 
         def observer():
             self.events.append("observe")
             return next(observations)
+        config = {"build_user": "szl-build", "hidden_paths": [], "nvidia_smi": "/usr/bin/nvidia-smi",
+                  "build_python": "/usr/bin/python3", "runner": "/opt/szl-cpu-broker/runner.py"}
+        if claim_dir is None:
+            options.setdefault("claim_store_factory", lambda: lock or FakeLock(self.events))
+        else:  # The production default: ClaimStore(config["claim_dir"]).
+            config["claim_dir"] = str(claim_dir)
         with unittest.mock.patch.object(qualify, "run_control", control or self.fake_control):
-            return qualify.qualify({"build_user": "szl-build", "hidden_paths": [],
-                                    "nvidia_smi": "/usr/bin/nvidia-smi"},
-                                   build=FakeBuild(), build_uid=999, observer=observer,
+            return qualify.qualify(config, build=build or FakeBuild(), build_uid=999,
+                                   observer=observer,
                                    clock=lambda: datetime(2030, 1, 1, tzinfo=timezone.utc),
                                    proc=Path(tempfile.gettempdir()) / "no-proc",
-                                   claim_store_factory=lambda: lock or FakeLock(self.events),
                                    shm_root=self.shm, **options)
 
     def test_model_identity_change_blocks_qualification(self):
@@ -378,9 +423,158 @@ class QualifyFlowTests(unittest.TestCase):
 
     def test_held_claim_lock_refuses_before_anything_runs(self):
         with self.assertRaisesRegex(qualify.QualifyError, "claim lock is held"):
-            self.run_qualify([observation()], lock=FakeLock(self.events, held=True))
+            self.run_qualify([observation()], lock=FakeLock(self.events, held_error()))
         self.assertEqual(self.events, [])
         self.assertEqual(list(self.shm.iterdir()), [])
+
+    def test_claim_lock_refusal_names_its_cause(self):
+        cases = ((held_error(), ("is held by another process (a build may be running): cannot "
+                                 "acquire trusted claim store; execution denied (BlockingIOError); ")),
+                 (claim_error("claim directory must have mode 0700 or 0750"),
+                  ("is held or unavailable (a build may be running): claim directory must have "
+                   "mode 0700 or 0750; ")),
+                 (claim_error("cannot acquire trusted claim store; execution denied",
+                              FileNotFoundError(errno.ENOENT, "missing")),
+                  ("is held or unavailable (a build may be running): cannot acquire trusted claim "
+                   "store; execution denied (FileNotFoundError); ")),
+                 (claim_error("lock file must be empty", claim_error("wrapped", held_error())),
+                  "is held by another process"))
+        for error, expected in cases:
+            with self.subTest(expected=expected):
+                with self.assertRaises(qualify.QualifyError) as raised:
+                    self.run_qualify([observation()], lock=FakeLock(self.events, error))
+                self.assertIn("the broker claim lock " + expected, str(raised.exception))
+                self.assertIs(raised.exception.__cause__, error)
+        self.assertEqual(self.events, [])
+
+    @unittest.skipUnless(os.name == "posix" and claims.fcntl is not None, "a real flock needs POSIX")
+    def test_default_factory_holds_the_real_broker_claim_lock(self):
+        directory = Path(tempfile.mkdtemp())  # 0700, like the provisioned claim directory.
+        self.addCleanup(shutil.rmtree, directory, True)
+        root = os.geteuid() == 0
+        checked = claims._directory_metadata
+
+        def directory_metadata(descriptor, final=False):
+            # Skip only what refuses a temp dir: its sticky /tmp ancestry and, when the
+            # test is unprivileged, its owner. The flock itself is the production one.
+            if final and root:
+                checked(descriptor, final=True)
+
+        def contended(*args, **kwargs):
+            # The broker cannot enter during a control.
+            with self.assertRaises(ClaimError), claims.ClaimStore(directory):
+                self.fail("the broker entered during qualification")
+            return self.fake_control(*args, **kwargs)
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(unittest.mock.patch.object(
+                claims, "_directory_metadata", directory_metadata))
+            if not root:  # Unprivileged, the lock file cannot be root's either.
+                stack.enter_context(unittest.mock.patch.object(claims, "_file_metadata", os.fstat))
+            receipt = self.run_qualify([observation(), observation()], control=contended,
+                                       claim_dir=directory)
+            self.assertEqual(receipt["result"], "QUALIFIED", receipt["failures"])
+            self.events.clear()
+            # Released afterwards; now hold it as a build would.
+            with claims.ClaimStore(directory), \
+                    self.assertRaisesRegex(qualify.QualifyError, "held by another process"):
+                self.run_qualify([observation()], claim_dir=directory)
+        self.assertEqual(self.events, [])
+        self.assertEqual(list(self.shm.iterdir()), [])
+
+    @unittest.skipUnless(hasattr(signal, "SIGHUP"), "SIGHUP is POSIX")
+    def test_hangup_is_ignored_while_qualifying_and_then_restored(self):
+        def handler(*_args):
+            self.fail("SIGHUP handler ran")
+        previous = signal.signal(signal.SIGHUP, handler)
+        self.addCleanup(signal.signal, signal.SIGHUP, previous)
+        interrupt, seen = signal.getsignal(signal.SIGINT), []
+
+        def control(*args, **kwargs):
+            seen.append((signal.getsignal(signal.SIGHUP), signal.getsignal(signal.SIGINT)))
+            return self.fake_control(*args, **kwargs)
+        self.run_qualify([observation(), observation()], control=control)
+        self.assertEqual(set(seen), {(signal.SIG_IGN, interrupt)})
+        self.assertIs(signal.getsignal(signal.SIGHUP), handler)
+        with self.assertRaises(qualify.QualifyError):
+            self.run_qualify([observation()], lock=FakeLock(self.events, held_error()))
+        self.assertIs(signal.getsignal(signal.SIGHUP), handler)
+
+    def test_stale_markers_are_removed_under_the_lock_and_nothing_else(self):
+        owner = os.geteuid() if hasattr(os, "geteuid") else 0
+        stale = [self.shm / ("szl-qualify-" + digit * 32) for digit in "0b"]  # No case clash.
+        kept = ["szl-qualify-" + "A" * 32, "szl-qualify-" + "0" * 31, "szl-qualify-" + "0" * 33,
+                "szl-qualify-" + "0" * 32 + ".x", "x-szl-qualify-" + "0" * 32, "unrelated"]
+        for path in [*stale, *(self.shm / name for name in kept)]:
+            path.write_bytes(b"")
+        (self.shm / ("szl-qualify-" + "1" * 32)).mkdir()
+        kept.append("szl-qualify-" + "1" * 32)
+        if os.name == "posix":  # Links are never followed or removed; nor is a name with "\n".
+            (self.shm / "target").write_bytes(b"")
+            os.symlink(self.shm / "target", self.shm / ("szl-qualify-" + "2" * 32))
+            os.link(self.shm / "unrelated", self.shm / ("szl-qualify-" + "3" * 32))
+            (self.shm / ("szl-qualify-" + "4" * 32 + "\n")).write_bytes(b"")
+            kept += ["target", "szl-qualify-" + "2" * 32, "szl-qualify-" + "3" * 32,
+                     "szl-qualify-" + "4" * 32 + "\n"]
+        with self.assertRaisesRegex(qualify.QualifyError, "claim lock"):
+            self.run_qualify([observation()], lock=FakeLock(self.events, held_error()))
+        self.assertTrue(all(path.exists() for path in stale))  # Only ever under the lock.
+        self.assertEqual(qualify.remove_stale_markers(self.shm, owner + 1), [])  # Not the owner.
+
+        def control(*args, **kwargs):
+            if args[2] == "isolation":
+                self.assertFalse(any(path.exists() for path in stale))
+            return self.fake_control(*args, **kwargs)
+        receipt = self.run_qualify([observation(), observation()], control=control,
+                                   shm_owner=owner)
+        self.assertEqual(receipt["result"], "QUALIFIED", receipt["failures"])
+        self.assertEqual(sorted(path.name for path in self.shm.iterdir()), sorted(kept))
+        self.assertEqual((self.shm / "unrelated").read_bytes(), b"")
+
+    def test_stale_marker_that_cannot_be_listed_or_removed_refuses(self):
+        (self.shm / ("szl-qualify-" + "0" * 32)).write_bytes(b"")
+        owner = os.geteuid() if hasattr(os, "geteuid") else 0
+        with unittest.mock.patch.object(qualify.os, "unlink", side_effect=PermissionError), \
+                self.assertRaisesRegex(qualify.QualifyError, "stale host /dev/shm marker: "
+                                       "PermissionError"):
+            qualify.remove_stale_markers(self.shm, owner)
+        with self.assertRaisesRegex(qualify.QualifyError, "cannot list host /dev/shm"):
+            qualify.remove_stale_markers(self.shm / "missing", owner)
+
+    @unittest.skipUnless(hasattr(signal, "SIGHUP"), "SIGHUP is POSIX")
+    def test_failed_rehearsal_keeps_diagnostics_and_cleans_up_through_a_hangup(self):
+        stale = self.shm / ("szl-qualify-" + "0" * 32)
+        stale.write_bytes(b"")
+        hangups = []
+        previous = signal.signal(signal.SIGHUP, lambda *_args: hangups.append("handled"))
+        self.addCleanup(signal.signal, signal.SIGHUP, previous)
+        build = FakeBuild()
+
+        @contextlib.contextmanager
+        def workspace(_request_id):
+            self.events.append("workspace")
+            try:
+                yield PurePosixPath("/source"), PurePosixPath("/out")
+            finally:  # A dropped session's SIGHUP lands while the workspace is removed.
+                os.kill(os.getpid(), signal.SIGHUP)
+                self.events.append("cleanup")
+        build.workspace = workspace
+        runner = {"schema": "szl.ssh-cpu-build.runner.v1", "started": True, "prepared": True,
+                  "steps": [{"name": name, "returncode": int(name == "unittest")}
+                            for name in qualify.STEP_NAMES], "truncated": []}
+        result = {"runner_stdout": qualify.canonical(runner), "readback": {"verified": True},
+                  "runner_stderr": b"Finished with result: success\n", "truncated": []}
+        with mock.patch.object(qualify, "stage_source"), \
+                mock.patch.object(qualify, "collect_outputs",
+                                  return_value=({"unittest.stderr": b"AssertionError\n"}, [])):
+            receipt = self.run_qualify([observation(), observation()], rehearse_sha="a" * 40,
+                                       build=build, run_unit=lambda *_a, **_kw: result,
+                                       shm_owner=os.geteuid())
+        self.assertEqual(receipt["failures"], ["rehearsal: rehearsal steps did not all pass"])
+        self.assertEqual(receipt["rehearsal"]["diagnostics"]["streams"]["unittest.stderr"]["tail"],
+                         "AssertionError\n")
+        self.assertEqual(self.events[-4:], ["workspace", "cleanup", "observe", "unlock"])
+        self.assertEqual(hangups, [])
+        self.assertEqual(list(self.shm.iterdir()), [])  # The stale marker and this run's.
 
     def test_running_build_unit_refuses_to_start(self):
         for competing in (1, None, True, "0", 0.0):

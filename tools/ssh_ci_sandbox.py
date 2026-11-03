@@ -203,8 +203,10 @@ def unit_properties(*, user, source_dir, output_dir, hidden_paths=(),
         "LockPersonality=yes", "SystemCallArchitectures=native",
         "SystemCallFilter=@system-service",
         "SystemCallFilter=~@privileged @resources @keyring io_uring_setup io_uring_enter io_uring_register",
-        # systemd 249's RestrictNamespaces= filters clone/unshare/setns flags but not
-        # clone3 (250 added that). ENOSYS, not EPERM, so glibc falls back to clone.
+        # RestrictNamespaces= filters clone/unshare/setns flags. Its clone3 rule (ENOSYS)
+        # is upstream in 251, not 250, and in stable 249.12 but not 249.11, VM2's base;
+        # where Ubuntu carries that backport this entry is redundant and harmless.
+        # ENOSYS, not EPERM, so glibc falls back to clone.
         "SystemCallFilter=~clone3:ENOSYS",
         "SystemCallErrorNumber=EPERM", "UMask=0077",
         "TemporaryFileSystem=/tmp:" + TMPFS_OPTIONS,
