@@ -78,8 +78,19 @@ Recomputed against all 113 retained held-out targets:
 
 | Saved outputs | Label accuracy | State accuracy | Joint label/state/ordered-evidence accuracy | Invalid outputs |
 |---|---:|---:|---:|---:|
-| Baseline | 0/113 | 0/113 | 0/113 | 113 |
+| Baseline (negative control) | 0/113 | 0/113 | 0/113 | 113 |
 | Seed 011 | 113/113 | 113/113 | 112/113 | 0 |
+
+The baseline row is the study's declared negative control, not a replay defect. All 113
+saved baseline records carry `"parsed": null`: the unadapted base model
+(`unsloth/Qwen3.5-0.8B`, no LoRA adapter) emitted free-text prose under the study's declared
+decoding (greedy, `malformed_json_repair` disabled). The replay counts those outputs as
+invalid in the denominator by design, and the row exactly reproduces the study's own
+`evidence/evaluation/metrics-base.json` at the pinned revision (`strict_json` 0,
+`failure_rows` 113; the downloaded file hashes match the study's
+`held_manifest_sha256`/`predictions_sha256` declarations). The 2026-11-05 audit
+[validation/science/triage-study5-baseline-audit.json](validation/science/triage-study5-baseline-audit.json)
+reproduced both rows locally and records this baseline as VALIDATED_AS_DECLARED_NEGATIVE_CONTROL.
 
 The capsule and completion record matched, with no changed sources. Stored correctness flags
 were ignored; missing outputs stay in the denominator. Inputs are synthetic and the model
