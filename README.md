@@ -67,9 +67,9 @@ The stable v0.4.0 tag retains twenty-three science tools and two evidence skills
 The fixed rc.3 source snapshot contains older marketplace metadata and historical
 CHANGELOG counts, as disclosed in its release notes; use its source revision and
 manifest rather than a version string to identify the published bytes.
-The measurement-harmonizer, synthetic rare-disease evidence-replay, synthetic
-rare-disease evidence-map and skill-conformance skills are unreleased source candidates
-on this branch.
+The measurement-harmonizer, reporting-guideline-audit, synthetic
+rare-disease evidence-replay, synthetic rare-disease evidence-map and
+skill-conformance skills are unreleased source candidates on this branch.
 
 Claude Code: `/plugin marketplace add szl-holdings/szl-skills`, or copy a folder from `skills/`
 into `.claude/skills/` or `~/.claude/skills/`.
