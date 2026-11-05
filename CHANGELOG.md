@@ -22,9 +22,10 @@
   pinned synthetic case and HPO/ClinVar-shaped declarations at a cutoff, with
   source/provenance ablations and permanent HOLD readiness. It does not diagnose,
   rank disease, evaluate a model or qualify clinical use.
-- Current source inventory is forty-one skills: thirty-eight science tools and three
-  evidence skills. The reporting map, both synthetic rare-disease tools, and measurement
-  harmonization are unreleased source additions; the fixed v0.5.0-rc.3 assets are unchanged.
+- Current source inventory is forty-two skills: thirty-nine science tools and three
+  evidence skills. The reporting map, the skill-conformance check, both synthetic
+  rare-disease tools, and measurement harmonization are unreleased source candidates;
+  the fixed v0.5.0-rc.3 assets are unchanged.
 - Add offline measurement harmonization with declared specimen ID maps, source hashes and
   affine unit conversions. Ambiguous or incomplete joins retain no usable rows; the result
   does not establish identity, calibration or scientific agreement. Package it with the
