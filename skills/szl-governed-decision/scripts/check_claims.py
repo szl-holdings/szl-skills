@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a claims ledger: every claim cites a receipt that exists, and no forbidden word
-appears in the generated prose."""
+"""Verify a claims ledger: each cited receipt file must exist."""
 import json, sys
 from pathlib import Path
 
