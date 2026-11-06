@@ -2,11 +2,13 @@
 
 import ast
 import json
+import os
 import pathlib
 import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 
 
@@ -59,6 +61,48 @@ class SourceSizeBudgetTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("skills/ is 1083001 bytes (limit 1,083,000)", result.stdout)
         self.assertIn("selfcheck: FAIL", result.stdout)
+
+    def test_ignored_python_cache_is_not_source_volume(self):
+        # Importing a skill module writes __pycache__ beside it. The packager,
+        # installer and inventory skip those ignored caches; the source budget must too.
+        cache = self.skill / "__pycache__"
+        cache.mkdir()
+        (cache / "kernel.cpython-313.pyc").write_bytes(b"\0" * 4096)
+        result = self.check_size(SOURCE_LIMIT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("selfcheck: PASS", result.stdout)
+
+    def test_selfcheck_without_b_writes_no_bytecode_into_skills(self):
+        # CI runs `python tools/selfcheck.py` without -B, and its behavioral tests
+        # load skill modules by path. A second run must see the same source bytes.
+        scripts = self.skill / "scripts"
+        scripts.mkdir()
+        (scripts / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (self.root / "tools" / "test_fixture_import.py").write_text(textwrap.dedent('''\
+            import importlib.util
+            import pathlib
+            import unittest
+
+            HELPER = (pathlib.Path(__file__).resolve().parents[1]
+                      / "skills" / "szl-budget-fixture" / "scripts" / "helper.py")
+
+
+            class FixtureImportTests(unittest.TestCase):
+                def test_fixture_skill_module_loads(self):
+                    spec = importlib.util.spec_from_file_location("budget_fixture_helper", HELPER)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    self.assertEqual(module.VALUE, 1)
+            '''), encoding="utf-8")
+        environment = os.environ.copy()
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)
+        environment.pop("PYTHONPYCACHEPREFIX", None)
+        for _ in range(2):
+            result = subprocess.run([sys.executable, str(self.root / "tools" / "selfcheck.py")],
+                                    capture_output=True, text=True, timeout=30, env=environment)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("test_fixture_skill_module_loads", result.stderr)
+        self.assertEqual(sorted((self.root / "skills").rglob("*.pyc")), [])
 
     def test_installer_skill_and_batch_limits_are_unchanged(self):
         parsed = ast.parse((ROOT / "tools" / "install_claude_science.py").read_text(encoding="utf-8"))
