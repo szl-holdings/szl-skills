@@ -187,9 +187,10 @@ python -B tools/sync_workbench.py --check
 python -B -m unittest discover -s tests -v
 ```
 
-These commands need Python 3.12 or newer and no third-party packages. Tests that need root,
-ssh-keygen, an OpenSSH server, a case-insensitive filesystem or an optional local input file
-skip with a stated reason when the host lacks them.
+These commands need Python 3.12 or newer, Git and a Git checkout of this repository, and no
+third-party Python packages: the packager and several tests read Git metadata and fail without it.
+Tests that need root, ssh-keygen, an OpenSSH server, a case-insensitive filesystem or an optional
+local input file skip with a stated reason when the host lacks them.
 
 Each ZIP has one enclosing skill directory containing SKILL.md, helpers, CLI, fixtures and
 license notices for manual claude.ai upload. This packaging is not evidence of a successful
@@ -236,4 +237,5 @@ changes. See [CHANGELOG.md](CHANGELOG.md).
   [triage study](https://huggingface.co/SZLHOLDINGS/szl-triage-qwen3.5-0.8b-lora-study5/tree/eb79a26a2934d5eaa667984720feacdcb90dcc28).
   [MODEL_INTEGRATIONS.md](MODEL_INTEGRATIONS.md) lists model candidates, none assessed.
   [SZLHOLDINGS/szl-skills-ci-evidence](https://huggingface.co/datasets/SZLHOLDINGS/szl-skills-ci-evidence)
-  mirrors CI results for selected pull requests; GitHub stays the authoritative record.
+  mirrors CI results for selected pull requests as unsigned, hand-assembled records; GitHub stays
+  the authoritative record.
