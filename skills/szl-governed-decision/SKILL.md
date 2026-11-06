@@ -76,5 +76,5 @@ hoping it matches.
 
 ## Scripts
 
-- `scripts/decide.py` — classify text, print the governed record and a receipt payload.
+- `scripts/decide.py` — classify text, print the governed record and a receipt payload. It needs a szl-typesafe-triage checkout as its repository root.
 - `scripts/check_claims.py` — verify every claim in a ledger cites a file that exists.

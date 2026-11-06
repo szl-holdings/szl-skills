@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Self-check for szl-skills. Stdlib only. Exit 1 on any failure."""
 import json, pathlib, re, sys, unittest
-import skill_inventory
+# The behavioral tests below load skill modules by path; never cache them in the tree measured here.
+sys.dont_write_bytecode = True
+import skill_inventory  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
@@ -27,7 +29,9 @@ except (OSError, ValueError, KeyError, TypeError) as e:
 if not SKILLS.is_dir():
     fails.append("skills/ folder missing")
 else:
-    size = sum(p.stat().st_size for p in SKILLS.rglob("*") if p.is_file())
+    # Ignored Python caches are not source; the packager, installer and inventory skip them too.
+    size = sum(p.stat().st_size for p in SKILLS.rglob("*")
+               if p.is_file() and "__pycache__" not in p.relative_to(SKILLS).parts)
     if size > MAX_SOURCE_SKILL_BYTES:
         fails.append("skills/ is %d bytes (limit %s)" % (size, format(MAX_SOURCE_SKILL_BYTES, ",")))
     names = set()

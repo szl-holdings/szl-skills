@@ -144,6 +144,7 @@ Community index with pinned commits and automated checks: https://github.com/ai4
 | szl-skill-conformance | Do retained source/export bytes and positive/irrelevant task records agree? | Supplied records only; actual host invocation stays NOT_VERIFIED and scientific validity stays NOT_EVALUATED |
 | szl-research-change-impact | Which conclusions still need review after a research dependency changes or disappears? | Uses declared retained graphs and supplied digests; does not verify scientific truth |
 | szl-uncertainty-lineage | How does uncertainty propagate through a declared arithmetic graph? | First-order local approximation; input validity, units and distribution coverage require separate checks |
+| szl-reporting-guideline-audit | Is every item of the frozen PRISMA 2020, CONSORT 2025 or STROBE 2007 checklist accounted for, with a declared locator or explicit applicability? | Locators are author declarations, not visual confirmation; reporting compliance stays NOT_EVALUATED |
 | szl-science-workbench | Nine integrated core checks on one project directory, with immutable runs and invalidation | Other science tools run separately; not an experiment runner |
 
 Each science skill ships `SKILL.md`, a `kernel.py` or CLI, relevant fixtures under `assets/` where needed,
@@ -186,6 +187,11 @@ python -B tools/sync_workbench.py --check
 python -B -m unittest discover -s tests -v
 ```
 
+These commands need Python 3.12 or newer, Git and a Git checkout of this repository, and no
+third-party Python packages: the packager and several tests read Git metadata and fail without it.
+Tests that need root, ssh-keygen, an OpenSSH server, a case-insensitive filesystem or an optional
+local input file skip with a stated reason when the host lacks them.
+
 Each ZIP has one enclosing skill directory containing SKILL.md, helpers, CLI, fixtures and
 license notices for manual claude.ai upload. This packaging is not evidence of a successful
 Claude Science import or runtime check. Pass
@@ -210,12 +216,26 @@ Use your own TypeSafe key. Save it as a credential (Customize > Credentials > Ad
 ## Provenance
 
 Built from szl-holdings/szl-typesafe-triage at commit 8d73dd23f640aace362172fff55d82ef7de63f98 (typesafe-ai source: GITHUB). License: Apache-2.0 (see LICENSE and NOTICE).
+
 ## Specialists
 
 [specialists/szl-estate-auditor](specialists/szl-estate-auditor/SPECIALIST.md) describes a read-only Claude Science specialist that audits a GitHub org and a Hugging Face org against their public claims. Specialists are not imported with the skills; copy the fields into Customize > Specialists.
 
 ## Checks
 
-Every push and pull request runs python tools/selfcheck.py. See [CHANGELOG.md](CHANGELOG.md).
+Every pull request and every push to main runs the selfcheck workflow: `python tools/selfcheck.py`,
+`python tools/sync_workbench.py --check` and the full unittest suite on Linux, plus the
+evidence-map portability tests on Windows. CodeQL runs for pull requests and pushes to main,
+OpenSSF Scorecard for pushes to main and weekly, and the SSH build contract when the SSH lane
+changes. See [CHANGELOG.md](CHANGELOG.md).
 
-Estate on Hugging Face: models, datasets and Spaces are published under the [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) org.
+## Links
+
+- Source, issues and releases: [szl-holdings/szl-skills](https://github.com/szl-holdings/szl-skills)
+- Hugging Face: [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) publishes the estate's models,
+  datasets and Spaces. At runtime only the opt-in `fetch-triage` contacts the Hub, for the pinned
+  [triage study](https://huggingface.co/SZLHOLDINGS/szl-triage-qwen3.5-0.8b-lora-study5/tree/eb79a26a2934d5eaa667984720feacdcb90dcc28).
+  [MODEL_INTEGRATIONS.md](MODEL_INTEGRATIONS.md) lists model candidates, none assessed.
+  [SZLHOLDINGS/szl-skills-ci-evidence](https://huggingface.co/datasets/SZLHOLDINGS/szl-skills-ci-evidence)
+  mirrors CI results for selected pull requests as unsigned, hand-assembled records; GitHub stays
+  the authoritative record.

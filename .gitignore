@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 .sync-stage-*/
+*.egg-info/
+build/
