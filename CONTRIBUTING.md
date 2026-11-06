@@ -11,25 +11,40 @@ contribution to this repository:
    UNKNOWN — UNKNOWN is never claimed as PASS.
 3. **Canonical surfaces only.** Product lives at a-11-oy.com, proof lives at
    a11oy.net. The legacy lookalike domain is forbidden and must never appear
-   in code, docs, config, or fixtures; the `forbidden-domain` CI gate is
-   release-blocking.
+   in code, docs, config, or fixtures. This repository has no automated
+   forbidden-domain gate, so reviewers check for it.
 
-## Branch model
+## Branches
 
-- Branch from the default branch as `szl/<change>` —
-  e.g. `szl/fix-receipt-ordering`, `szl/alignment-v14`.
-- One concern per branch; keep diffs reviewable.
+- Branch from `main`. One concern per branch; keep diffs reviewable.
 - Never push to the default branch — every change lands via pull request.
 
 ## Commits
 
 - [Conventional Commits](https://www.conventionalcommits.org):
   `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:` …
-- Sign off every commit (`git commit -s`): the `Signed-off-by:` trailer
-  certifies you have the right to submit the change (DCO style).
+- Sign-off trailers are optional. The organization's solo-builder provenance
+  policy ([szl-holdings/.github](https://github.com/szl-holdings/.github))
+  does not require them.
+
+## Checks
+
+Run these from the repository root before you push (Python 3.12 or newer,
+standard library only):
+
+```bash
+python -B tools/selfcheck.py
+python -B tools/sync_workbench.py --check
+python -B -m unittest discover -s tests -v
+```
+
+CI runs the same three checks on Linux and the evidence-map portability tests
+on Windows (selfcheck workflow) for every pull request. The SSH build contract
+runs when the SSH lane changes, and CodeQL runs for pull requests to `main`.
 
 ## Pull requests
 
-- Fill in the PR template checklist — every box is a control or a receipt.
-- CI must be green, including the forbidden-domain gate.
+- Fill in the organization's pull-request template — every section is a
+  control or a receipt.
+- CI must be green.
 - If the change alters a governed surface, attach the receipt that proves it.
