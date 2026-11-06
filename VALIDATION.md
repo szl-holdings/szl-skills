@@ -30,9 +30,12 @@ to 1,074,143 bytes, 10,606 above that baseline; the allowance at that point was
 1,075,000 bytes, leaving 857 bytes of headroom. Later additions raised the allowance
 to 1,082,000 bytes, and the figure-data-contract scope-gap fix raised it from
 1,082,000 to 1,083,000 bytes, as recorded in the unreleased changelog notes above.
-At the current source state, the 274 tracked skill-resource files measure 1,082,972
-bytes, leaving 28 bytes of headroom; the exact-limit and one-byte-over tests
-remain active. This is a source-volume allowance, not evidence of host import or clinical use.
+At the current source state, the 274 tracked skill-resource files measure 1,082,977
+bytes, leaving 23 bytes of headroom; the exact-limit and one-byte-over tests
+remain active. `tools/selfcheck.py` skips ignored `__pycache__` files when it measures,
+as the packager, installer and inventory already do, and it writes no bytecode itself,
+so a cache left by running a skill helper cannot fail the gate.
+This is a source-volume allowance, not evidence of host import or clinical use.
 The SDK limits remain 200,000 bytes per skill, 1,000,000 bytes per staging batch and
 eight batches. Doctrine and honest-status checks are unchanged.
 The aggregate repository budget is not an application

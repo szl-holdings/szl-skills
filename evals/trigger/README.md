@@ -1,7 +1,8 @@
 # Trigger evaluation sets
 
-One file per skill: 20 user queries, 10 that should load the skill and 10 near-misses that should not
-(same keywords, different need). The format follows the Anthropic skill-creator guidance for description
+Each file covers one skill. Most hold 20 user queries, 10 that should load the skill and 10 near-misses
+that should not (same keywords, different need); `szl-research-change-impact.json` holds 10 (5 and 5).
+Skills without a file have no trigger set yet. The format follows the Anthropic skill-creator guidance for description
 optimization: run each query against the model that powers the session, record the trigger rate, and
 revise the description for the failures.
 
