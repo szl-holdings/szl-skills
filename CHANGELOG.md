@@ -5,8 +5,10 @@
 - Measure the aggregate `skills/` source budget without ignored `__pycache__` files, as
   the packager, installer and inventory already do, and keep `tools/selfcheck.py` from
   writing bytecode while its behavioral tests load skill modules. A second selfcheck run,
-  or a cache left by running a skill helper, no longer fails the gate. Tracked
-  skill-resource bytes are 1,082,977; the 1,083,000-byte limit is unchanged.
+  or a cache left by running a skill helper, no longer fails the gate. Because the gate
+  now skips caches, a repository test fails if any `__pycache__` or `.pyc` path under
+  `skills/` is tracked. Tracked skill-resource bytes are 1,082,977; the 1,083,000-byte
+  limit is unchanged.
 - szl-governed-decision: `scripts/check_claims.py` no longer describes a forbidden-word
   check it does not perform, and SKILL.md states that `scripts/decide.py` needs a
   szl-typesafe-triage checkout as its repository root.

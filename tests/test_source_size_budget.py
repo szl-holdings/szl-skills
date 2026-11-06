@@ -117,5 +117,19 @@ class SourceSizeBudgetTests(unittest.TestCase):
             self.assertEqual(actual, expected)
 
 
+class TrackedSourceTests(unittest.TestCase):
+    def test_skipped_python_caches_are_never_tracked(self):
+        # The budget may skip __pycache__ only because caches stay ignored and untracked.
+        # A force-added cache would ship in revision-built archives and plugin checkouts
+        # without being counted, and the packager only rejects it for science skills.
+        listed = subprocess.run(["git", "ls-files", "-z", "--", "skills"], cwd=ROOT, check=True,
+                                capture_output=True, timeout=30).stdout
+        tracked = [path for path in os.fsdecode(listed).split("\0") if path]
+        self.assertTrue(tracked)
+        caches = [path for path in tracked
+                  if "__pycache__" in path.split("/") or path.endswith((".pyc", ".pyo"))]
+        self.assertEqual(caches, [])
+
+
 if __name__ == "__main__":
     unittest.main()
