@@ -217,3 +217,5 @@ Built from szl-holdings/szl-typesafe-triage at commit 8d73dd23f640aace362172fff5
 ## Checks
 
 Every push and pull request runs python tools/selfcheck.py. See [CHANGELOG.md](CHANGELOG.md).
+
+Estate on Hugging Face: models, datasets and Spaces are published under the [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) org.
