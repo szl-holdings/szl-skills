@@ -88,6 +88,13 @@ def _plain_path(value, label):
     return value
 
 
+def overlaps_unit_mount(path):
+    """True for "/" and any path at, under, or above a unit mount, as unit_properties compares."""
+    plain = "/" + "/".join(part for part in path.split("/") if part not in ("", "."))
+    return any(plain == mount or plain.startswith(mount + "/")
+               or mount.startswith(plain.rstrip("/") + "/") for mount in sandbox.UNIT_MOUNTS)
+
+
 def parse_config(data):
     """Strictly parse the closed broker configuration."""
     config = strict_json_loads(data, MAX_CONFIG_BYTES)
@@ -111,6 +118,11 @@ def parse_config(data):
         raise ContractError("hidden_paths must be a bounded list")
     for path in hidden:
         _plain_path(path, "hidden path")
+        # The build unit refuses these or silently drops them under its own mounts; refuse
+        # here, so provisioning fails instead of every build after its claim is spent.
+        if overlaps_unit_mount(path):
+            raise ContractError("hidden path " + path + " must not overlap a unit mount ("
+                                + ", ".join(sandbox.UNIT_MOUNTS) + ")")
     return config
 
 

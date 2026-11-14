@@ -36,6 +36,11 @@ OWNER_CONFIG = {
 }
 ROOT_POSIX = os.name == "posix" and os.geteuid() == 0
 SSH_KEYGEN = shutil.which("ssh-keygen")
+# Every status GitHub gives a run that is not completed; written out, not read from the tool.
+UNFINISHED = ("waiting", "pending", "queued", "requested", "in_progress")
+ACTIVE_LISTING = "repos/%s/actions/workflows/%s/runs?per_page=100&status=" % (
+    owner_issue.REPOSITORY, owner_issue.WORKFLOW)
+RUN_PATH = "repos/%s/actions/runs/" % owner_issue.REPOSITORY
 
 
 RUN_METADATA = {"id": 777, "status": "waiting", "event": "workflow_dispatch",
@@ -82,6 +87,8 @@ class FakeHost:
         self.branch_policies = {"total_count": 1,
                                 "branch_policies": [{"name": "main", "type": "branch"}]}
         self.active = {}  # --status -> unfinished runs of the workflow.
+        self.run_status = "waiting"  # What actions/runs/<id> reports.
+        self.environment_id = 55  # The gate's id in pending_deployments.
         self.run_ids = [777]  # Runs titled with the dispatched permit.
         self.appear_at = 0.0  # Fake time from which those runs are listed.
         self.refuse = lambda argv: False  # True: the command exits 1.
@@ -167,10 +174,12 @@ class FakeHost:
             return json.dumps({"total_count": len(rows), "workflow_runs": rows}).encode()
         if args[:2] == ["run", "cancel"]:
             return b""
-        if args[:2] == ["api", "repos/%s/actions/runs/777" % owner_issue.REPOSITORY]:
-            return json.dumps(RUN_METADATA).encode()
+        if args[0] == "api" and args[1].startswith(RUN_PATH) and args[1][len(RUN_PATH):].isdigit():
+            return json.dumps(dict(RUN_METADATA, id=int(args[1][len(RUN_PATH):]),
+                                   status=self.run_status)).encode()
         if args[:2] == ["api", "repos/%s/actions/runs/777/pending_deployments" % owner_issue.REPOSITORY]:
-            return json.dumps([{"environment": {"id": 55, "name": "massed-cpu-build"},
+            return json.dumps([{"environment": {"id": self.environment_id,
+                                                "name": "massed-cpu-build"},
                                 "current_user_can_approve": True}]).encode()
         if args[:3] == ["api", "-X", "POST"]:
             return b"[]"
@@ -276,9 +285,10 @@ class IssueFlowTests(unittest.TestCase):
         self.assertNotIn("unapproved_run", record)
         dispatch = next(i for i, argv in enumerate(self.host.calls) if argv[1:3] == ["workflow", "run"])
         before = self.host.calls[:dispatch]
-        self.assertEqual([argv[2].split("status=", 1)[1] for argv in before
-                          if argv[1] == "api" and "runs?per_page=100&status=" in argv[2]],
-                         list(owner_issue.ACTIVE_STATUSES))
+        self.assertEqual(owner_issue.ACTIVE_STATUSES, UNFINISHED)
+        self.assertEqual([argv[2] for argv in before
+                          if argv[1] == "api" and argv[2].startswith(ACTIVE_LISTING)],
+                         [ACTIVE_LISTING + status for status in UNFINISHED])
         self.assertFalse(any(argv[1:3] == ["run", "list"] for argv in self.host.calls))
         reach = [argv for argv in before if argv[0] == "ssh" and argv[-1] == "true"]
         self.assertEqual(len(reach), 1)
@@ -343,7 +353,7 @@ class IssueFlowTests(unittest.TestCase):
         self.assertIn("permit-installed", record["stages"])
         self.assertEqual(self.cancels(), [["run", "cancel", "777", "-R", owner_issue.REPOSITORY]])
         self.assertEqual(record["unapproved_run"], {"cancelled": [777], "rejected": [],
-                                                    "by_hand": None})
+                                                    "already_completed": [], "by_hand": None})
 
     def test_approval_cap_leaves_runner_pickup_time_before_the_claim_floor(self):
         self.assertEqual(owner_issue.WINDOW_SECONDS, owner_window.MAX_WINDOW_SECONDS)
@@ -480,7 +490,7 @@ class IssueFlowTests(unittest.TestCase):
         self.assertEqual(self.host.calls, [])
 
     def test_unfinished_runs_of_the_workflow_block_dispatch(self):
-        for status in owner_issue.ACTIVE_STATUSES:
+        for status in UNFINISHED:
             with self.subTest(status=status):
                 self.setUp()
                 self.host.active = {status: [
@@ -557,7 +567,7 @@ class IssueFlowTests(unittest.TestCase):
         record, _owner = self.issue()
         self.assertIn("at most 8 GPU compute processes", record["failure"])
         self.assertEqual(record["unapproved_run"], {"cancelled": [], "rejected": [777],
-                                                    "by_hand": None})
+                                                    "already_completed": [], "by_hand": None})
         self.assertEqual(len(self.approvals()), 1)
         self.assertIn("state=rejected", self.approvals()[0])
         self.assertIn("environment_ids[]=55", self.approvals()[0])
@@ -679,6 +689,7 @@ class IssueFlowTests(unittest.TestCase):
         self.host.run_ids = []
         record, _owner = self.issue()
         self.assertIn("dispatched run did not appear", record["failure"])
+        self.assertIn("the dispatched run was not found; find it with", record["failure"])
         self.assertIn("gh run list -R %s --workflow %s" % (owner_issue.REPOSITORY,
                                                            owner_issue.WORKFLOW), record["failure"])
         self.assertIn("CPU build permit " + record["permit_id"], record["failure"])
@@ -693,6 +704,124 @@ class IssueFlowTests(unittest.TestCase):
                 self.assertEqual(sorted(record["unapproved_run"]["cancelled"]), run_ids)
                 self.assertIsNone(record["unapproved_run"]["by_hand"])
                 self.assertEqual(self.approvals(), [])
+
+    def test_failed_dispatch_is_not_reported_as_a_dispatched_run_gone_missing(self):
+        self.host.run_ids = []
+        self.host.refuse = lambda argv: argv[1:3] == ["workflow", "run"]
+        record, _owner = self.issue()
+        steps = ("the dispatch did not complete, and GitHub may still have created a run; "
+                 + owner_issue.FIND_RUN % record["permit_id"])
+        self.assertEqual(record["failure"],
+                         "IssueError: dispatch workflow failed: refused by the test; " + steps)
+        self.assertNotIn("dispatched run was not found", record["failure"])
+        self.assertEqual(record["unapproved_run"]["by_hand"], steps)
+        self.assertEqual(self.cancels(), [])
+        # A dispatch that fails after GitHub created the run still has that run cancelled.
+        self.setUp()
+        host = self.host
+
+        def refuse(argv):
+            if argv[1:3] == ["workflow", "run"]:
+                host.permit_id = argv[-1].split("=", 1)[1]
+                return True
+            return False
+        host.refuse = refuse
+        record, _owner = self.issue()
+        self.assertEqual(record["failure"], "dispatch workflow failed: refused by the test")
+        self.assertEqual(record["unapproved_run"], {"cancelled": [777], "rejected": [],
+                                                    "already_completed": [], "by_hand": None})
+
+    def test_run_that_completed_before_approval_is_not_left_for_a_hand_cancel(self):
+        # gh refuses to cancel a completed run; there is nothing left to cancel.
+        self.host.run_status = "completed"
+        self.host.refuse = lambda argv: argv[1:3] == ["run", "cancel"]
+        record, _owner = self.issue()
+        self.assertEqual(record["failure"], "run completed before approval (configuration BLOCKED?)")
+        self.assertEqual(record["unapproved_run"], {"cancelled": [], "rejected": [],
+                                                    "already_completed": [777], "by_hand": None})
+        self.assertEqual(self.host.calls[-1], ["gh", "api", RUN_PATH + "777"])  # Then no reject.
+        # A run not read back as completed is still named for a hand cancel.
+        for read in (b'{"status": "in_progress"}', b'{"status": "Completed"}',
+                     b'[{"status": "completed"}]', b"completed", None):
+            with self.subTest(read=read):
+                self.setUp()
+                self.host.refuse = lambda argv, read=read: argv[1:3] == ["run", "cancel"] or (
+                    read is None and argv[1:] == ["api", RUN_PATH + "777"])
+                self.host.gh = lambda args, gh=self.host.gh, read=read: (
+                    read if args == ["api", RUN_PATH + "777"] else gh(args))
+                done = {"cancelled": [], "rejected": [], "already_completed": [], "by_hand": None}
+                self.assertIs(self.owner().withdraw("permit", 777, None, done), done)
+                self.assertEqual(done, {"cancelled": [], "rejected": [], "already_completed": [],
+                                        "by_hand": "cancel by hand: gh run cancel 777 -R "
+                                        + owner_issue.REPOSITORY})
+
+    def test_second_interrupt_during_withdraw_is_recorded_then_re_raised(self):
+        # Two titled runs stop the flow; Ctrl+C at the first cancel stops the withdraw too.
+        self.host.run_ids = [777, 778]
+        self.host.interrupt = lambda argv: (KeyboardInterrupt() if argv[1:4] == ["run", "cancel", "777"]
+                                            else None)
+        record, errors = owner_issue.new_record(), io.StringIO()
+        with self.assertRaises(KeyboardInterrupt), contextlib.redirect_stderr(errors):
+            owner_issue.issue(self.args, record, owner=self.owner())
+        steps = "cancel by hand: gh run cancel 777 -R %s; gh run cancel 778 -R %s" % (
+            owner_issue.REPOSITORY, owner_issue.REPOSITORY)
+        self.assertEqual(record["unapproved_run"], {"cancelled": [], "rejected": [],
+                                                    "already_completed": [], "by_hand": steps})
+        self.assertEqual(self.host.calls[-1][1:4], ["run", "cancel", "777"])  # Nothing after it.
+        self.assertIn("CPU BUILD STOPPED: " + steps, errors.getvalue())
+        # Through main, the receipt still names both runs.
+        self.setUp()
+        self.host.run_ids = [777, 778]
+        self.host.interrupt = lambda argv: (KeyboardInterrupt() if argv[1:4] == ["run", "cancel", "777"]
+                                            else None)
+        with self.assertRaises(KeyboardInterrupt):
+            self.main()
+        receipt = json.loads(next((self.root / "evidence").glob("owner-issue-*.json")).read_text())
+        self.assertEqual(receipt["unapproved_run"]["by_hand"], steps)
+
+    def test_by_hand_step_is_recorded_before_the_withdraw_runs(self):
+        owner = self.owner()
+
+        def stop(*_args):
+            raise KeyboardInterrupt
+        owner.sign = owner.withdraw = stop  # Ctrl+C at the prompt, then again at once.
+        record, errors = owner_issue.new_record(), io.StringIO()
+        with self.assertRaises(KeyboardInterrupt), contextlib.redirect_stderr(errors):
+            owner_issue.issue(self.args, record, owner=owner)
+        steps = "cancel by hand: gh run cancel 777 -R " + owner_issue.REPOSITORY
+        self.assertEqual(record["unapproved_run"], {"cancelled": [], "rejected": [],
+                                                    "already_completed": [], "by_hand": steps})
+        self.assertIn("CPU BUILD STOPPED: " + steps, errors.getvalue())
+
+    def test_signing_timeout_at_the_passphrase_prompt_is_a_clean_stop_that_cancels(self):
+        self.host.interrupt = lambda argv: (subprocess.TimeoutExpired(argv, 300)
+                                            if argv[0] == "ssh-keygen" else None)
+        owner = owner_issue.Owner(self.args, run=self.host, sleep=self.host.sleep,
+                                  clock=self.host.clock)  # The real sign, not FakeOwner's.
+        with self.assertRaisesRegex(owner_issue.IssueError, "^owner signing timed out after 300 s$"):
+            owner_issue.issue(self.args, owner_issue.new_record(), owner=owner)
+        signing = [(argv, options) for argv, options in zip(self.host.calls, self.host.options)
+                   if argv[0] == "ssh-keygen"]
+        self.assertEqual(len(signing), 1)
+        self.assertEqual(signing[0][0][:7], ["ssh-keygen", "-Y", "sign", "-f", "key", "-n",
+                                             signature.NAMESPACE])
+        self.assertEqual(signing[0][1]["timeout"], 300)
+        self.assertEqual(self.cancels(), [["run", "cancel", "777", "-R", owner_issue.REPOSITORY]])
+        self.assertEqual(self.approvals(), [])
+        self.assertFalse(any(argv[0] == "ssh" and "-t" in argv for argv in self.host.calls))
+
+    def test_gate_with_a_non_integer_environment_id_is_never_approved(self):
+        for environment_id in ("55", True, 55.0, None):
+            with self.subTest(environment_id=environment_id):
+                self.setUp()
+                self.host.environment_id = environment_id
+                record, owner = self.issue()
+                self.assertIn("the owner cannot approve exactly one massed-cpu-build gate",
+                              record["failure"])
+                self.assertFalse(hasattr(owner, "signed"))
+                self.assertEqual(self.approvals(), [])
+                self.assertEqual(self.cancels(), [["run", "cancel", "777", "-R",
+                                                   owner_issue.REPOSITORY]])
 
     def test_subprocess_timeouts_become_clean_issue_errors(self):
         for name, match, stage in (

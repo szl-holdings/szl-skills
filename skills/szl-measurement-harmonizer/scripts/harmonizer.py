@@ -11,7 +11,7 @@ import json
 import os
 import re
 import stat
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import Context, Decimal, InvalidOperation, ROUND_HALF_EVEN, localcontext
 from pathlib import Path, PurePosixPath
 
 SCHEMA = "szl.measurement-harmonizer.v1"
@@ -217,8 +217,7 @@ def harmonize(manifest: object, root: str | Path) -> dict:
                     canonical_id = source["id_map"][raw_id]
                     canonical_seen.add(canonical_id)
                     value = _decimal(raw_value)
-                    with localcontext() as context:
-                        context.prec = 50
+                    with localcontext(Context(prec=50, rounding=ROUND_HALF_EVEN, Emax=500, Emin=-500)):
                         normalized = value * scale + offset
                     staged.append({"source": sid, "row": number, "observed_id": raw_id,
                                    "canonical_id": canonical_id, "raw_value": raw_value,

@@ -1,6 +1,7 @@
 """The harmonizer must refuse ambiguous joins and changed source bytes."""
 
 import copy
+import decimal
 import hashlib
 import json
 import pathlib
@@ -29,6 +30,43 @@ class MeasurementHarmonizerTests(unittest.TestCase):
         self.assertEqual({row["normalized_value"] for row in groups["specimen-1"]}, {"298.15"})
         self.assertEqual({row["normalized_value"] for row in groups["specimen-2"]}, {"293.15"})
         self.assertEqual({row["raw_value"] for row in groups["specimen-1"]}, {"25", "298.15"})
+
+    def test_decimal_rounding_traps_and_exponent_bounds_are_caller_independent(self):
+        # The supported coefficient/exponent limits can require rounding even
+        # though each operand is exact. Use integer arithmetic for the oracle.
+        raw = "999999999999999999999999e20"
+        expected_value = str((10 ** 24 - 1) ** 2 * 10 ** 40)
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            sources = []
+            for name in ("lab-a", "lab-b"):
+                content = f"id,value\nitem,{raw}\n".encode()
+                (root / f"{name}.csv").write_bytes(content)
+                sources.append({"id": name, "path": f"{name}.csv",
+                                "sha256": hashlib.sha256(content).hexdigest(),
+                                "id_column": "id", "value_column": "value", "unit": "raw",
+                                "id_map": {"item": "specimen-1"}})
+            manifest = {"schema": IMPL["SCHEMA"], "sources": sources,
+                        "expected_ids": ["specimen-1"], "target_unit": "normalized",
+                        "conversions": {"raw": {"scale": raw, "offset": "1e-20"},
+                                        "normalized": {"scale": "1", "offset": "0"}}}
+            expected = HARMONIZE(manifest, root)
+            self.assertEqual(expected["status"], "HARMONIZED")
+            self.assertEqual([row["normalized_value"] for row in expected["rows"]],
+                             [expected_value, expected_value])
+            for mode in ("rounding", "traps", "exponents"):
+                with self.subTest(mode=mode), decimal.localcontext() as context:
+                    context.prec = 3
+                    if mode == "rounding":
+                        context.rounding = decimal.ROUND_UP
+                    elif mode == "traps":
+                        context.traps[decimal.Inexact] = True
+                        context.traps[decimal.Rounded] = True
+                    else:
+                        context.Emax, context.Emin = 2, -2
+                    context.clear_flags()
+                    self.assertEqual(HARMONIZE(manifest, root), expected)
+                    self.assertFalse(any(context.flags.values()))
 
     def test_changed_file_blocks_all_rows(self):
         with tempfile.TemporaryDirectory() as temp:

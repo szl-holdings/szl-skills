@@ -14,7 +14,9 @@ The [source inventory](SKILL_INVENTORY.json) is generated from the current SKILL
 and marketplace entries; run `python -B tools/skill_inventory.py` to check it. These
 historical evidence sets establish neither application import nor measured agent efficacy.
 
-The aggregate `skills/` source budget is 1,075,000 bytes. It moved from 1,000,000 to
+The aggregate `skills/` source budget is 1,083,000 bytes, the limit enforced by
+`tools/selfcheck.py` and exercised at its exact boundary by the repository tests.
+It moved from 1,000,000 to
 1,025,000 for the two synthetic rare-disease tools, then to 1,050,000 for the
 reporting-guideline family. At main `71b513ae2a3697466a3e8e0ec0f3599d6bfac4a6`,
 the 267 tracked skill-resource files measured 1,042,966 bytes. Moving the pilot's four
@@ -23,10 +25,17 @@ skill-resource bytes. The former 1,050,000-byte cap would reject this packaging-
 graduation by 13,537 bytes; this change therefore raises only that aggregate source
 cap to 1,065,000 bytes, leaving 1,463 bytes of headroom. Regression tests live in the
 repository test suite. The measurements exclude generated, ignored Python caches.
-The two-cutoff synthetic evidence-delta addition brings tracked `skills/` resources to
-1,074,143 bytes, 10,606 above that baseline. The reviewed aggregate allowance is therefore
-1,075,000 bytes, leaving 857 bytes of headroom; the exact-limit and one-byte-over tests
-remain active. This is a source-volume allowance, not evidence of host import or clinical use.
+The two-cutoff synthetic evidence-delta addition brought tracked `skills/` resources
+to 1,074,143 bytes, 10,606 above that baseline; the allowance at that point was
+1,075,000 bytes, leaving 857 bytes of headroom. Later additions raised the allowance
+to 1,082,000 bytes, and the figure-data-contract scope-gap fix raised it from
+1,082,000 to 1,083,000 bytes, as recorded in the unreleased changelog notes above.
+At the current source state, the 274 tracked skill-resource files measure 1,082,977
+bytes, leaving 23 bytes of headroom; the exact-limit and one-byte-over tests
+remain active. `tools/selfcheck.py` skips ignored `__pycache__` files when it measures,
+as the packager, installer and inventory already do, and it writes no bytecode itself,
+so a cache left by running a skill helper cannot fail the gate.
+This is a source-volume allowance, not evidence of host import or clinical use.
 The SDK limits remain 200,000 bytes per skill, 1,000,000 bytes per staging batch and
 eight batches. Doctrine and honest-status checks are unchanged.
 The aggregate repository budget is not an application
@@ -72,8 +81,19 @@ Recomputed against all 113 retained held-out targets:
 
 | Saved outputs | Label accuracy | State accuracy | Joint label/state/ordered-evidence accuracy | Invalid outputs |
 |---|---:|---:|---:|---:|
-| Baseline | 0/113 | 0/113 | 0/113 | 113 |
+| Baseline (negative control) | 0/113 | 0/113 | 0/113 | 113 |
 | Seed 011 | 113/113 | 113/113 | 112/113 | 0 |
+
+The baseline row is the study's declared negative control, not a replay defect. All 113
+saved baseline records carry `"parsed": null`: the unadapted base model
+(`unsloth/Qwen3.5-0.8B`, no LoRA adapter) emitted free-text prose under the study's declared
+decoding (greedy, `malformed_json_repair` disabled). The replay counts those outputs as
+invalid in the denominator by design, and the row exactly reproduces the study's own
+`evidence/evaluation/metrics-base.json` at the pinned revision (`strict_json` 0,
+`failure_rows` 113; the downloaded file hashes match the study's
+`held_manifest_sha256`/`predictions_sha256` declarations). The 2026-11-05 audit
+[validation/science/triage-study5-baseline-audit.json](validation/science/triage-study5-baseline-audit.json)
+reproduced both rows locally and records this baseline as VALIDATED_AS_DECLARED_NEGATIVE_CONTROL.
 
 The capsule and completion record matched, with no changed sources. Stored correctness flags
 were ignored; missing outputs stay in the denominator. Inputs are synthetic and the model

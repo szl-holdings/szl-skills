@@ -1,0 +1,66 @@
+{
+  "schema": "szl.triage-study5-replay-audit.v1",
+  "investigated_claim": "VALIDATION.md pinned triage baseline 0/113 with 113 invalid outputs reads as a baseline failure",
+  "verdict": "NOT_A_HARNESS_FAILURE",
+  "root_cause": "All 113 saved baseline records carry \"parsed\": null because the unadapted base model (unsloth/Qwen3.5-0.8B, no LoRA adapter) emitted free-text prose, not structured JSON, under the study's declared decoding (greedy do_sample=false, max_new_tokens=192, malformed_json_repair=false). The workbench replays saved declarations and counts invalid outputs in the denominator by design; the 0/113 row exactly reproduces the study's own negative control.",
+  "study_source": {
+    "repo": "SZLHOLDINGS/szl-triage-qwen3.5-0.8b-lora-study5",
+    "revision": "eb79a26a2934d5eaa667984720feacdcb90dcc28",
+    "study_own_baseline_metrics": {
+      "file": "evidence/evaluation/metrics-base.json",
+      "model_source": "unsloth/Qwen3.5-0.8B",
+      "strict_json": 0,
+      "label_exact": 0,
+      "state_exact": 0,
+      "joint_exact": 0,
+      "failure_rows": 113,
+      "predictions_sha256": "2988e770877a9109232eef3c3740b308d06ef0465f2ec670ccaf86797a4d8dbd"
+    },
+    "study_readme_table": "base row declares Valid JSON 0.0%, Label 0.0%, State 0.0%, Joint 0.0%, Failure rows 113; all five seed adapters declare 100.0%"
+  },
+  "local_reproduction": {
+    "date_utc": "2026-11-05",
+    "host": "Windows Python 3.11",
+    "workbench_run_id": "20261105T021520556141Z-6abba1fd0e40",
+    "pinned_file_receipts_sha256": {
+      "train.jsonl": "c498b3d4be6d5b04b89b537941bddd35155b275b0643060899b736730a22e1ad",
+      "held.jsonl": "04c37f596ffeb89b3da0522812e9ae1cff78d5a4dbe684e9ca2104a81482fd4d",
+      "predictions-base.jsonl": "2988e770877a9109232eef3c3740b308d06ef0465f2ec670ccaf86797a4d8dbd",
+      "predictions-seed-011.jsonl": "f496d9a93623c40af13838a93701e7a3a317283be47e9a2bfb3399908bc3e63a"
+    },
+    "sha256_bindings": [
+      "held.jsonl sha256 equals study held_manifest_sha256 04c37f596ffeb89b3da0522812e9ae1cff78d5a4dbe684e9ca2104a81482fd4d",
+      "predictions-base.jsonl sha256 equals study predictions_sha256 in metrics-base.json"
+    ],
+    "recomputed_baseline_check": {
+      "n": 113,
+      "label_accuracy": 0.0,
+      "state_accuracy": 0.0,
+      "joint_label_state_evidence_accuracy": 0.0,
+      "invalid_outputs": 113,
+      "matches_validation_md_row": true
+    },
+    "recomputed_seed_011_check": {
+      "n": 113,
+      "label_accuracy": 1.0,
+      "state_accuracy": 1.0,
+      "joint_label_state_evidence_accuracy": 0.9911504424778761,
+      "invalid_outputs": 0,
+      "matches_validation_md_row": true
+    }
+  },
+  "harness_behavior_review": {
+    "invalid_output_rule": "library/model.py szl_evaluate_categories treats parsed==null or a parsed object missing label-in-label_set/state-string/evidence-string-list as invalid; the label_set comes from the retained held-out rows, so no label-mapping drift is possible",
+    "duplicate_unmatched_or_target_mismatch_records": "raise instead of scoring",
+    "regression_tests": "tests/test_science_workbench.py CategoricalTests already covers a parsed-null record with 0.5 label accuracy and 1 invalid output",
+    "chat_template_or_decoding": "not applicable; the workbench never runs inference, it replays saved parsed declarations"
+  },
+  "adapter_base_binding_audit": {
+    "suspicion_checked": "saved baseline predictions produced against a different model or prompt format than the harness expects",
+    "finding": "No adapter/base swap. The baseline file is bound to the unadapted base model by metrics-base.json model_source, and its sha256 matches the pinned download. Whether the base model was prompted with the adapter chat format is a study-side declaration; the workbench records prediction_model_binding=DECLARED_ONLY and model_loaded=false, so no fresh-inference verification claim is made anywhere",
+    "fresh_inference_verification": "NOT_PERFORMED_BY_DESIGN; the replay is a saved-declaration audit, not a model rerun"
+  },
+  "baseline_status": "VALIDATED_AS_DECLARED_NEGATIVE_CONTROL",
+  "status_reason": "The 0/113 baseline row is the exact reproduction of the pinned study's declared base-model negative control, not a replay defect. No fresh inference was run, so the row remains a saved-declaration replay, not an independent model measurement.",
+  "signed": false
+}
