@@ -21,6 +21,8 @@ with time. **No external code was installed or executed.**
 
 ### Agent evaluation and adaptive search
 
+- [Self-Harness (arXiv:2606.09498)](https://arxiv.org/abs/2606.09498) is a genuine, separately named 2026 paper proposing weakness mining -> harness proposal -> regression validation. Its reported experiments are not evidence for the social poster's distinct 41-round/0.31-to-0.64 assertion.
+- [Meta-Harness (arXiv:2603.28052)](https://arxiv.org/abs/2603.28052) presents an outer-loop harness optimization method, while [Meta-squared (arXiv:2611.05139)](https://arxiv.org/abs/2611.05139) studies reusable evolution guidance rather than one universal harness.
 - [Google DeepMind AlphaEvolve technical report (arXiv:2506.13131)](https://arxiv.org/abs/2506.13131): model-proposed program revisions with externally executable evaluators. Promising **pattern**: frozen, reproducible graders and independently verified candidate programs, not a proof that every agent loop improves.
 - [Wang et al., *Rethinking the Evaluation of Harness Evolution for Agents* (arXiv:2607.12227)](https://arxiv.org/abs/2607.12227): test-time scaling baselines, matched compute and feedback, and unseen-task transfer are essential. The authors find that harness evolution does not consistently beat simpler approaches and has limited held-out generalization.
 - [Wang et al., *Beneath the Surface* (arXiv:2611.07624)](https://arxiv.org/abs/2611.07624): evolution can gain tasks while losing previous coverage and increasing deployment cost; preserve prior coverage and measure budget.

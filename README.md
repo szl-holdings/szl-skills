@@ -76,6 +76,8 @@ into `.claude/skills/` or `~/.claude/skills/`.
 
 Community index with pinned commits and automated checks: https://github.com/ai4science-skills/skills
 
+For offline, **unattested** adaptive harness-selection evidence review (not an installable skill), see [the November frontier survey](docs/FRONTIER_HARNESS_SECURITY_AUDIT_2026-11-16.md) and run `python -B tools/harness_selection_audit.py path/to/operator-review.json`. It cannot execute candidates, certify model quality or authorize a release.
+
 ## Start here
 
 | If you want to... | Use | It tells you |
