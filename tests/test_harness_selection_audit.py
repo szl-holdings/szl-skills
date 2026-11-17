@@ -45,14 +45,16 @@ def fixture():
                     "round": index,
                     "candidates": [
                         {
-                            "candidate_id": "trial-good",
-                            "harness_sha256": winner,
+                            "candidate_id": f"trial-good-{index}",
+                            "harness_sha256": winner if index == 3 else str(index) * 64,
                             "correct": 39 + index,
                             "total": 50,
                         },
                         {
-                            "candidate_id": "trial-bad",
-                            "harness_sha256": loser,
+                            "candidate_id": f"trial-bad-{index}",
+                            "harness_sha256": loser
+                            if index == 3
+                            else str(index + 3) * 64,
                             "correct": 30 + index,
                             "total": 50,
                         },
@@ -99,7 +101,8 @@ class AuditTests(unittest.TestCase):
             r["hold_reasons"], ["NO_INDEPENDENT_INPUT_OR_EXECUTION_WITNESS"]
         )
         self.assertEqual(r["selection"]["candidate_evaluations"], 6)
-        self.assertEqual(r["selection"]["unique_harness_hashes"], 2)
+        self.assertEqual(r["selection"]["unique_harness_hashes"], 6)
+        self.assertEqual(r["selection"]["same_harness_hashes_with_changed_scores"], 0)
         self.assertEqual(r["selection"]["reported_control_passes"], 2)
         self.assertAlmostEqual(r["final_test"]["paired_difference"], 23 / 80)
         self.assertLess(r["final_test"]["nominal_one_sided_exact_mcnemar_p"], 0.05)
@@ -110,6 +113,47 @@ class AuditTests(unittest.TestCase):
             "production_ready",
         ):
             self.assertIs(r[key], False)
+
+    def test_unchanged_harness_cannot_fake_round_improvement(self):
+        data = fixture()
+        first = data["development"]["rounds"][0]["candidates"][0]
+        second = data["development"]["rounds"][1]["candidates"][0]
+        second["harness_sha256"] = first["harness_sha256"]
+        result = report(data)
+        self.assertEqual(result["state"], "HOLD_INCOMPLETE_OR_CONTRADICTORY_EVIDENCE")
+        self.assertIn(
+            "REPEATED_UNCHANGED_HARNESS_HAS_UNEXPLAINED_SCORE_DRIFT",
+            result["hold_reasons"],
+        )
+        self.assertEqual(
+            result["selection"]["same_harness_hashes_with_changed_scores"], 1
+        )
+
+    def test_identical_repeated_harness_same_score_is_not_invented_progress(self):
+        data = fixture()
+        first = data["development"]["rounds"][0]["candidates"][0]
+        second = data["development"]["rounds"][1]["candidates"][0]
+        second["harness_sha256"] = first["harness_sha256"]
+        second["correct"] = first["correct"]
+        result = report(data)
+        self.assertEqual(result["selection"]["unique_harness_hashes"], 5)
+        self.assertEqual(
+            result["selection"]["same_harness_hashes_with_changed_scores"], 0
+        )
+        self.assertEqual(result["state"], "UNATTESTED_REVIEW_CANDIDATE")
+
+    def test_reusing_candidate_id_for_new_bytes_is_invalid(self):
+        data = fixture()
+        first_id = data["development"]["rounds"][0]["candidates"][0]["candidate_id"]
+        data["development"]["rounds"][1]["candidates"][0]["candidate_id"] = first_id
+        with self.assertRaisesRegex(ValueError, "candidate_id_rebound"):
+            report(data)
+
+    def test_extreme_json_integer_rejected_without_overflow(self):
+        data = fixture()
+        data["pre_registration"]["alpha"] = 10**2000
+        with self.assertRaisesRegex(ValueError, "alpha_out_of_bounds"):
+            report(data)
 
     def test_nominal_exact_tail_known_small_cases(self):
         self.assertEqual(h.exact_binomial_tail(0, 0), 1.0)
@@ -256,7 +300,9 @@ class AuditTests(unittest.TestCase):
                 correct=5.5
             ),
             lambda d: d["development"]["rounds"][0]["candidates"][1].update(
-                candidate_id="trial-good"
+                candidate_id=d["development"]["rounds"][0]["candidates"][0][
+                    "candidate_id"
+                ]
             ),
             lambda d: d["sealed_test"]["paired"].update(both_correct=33),
             lambda d: d["sealed_test"]["paired"].update(candidate_only=True),

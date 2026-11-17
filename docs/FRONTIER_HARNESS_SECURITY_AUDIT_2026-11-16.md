@@ -33,7 +33,10 @@ with time. **No external code was installed or executed.**
 (iii) **a different sealed, frozen, never-feedback-driven final set**, used once,
 (iv) match total model calls and actual time/cost against sampling/refinement
 baselines, (v) preserve previous working tasks, (vi) report source/data hashes
-and explicit authority with no automatic promotion.
+and explicit authority with no automatic promotion. Identical harness bytes
+with different scores on the *same declared development dataset* remain a
+HOLD unless the execution/decoding variability is explicitly auditable;
+candidate IDs cannot silently acquire different hashes.
 
 ### Skills and software engineering — GitHub API readback (2026-11-17 UTC)
 

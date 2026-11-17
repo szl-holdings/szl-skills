@@ -52,8 +52,12 @@ def boolean(value: object, field: str) -> bool:
 
 def number(value: object, field: str, low: float, high: float) -> float:
     require(type(value) in (int, float), field + "_must_be_number")
-    require(math.isfinite(value) and low <= value <= high, field + "_out_of_bounds")
-    return float(value)
+    # Check bounds before converting to float: huge but legal JSON integers
+    # otherwise raise OverflowError inside math.isfinite and escape the CLI.
+    require(low <= value <= high, field + "_out_of_bounds")
+    parsed = float(value)
+    require(math.isfinite(parsed), field + "_out_of_bounds")
+    return parsed
 
 
 def positive_int(value: object, field: str, cap: int) -> int:
@@ -191,7 +195,8 @@ def audit(raw: bytes) -> dict:
     )
     all_candidate_ids = set()
     all_snapshots = []
-    final_dev_scores = {}
+    by_candidate_id = {}
+    score_sets_by_hash = {}
     for index, rnd in enumerate(rounds, start=1):
         r = exact(rnd, {"round", "candidates"}, "round")
         require(type(r["round"]) is int and r["round"] == index, "nonsequential_round")
@@ -217,6 +222,8 @@ def audit(raw: bytes) -> dict:
             local.add(c["candidate_id"])
             all_candidate_ids.add(c["candidate_id"])
             digest = sha(c["harness_sha256"], "harness")
+            old_hash = by_candidate_id.setdefault(c["candidate_id"], digest)
+            require(old_hash == digest, "candidate_id_rebound_to_different_hash")
             require(
                 type(c["total"]) is int and c["total"] == n_dev, "denominator_mismatch"
             )
@@ -225,8 +232,11 @@ def audit(raw: bytes) -> dict:
                 "invalid_correct_count",
             )
             all_snapshots.append(digest)
-            final_dev_scores[digest] = c["correct"]
+            score_sets_by_hash.setdefault(digest, set()).add(c["correct"])
     require(len(set(all_snapshots)) >= 1, "no_candidate_snapshots")
+    # Same hash, same grader, same dataset but changed scores might be
+    # stochastic; absent a declared decoding/seed trace, it cannot qualify.
+    drifting_scores = sum(len(scores) > 1 for scores in score_sets_by_hash.values())
 
     seal = exact(
         data["sealed_test"],
@@ -291,6 +301,8 @@ def audit(raw: bytes) -> dict:
     p_value = exact_binomial_tail(candidate_only, baseline_only)
 
     problems = []
+    if drifting_scores:
+        problems.append("REPEATED_UNCHANGED_HARNESS_HAS_UNEXPLAINED_SCORE_DRIFT")
     if not frozen:
         problems.append("GRADER_NOT_FROZEN")
     if not controls_passed:
@@ -344,6 +356,7 @@ def audit(raw: bytes) -> dict:
             "rounds": len(rounds),
             "candidate_evaluations": len(all_snapshots),
             "unique_harness_hashes": len(set(all_snapshots)),
+            "same_harness_hashes_with_changed_scores": drifting_scores,
             "distinct_candidate_ids": len(all_candidate_ids),
             "development_reused_across_rounds": len(rounds) > 1,
             "development_is_final_test": final_hash == dev_hash,
